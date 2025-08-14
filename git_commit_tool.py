@@ -154,7 +154,7 @@ def clean_commit_message(message):
     :param message: 原始提交信息
     :return: 处理后的提交信息
     """
-    cleaned_message = re.sub(r'^(feat|fix|refactor|chore|docs|style|test|perf|ci|build|revert):\s*', '', message, flags=re.IGNORECASE)
+    cleaned_message = re.sub(r'^(feat|fix|refactor|chore|docs|style|test|perf|ci|build|revert|init):\s*', '', message, flags=re.IGNORECASE)
     cleaned_message = cleaned_message.replace("['']", "").replace('"', '')
     return cleaned_message
 
