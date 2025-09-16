@@ -173,36 +173,45 @@ def save_commits_to_file(commits, messages, output_file, detailed_output, projec
     try:
         output_file = os.path.abspath(output_file)
 
+        # 先构建完整文本内容，便于同时写入文件与回显到终端
+        output_text_parts = []
+
+        if detailed_output:
+            for commit in commits:
+                output_text_parts.append(commit + '\n\n')
+                output_text_parts.append('\n' + '='*40 + '\n')
+                output_text_parts.append('Summary of all commit messages:\n\n')
+
+        for entry in messages:
+            if isinstance(entry, tuple) and len(entry) == 2:
+                repo_path, message = entry
+                project_name = os.path.basename(repo_path)
+                cleaned_message = clean_commit_message(message)
+                current_branch = get_current_branch(repo_path)
+
+                # 首先检查是否有精确匹配的项目名+分支名
+                custom_project_name = project_names.get(f"{project_name}({current_branch})", "")
+
+                # 如果没有精确匹配，检查是否有通配符匹配
+                if not custom_project_name:
+                    wildcard_key = f"{project_name}(*)"
+                    custom_project_name = project_names.get(wildcard_key, "")
+
+                # 生成输出内容
+                if show_project_and_branch:
+                    output_line = f"{project_name}({current_branch}) - {custom_project_name}{cleaned_message}\n"
+                else:
+                    output_line = f"{custom_project_name}{cleaned_message}\n"
+
+                output_text_parts.append(output_line)
+
+        output_text = ''.join(output_text_parts)
+
         with open(output_file, 'w', encoding='utf-8') as f:
-            if detailed_output:
-                for commit in commits:
-                    f.write(commit + '\n\n')
-                    f.write('\n' + '='*40 + '\n')
-                    f.write('Summary of all commit messages:\n\n')
-            
-            for entry in messages:
-                if isinstance(entry, tuple) and len(entry) == 2:
-                    repo_path, message = entry
-                    project_name = os.path.basename(repo_path)
-                    cleaned_message = clean_commit_message(message)
-                    current_branch = get_current_branch(repo_path)
-                    
-                    # 首先检查是否有精确匹配的项目名+分支名
-                    custom_project_name = project_names.get(f"{project_name}({current_branch})", "")
-                    
-                    # 如果没有精确匹配，检查是否有通配符匹配
-                    if not custom_project_name:
-                        wildcard_key = f"{project_name}(*)"
-                        custom_project_name = project_names.get(wildcard_key, "")
+            f.write(output_text)
 
-                    # 生成输出内容
-                    if show_project_and_branch:
-                        output_line = f"{project_name}({current_branch}) - {custom_project_name}{cleaned_message}\n"
-                    else:
-                        output_line = f"{custom_project_name}{cleaned_message}\n"
-
-                    f.write(output_line)
-        
         print(f"File successfully saved at: {output_file}")
+        return output_text
     except Exception as e:
         print(f"Failed to save file: {e}")
+        return ""

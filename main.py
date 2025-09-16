@@ -54,6 +54,8 @@ if __name__ == "__main__":
     output_file = os.path.join(os.path.expanduser(output_directory), f"git_commits_{date_part}.txt")
     
     if all_commits:
-        save_commits_to_file(all_commits, all_messages, output_file, detailed_output, project_names, show_project_and_branch)
+        output_text = save_commits_to_file(all_commits, all_messages, output_file, detailed_output, project_names, show_project_and_branch)
+        if output_text:
+            print(output_text)
     else:
         print(f"No commits found for {start_date} to {end_date}")
