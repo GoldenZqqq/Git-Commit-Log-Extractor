@@ -76,8 +76,10 @@ def find_git_repos(root_dir, max_depth=None):
 def get_current_branch(repo_path):
     """获取当前Git分支名称"""
     try:
-        os.chdir(repo_path)  # 切换到指定的仓库路径
-        return subprocess.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD']).strip().decode('utf-8')
+        return subprocess.check_output(
+            ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
+            cwd=repo_path
+        ).strip().decode('utf-8')
     except subprocess.CalledProcessError:
         return "unknown branch"
 
@@ -94,12 +96,10 @@ def get_git_commits(repo_path, start_date, end_date, author, pull_latest_code, e
     :return: 提交记录和提交信息列表
     """
     try:
-        os.chdir(repo_path)
-
         # 根据配置决定是否拉取最新代码
         if pull_latest_code:
             pull_command = ['git', 'pull']
-            subprocess.run(pull_command, check=True)
+            subprocess.run(pull_command, check=True, cwd=repo_path)
 
         commits = []
         messages = []
@@ -112,7 +112,7 @@ def get_git_commits(repo_path, start_date, end_date, author, pull_latest_code, e
                 '--since="{} 00:00:00"'.format(start_date),
                 '--until="{} 23:59:59"'.format(end_date),
                 '--author={}'.format(author),
-                '--pretty=format:Hash: %H%nAuthor: %an%nDate: %ad%nMessage: %B%n',
+                '--pretty=format:%x1eHash: %H%nAuthor: %an%nDate: %ad%nMessage: %B',
                 '--date=iso'
             ]
         else:
@@ -122,15 +122,22 @@ def get_git_commits(repo_path, start_date, end_date, author, pull_latest_code, e
                 '--since="{} 00:00:00"'.format(start_date),
                 '--until="{} 23:59:59"'.format(end_date),
                 '--author={}'.format(author),
-                '--pretty=format:Hash: %H%nAuthor: %an%nDate: %ad%nMessage: %B%n',
+                '--pretty=format:%x1eHash: %H%nAuthor: %an%nDate: %ad%nMessage: %B',
                 '--date=iso'
             ]
 
 
-        result = subprocess.run(git_log_command, capture_output=True, text=True, check=True, encoding='utf-8')
+        result = subprocess.run(
+            git_log_command,
+            capture_output=True,
+            text=True,
+            check=True,
+            encoding='utf-8',
+            cwd=repo_path
+        )
 
         if result.stdout:
-            for commit in result.stdout.strip().split('\n\n'):
+            for commit in result.stdout.split('\x1e'):
                 if commit:
                     cleaned_commit = f"Repository: {repo_path}\n{commit.strip()}"
                     commits.append(cleaned_commit)
@@ -156,6 +163,7 @@ def clean_commit_message(message):
     """
     cleaned_message = re.sub(r'^(feat|fix|refactor|chore|docs|style|test|perf|ci|build|revert|init):\s*', '', message, flags=re.IGNORECASE)
     cleaned_message = cleaned_message.replace("['']", "").replace('"', '')
+    cleaned_message = re.sub(r'\s+', ' ', cleaned_message).strip()
     return cleaned_message
 
 
