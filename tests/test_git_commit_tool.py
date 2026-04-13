@@ -3,7 +3,12 @@ import subprocess
 import tempfile
 import unittest
 
-from git_commit_tool import get_git_commits, save_commits_to_file
+from git_commit_tool import (
+    get_current_branch,
+    get_git_commits,
+    prompt_for_missing_project_names,
+    save_commits_to_file,
+)
 
 
 class GitCommitToolTests(unittest.TestCase):
@@ -54,10 +59,39 @@ class GitCommitToolTests(unittest.TestCase):
                 )
 
                 self.assertIn(
-                    "扩展问卷题目选项上限到20项 - 将单选题和多选题的选项渲染上限从 12 调整为 20 - 抽出页面级选项上限配置，便于后续续封扩展",
+                    "扩展问卷题目选项上限到20项；将单选题和多选题的选项渲染上限从 12 调整为 20；抽出页面级选项上限配置，便于后续续封扩展",
                     output_text,
                 )
                 self.assertNotIn("\n- 将单选题和多选题的选项渲染上限从 12 调整为 20", output_text)
+            finally:
+                os.chdir(original_cwd)
+
+    def test_prompt_for_missing_project_names_updates_config_file(self):
+        original_cwd = os.getcwd()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            try:
+                self._init_repo_with_multiline_commit(temp_dir)
+                config_file = os.path.join(temp_dir, "config.yaml")
+                config = {"project_names": {}}
+                answers = iter(["y", "示例项目-"])
+
+                prompt_for_missing_project_names(
+                    messages=[(temp_dir, "fix: 新增命令行补齐项目映射")],
+                    config=config,
+                    config_file=config_file,
+                    input_func=lambda _: next(answers),
+                    print_func=lambda _: None,
+                )
+
+                current_branch = get_current_branch(temp_dir)
+                expected_key = f"{os.path.basename(temp_dir)}({current_branch})"
+
+                self.assertEqual(config["project_names"][expected_key], "示例项目-")
+
+                with open(config_file, "r", encoding="utf-8") as file:
+                    saved_text = file.read()
+
+                self.assertIn(f"{expected_key}: 示例项目-", saved_text)
             finally:
                 os.chdir(original_cwd)
 

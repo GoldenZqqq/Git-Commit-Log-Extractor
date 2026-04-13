@@ -51,6 +51,17 @@ def load_config(config_file="config.yaml"):
         return {}
 
 
+def save_config(config, config_file="config.yaml"):
+    """
+    将配置保存回 YAML 文件。
+
+    :param config: 配置字典
+    :param config_file: 配置文件路径
+    """
+    with open(config_file, 'w', encoding='utf-8') as file:
+        yaml.safe_dump(config, file, allow_unicode=True, sort_keys=False)
+
+
 def find_git_repos(root_dir, max_depth=None):
     """
     递归查找 root_dir 下的所有 git 仓库。
@@ -82,6 +93,104 @@ def get_current_branch(repo_path):
         ).strip().decode('utf-8')
     except subprocess.CalledProcessError:
         return "unknown branch"
+
+
+def get_project_mapping_key(project_name, branch_name):
+    """生成项目名称映射的精确 key。"""
+    return f"{project_name}({branch_name})"
+
+
+def resolve_project_name(project_names, project_name, branch_name):
+    """
+    获取项目显示名称，优先精确匹配，其次通配符匹配。
+
+    :param project_names: 项目名称映射字典
+    :param project_name: 仓库目录名
+    :param branch_name: 分支名
+    :return: 自定义显示名称
+    """
+    exact_key = get_project_mapping_key(project_name, branch_name)
+    custom_project_name = project_names.get(exact_key, "")
+    if custom_project_name:
+        return custom_project_name
+
+    wildcard_key = f"{project_name}(*)"
+    return project_names.get(wildcard_key, "")
+
+
+def find_missing_project_name_mappings(messages, project_names):
+    """
+    找出缺失 project_names 映射的项目分支。
+
+    :param messages: 提交消息列表
+    :param project_names: 项目名称映射字典
+    :return: [(mapping_key, project_name, branch_name), ...]
+    """
+    missing_mappings = []
+    seen_keys = set()
+
+    for repo_path, _ in messages:
+        project_name = os.path.basename(repo_path)
+        branch_name = get_current_branch(repo_path)
+        mapping_key = get_project_mapping_key(project_name, branch_name)
+
+        if mapping_key in seen_keys:
+            continue
+
+        seen_keys.add(mapping_key)
+
+        if not resolve_project_name(project_names, project_name, branch_name):
+            missing_mappings.append((mapping_key, project_name, branch_name))
+
+    return missing_mappings
+
+
+def prompt_for_missing_project_names(messages, config, config_file="config.yaml", input_func=input, print_func=print):
+    """
+    在命令行中交互式补全缺失的项目名称映射，并保存回配置文件。
+
+    :param messages: 提交消息列表
+    :param config: 当前配置字典
+    :param config_file: 配置文件路径
+    :param input_func: 可注入的输入函数，便于测试
+    :param print_func: 可注入的输出函数，便于测试
+    :return: 更新后的项目名称映射字典
+    """
+    project_names = config.get('project_names') or {}
+    config['project_names'] = project_names
+
+    missing_mappings = find_missing_project_name_mappings(messages, project_names)
+    if not missing_mappings:
+        return project_names
+
+    print_func("⚠️ 检测到以下项目分支缺少 project_names 映射：")
+    for mapping_key, _, _ in missing_mappings:
+        print_func(f"  - {mapping_key}")
+
+    should_update = input_func("是否现在补充这些映射到 config.yaml？[Y/n]: ").strip().lower()
+    if should_update not in ("", "y", "yes"):
+        print_func("已跳过 project_names 补充。")
+        return project_names
+
+    updated = False
+    for mapping_key, _, _ in missing_mappings:
+        custom_name = input_func(
+            f"请输入 {mapping_key} 的显示名称（留空跳过，例如：示例项目-）："
+        ).strip()
+        if not custom_name:
+            continue
+
+        project_names[mapping_key] = custom_name
+        updated = True
+        print_func(f"已添加映射：{mapping_key} -> {custom_name}")
+
+    if updated:
+        save_config(config, config_file)
+        print_func(f"✅ 已更新配置文件：{os.path.abspath(config_file)}")
+    else:
+        print_func("未新增任何 project_names 映射。")
+
+    return project_names
 
 
 def get_git_commits(repo_path, start_date, end_date, author, pull_latest_code, extract_all_branches):
@@ -164,6 +273,7 @@ def clean_commit_message(message):
     cleaned_message = re.sub(r'^(feat|fix|refactor|chore|docs|style|test|perf|ci|build|revert|init):\s*', '', message, flags=re.IGNORECASE)
     cleaned_message = cleaned_message.replace("['']", "").replace('"', '')
     cleaned_message = re.sub(r'\s+', ' ', cleaned_message).strip()
+    cleaned_message = re.sub(r'\s+-\s+', '；', cleaned_message)
     return cleaned_message
 
 
@@ -196,14 +306,7 @@ def save_commits_to_file(commits, messages, output_file, detailed_output, projec
                 project_name = os.path.basename(repo_path)
                 cleaned_message = clean_commit_message(message)
                 current_branch = get_current_branch(repo_path)
-
-                # 首先检查是否有精确匹配的项目名+分支名
-                custom_project_name = project_names.get(f"{project_name}({current_branch})", "")
-
-                # 如果没有精确匹配，检查是否有通配符匹配
-                if not custom_project_name:
-                    wildcard_key = f"{project_name}(*)"
-                    custom_project_name = project_names.get(wildcard_key, "")
+                custom_project_name = resolve_project_name(project_names, project_name, current_branch)
 
                 # 生成输出内容
                 if show_project_and_branch:
