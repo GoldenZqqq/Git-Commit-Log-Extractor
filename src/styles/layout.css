@@ -306,6 +306,43 @@
   align-items: stretch;
 }
 
+.workbench-view-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid rgba(200, 216, 232, 0.82);
+  border-radius: var(--radius-md);
+  background: rgba(237, 246, 255, 0.76);
+  align-self: start;
+  width: fit-content;
+}
+
+.workbench-view-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 0 14px;
+  color: var(--ink-soft);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 820;
+  transition: color 0.14s ease, background 0.14s ease;
+}
+
+.workbench-view-tabs button:hover {
+  color: var(--ink);
+  background: rgba(63, 140, 255, 0.08);
+}
+
+.workbench-view-tabs button.active {
+  color: var(--ink);
+  background: var(--paper);
+  box-shadow: 0 4px 14px rgba(63, 140, 255, 0.14);
+}
+
 .assist-rail,
 .repo-drawer,
 .report-canvas,

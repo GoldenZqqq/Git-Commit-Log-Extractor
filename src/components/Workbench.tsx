@@ -19,7 +19,6 @@ import {
   Sparkles,
   TerminalSquare,
   Trash2,
-  TrendingUp,
   UserRound,
   XCircle,
 } from "lucide-react";
@@ -36,12 +35,13 @@ import {
   type RepoScanProgress,
 } from "../model";
 import { convertMarkdownTo, REPORT_FORMAT_PRESETS, type IMFormatPresetId } from "../reportFormat";
-import { ContributionHeatmap, type HeatmapResult } from "./ContributionHeatmap";
+import { type HeatmapResult } from "./ContributionHeatmap";
 import { CustomRangeDialog } from "./CustomRangeDialog";
+import { InsightsView } from "./InsightsView";
 import { MarkdownPreview } from "./MarkdownPreview";
 import { ReportQualityPanel } from "./ReportQualityPanel";
-import { TrendPanel, type TrendResult } from "./TrendPanel";
-import { WorkRhythmPanel, type WorkRhythmResult } from "./WorkRhythmPanel";
+import { type TrendResult } from "./TrendPanel";
+import { type WorkRhythmResult } from "./WorkRhythmPanel";
 
 type Props = {
   repos: RepoInfo[];
@@ -100,7 +100,9 @@ type Props = {
   onAddRootDirs: () => void;
 };
 
-type AssistPanel = "repos" | "history" | "quality" | "heatmap" | "trend";
+type AssistPanel = "repos" | "history" | "quality";
+
+type WorkbenchView = "report" | "insights";
 
 export function Workbench(props: Props) {
   const previewMeta = props.aiConfigured ? "AI 可润色" : "Markdown 渲染";
@@ -111,6 +113,7 @@ export function Workbench(props: Props) {
   const [copyAsMenuOpen, setCopyAsMenuOpen] = useState(false);
   const [polishExtra, setPolishExtra] = useState("");
   const [activeAssistPanel, setActiveAssistPanel] = useState<AssistPanel>("repos");
+  const [workbenchView, setWorkbenchView] = useState<WorkbenchView>("report");
   const [heatmapData, setHeatmapData] = useState<HeatmapResult | null>(null);
   const [heatmapLoading, setHeatmapLoading] = useState(false);
   const [rhythmData, setRhythmData] = useState<WorkRhythmResult | null>(null);
@@ -162,6 +165,28 @@ export function Workbench(props: Props) {
       .catch(() => setTrendData(null))
       .finally(() => setTrendLoading(false));
   }, [props.rootDirs, props.author, trendLoading]);
+
+  const loadAllInsightsData = useCallback(() => {
+    loadHeatmapData();
+    loadTrendData(trendGranularity);
+  }, [loadHeatmapData, loadTrendData, trendGranularity]);
+
+  const refreshInsightsData = useCallback(() => {
+    setHeatmapData(null);
+    setRhythmData(null);
+    setTrendData(null);
+    setHeatmapLoading(false);
+    setRhythmLoading(false);
+    setTrendLoading(false);
+    setTimeout(() => loadAllInsightsData(), 0);
+  }, [loadAllInsightsData]);
+
+  function handleViewChange(view: WorkbenchView) {
+    setWorkbenchView(view);
+    if (view === "insights" && !heatmapData && !heatmapLoading) {
+      loadAllInsightsData();
+    }
+  }
 
   useEffect(() => {
     if (!isPreviewExpanded) return;
@@ -305,6 +330,30 @@ export function Workbench(props: Props) {
         </div>
       </header>
 
+      <div className="workbench-view-tabs" role="tablist" aria-label="工作台视图">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={workbenchView === "report"}
+          className={workbenchView === "report" ? "active" : ""}
+          onClick={() => handleViewChange("report")}
+        >
+          <FileText size={14} />
+          报告
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={workbenchView === "insights"}
+          className={workbenchView === "insights" ? "active" : ""}
+          onClick={() => handleViewChange("insights")}
+        >
+          <Activity size={14} />
+          洞察
+        </button>
+      </div>
+
+      {workbenchView === "report" ? (
       <div className="studio-grid">
         <section className={`report-canvas ${isPreviewExpanded ? "preview-expanded" : ""}`}>
           <div className="canvas-head">
@@ -570,32 +619,6 @@ export function Workbench(props: Props) {
               交付
               <span>{hasQualityPanel ? "可查" : "待生成"}</span>
             </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={visibleAssistPanel === "heatmap"}
-              className={visibleAssistPanel === "heatmap" ? "active" : ""}
-              onClick={() => {
-                setActiveAssistPanel("heatmap");
-                if (!heatmapData && !heatmapLoading) loadHeatmapData();
-              }}
-            >
-              <Activity size={14} />
-              热力图
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={visibleAssistPanel === "trend"}
-              className={visibleAssistPanel === "trend" ? "active" : ""}
-              onClick={() => {
-                setActiveAssistPanel("trend");
-                if (!trendData && !trendLoading) loadTrendData(trendGranularity);
-              }}
-            >
-              <TrendingUp size={14} />
-              趋势
-            </button>
           </div>
 
           <div className="assist-panel">
@@ -704,29 +727,26 @@ export function Workbench(props: Props) {
                 canExport={props.canExport}
               />
             )}
-
-            {visibleAssistPanel === "heatmap" && (
-              <>
-                <ContributionHeatmap data={heatmapData} loading={heatmapLoading} />
-                <WorkRhythmPanel data={rhythmData} loading={rhythmLoading} />
-              </>
-            )}
-
-            {visibleAssistPanel === "trend" && (
-              <TrendPanel
-                data={trendData}
-                loading={trendLoading}
-                granularity={trendGranularity}
-                onGranularityChange={(g) => {
-                  setTrendGranularity(g);
-                  setTrendData(null);
-                  loadTrendData(g);
-                }}
-              />
-            )}
           </div>
         </aside>
       </div>
+      ) : (
+      <InsightsView
+        heatmapData={heatmapData}
+        heatmapLoading={heatmapLoading}
+        rhythmData={rhythmData}
+        rhythmLoading={rhythmLoading}
+        trendData={trendData}
+        trendLoading={trendLoading}
+        trendGranularity={trendGranularity}
+        onTrendGranularityChange={(g) => {
+          setTrendGranularity(g);
+          setTrendData(null);
+          loadTrendData(g);
+        }}
+        onRefresh={refreshInsightsData}
+      />
+      )}
 
       {(props.warnings.length > 0 || props.lastOutputFile || emptyReportAdvice) && (
         <footer className="event-log">

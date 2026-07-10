@@ -19,11 +19,14 @@ export type HeatmapResult = {
 type Props = {
   data: HeatmapResult | null;
   loading: boolean;
+  fullWidth?: boolean;
 };
 
 const CELL_SIZE = 11;
+const CELL_SIZE_FULL = 13;
 const GAP = 3;
 const STEP = CELL_SIZE + GAP;
+const STEP_FULL = CELL_SIZE_FULL + GAP;
 const WEEKDAY_LABEL_WIDTH = 28;
 const MONTH_LABEL_HEIGHT = 16;
 const WEEKDAY_LABELS = ["", "Mon", "", "Wed", "", "Fri", ""];
@@ -70,7 +73,7 @@ function buildMonthLabels(cells: { col: number; row: number; entry: HeatmapEntry
   return labels;
 }
 
-export function ContributionHeatmap({ data, loading }: Props) {
+export function ContributionHeatmap({ data, loading, fullWidth }: Props) {
   const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -112,8 +115,10 @@ export function ContributionHeatmap({ data, loading }: Props) {
   const cells = buildWeekColumns(data.entries);
   const maxCount = data.busiestCount;
   const totalCols = cells.length > 0 ? cells[cells.length - 1].col + 1 : 52;
-  const svgWidth = WEEKDAY_LABEL_WIDTH + totalCols * STEP;
-  const svgHeight = MONTH_LABEL_HEIGHT + 7 * STEP;
+  const cellSize = fullWidth ? CELL_SIZE_FULL : CELL_SIZE;
+  const step = fullWidth ? STEP_FULL : STEP;
+  const svgWidth = WEEKDAY_LABEL_WIDTH + totalCols * step;
+  const svgHeight = MONTH_LABEL_HEIGHT + 7 * step;
   const monthLabels = buildMonthLabels(cells);
 
   return (
@@ -130,7 +135,7 @@ export function ContributionHeatmap({ data, loading }: Props) {
             <text
               key={`m-${ml.col}`}
               className="heatmap-month-label"
-              x={WEEKDAY_LABEL_WIDTH + ml.col * STEP}
+              x={WEEKDAY_LABEL_WIDTH + ml.col * step}
               y={MONTH_LABEL_HEIGHT - 4}
             >
               {ml.label}
@@ -142,7 +147,7 @@ export function ContributionHeatmap({ data, loading }: Props) {
                 key={`w-${i}`}
                 className="heatmap-weekday-label"
                 x={0}
-                y={MONTH_LABEL_HEIGHT + i * STEP + CELL_SIZE - 1}
+                y={MONTH_LABEL_HEIGHT + i * step + cellSize - 1}
               >
                 {label}
               </text>
@@ -153,10 +158,10 @@ export function ContributionHeatmap({ data, loading }: Props) {
               key={cell.entry.date}
               className="heatmap-cell"
               data-level={getLevel(cell.entry.count, maxCount)}
-              x={WEEKDAY_LABEL_WIDTH + cell.col * STEP}
-              y={MONTH_LABEL_HEIGHT + cell.row * STEP}
-              width={CELL_SIZE}
-              height={CELL_SIZE}
+              x={WEEKDAY_LABEL_WIDTH + cell.col * step}
+              y={MONTH_LABEL_HEIGHT + cell.row * step}
+              width={cellSize}
+              height={cellSize}
               onMouseEnter={(e) => handleMouseEnter(e, cell.entry)}
               onMouseLeave={handleMouseLeave}
             />
