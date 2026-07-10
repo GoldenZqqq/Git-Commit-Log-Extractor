@@ -159,7 +159,7 @@
 
 .workbench {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 12px;
   min-width: 0;
   height: calc(100vh - 32px);
@@ -315,6 +315,8 @@
   background: rgba(237, 246, 255, 0.76);
   align-self: start;
   width: fit-content;
+  position: relative;
+  z-index: 1;
 }
 
 .workbench-view-tabs button {
