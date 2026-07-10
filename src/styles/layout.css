@@ -329,6 +329,7 @@
   background: transparent;
   font-size: 13px;
   font-weight: 820;
+  cursor: pointer;
   transition: color 0.14s ease, background 0.14s ease;
 }
 

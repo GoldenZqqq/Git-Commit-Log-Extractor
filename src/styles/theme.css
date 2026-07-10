@@ -39,13 +39,27 @@
   background: rgba(20, 31, 48, 0.72);
 }
 
+:root[data-theme="dark"] .workbench-view-tabs {
+  border-color: var(--canvas-line);
+  background: rgba(20, 31, 48, 0.72);
+}
+
 :root[data-theme="dark"] .assist-tabs button:hover:not(:disabled) {
+  background: rgba(109, 168, 255, 0.1);
+}
+
+:root[data-theme="dark"] .workbench-view-tabs button:hover {
   background: rgba(109, 168, 255, 0.1);
 }
 
 :root[data-theme="dark"] .assist-tabs button.active {
   background: rgba(109, 168, 255, 0.14);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+}
+
+:root[data-theme="dark"] .workbench-view-tabs button.active {
+  background: rgba(109, 168, 255, 0.14);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
 }
 
 :root[data-theme="dark"] .dialog-backdrop {
