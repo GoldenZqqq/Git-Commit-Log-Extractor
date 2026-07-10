@@ -794,15 +794,20 @@
 }
 
 .im-format-preset-select {
+  appearance: none;
   width: 100%;
   min-height: 38px;
-  padding: 6px 10px;
+  padding: 6px 34px 6px 10px;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   color: var(--ink);
   font-size: 13px;
   font-weight: 700;
-  background: rgba(255, 255, 255, 0.82);
+  background-color: rgba(255, 255, 255, 0.82);
+  background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23526174' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  background-size: 14px;
   cursor: pointer;
 }
 
