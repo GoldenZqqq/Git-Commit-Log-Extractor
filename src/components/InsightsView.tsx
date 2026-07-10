@@ -58,17 +58,17 @@ export function InsightsView({
       ) : (
         <div className="insights-content">
           <div className="insights-heatmap-section">
-            <ContributionHeatmap data={heatmapData} loading={false} fullWidth />
+            <ContributionHeatmap data={heatmapData} loading={heatmapLoading} fullWidth />
           </div>
 
           <div className="insights-bottom-grid">
             <div className="insights-rhythm-section">
-              <WorkRhythmPanel data={rhythmData} loading={false} />
+              <WorkRhythmPanel data={rhythmData} loading={rhythmLoading} />
             </div>
             <div className="insights-trend-section">
               <TrendPanel
                 data={trendData}
-                loading={false}
+                loading={trendLoading}
                 granularity={trendGranularity}
                 onGranularityChange={onTrendGranularityChange}
               />
