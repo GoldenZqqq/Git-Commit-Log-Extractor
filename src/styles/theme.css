@@ -998,3 +998,26 @@
 :root[data-theme="dark"] .markdown-preview hr {
   border-top-color: rgba(109, 168, 255, 0.18);
 }
+
+:root[data-theme="dark"] .insights-view {
+  border-color: rgba(52, 74, 103, 0.92);
+  background: rgba(16, 24, 39, 0.9);
+}
+
+:root[data-theme="dark"] .insights-refresh-button {
+  border-color: rgba(109, 168, 255, 0.28);
+  color: var(--primary-dark);
+  background: rgba(20, 31, 48, 0.78);
+}
+
+:root[data-theme="dark"] .insights-refresh-button:hover:not(:disabled) {
+  border-color: rgba(109, 168, 255, 0.42);
+  background: rgba(63, 140, 255, 0.18);
+}
+
+:root[data-theme="dark"] .insights-heatmap-section,
+:root[data-theme="dark"] .insights-rhythm-section,
+:root[data-theme="dark"] .insights-trend-section {
+  border-color: rgba(52, 74, 103, 0.9);
+  background: rgba(20, 31, 48, 0.6);
+}
