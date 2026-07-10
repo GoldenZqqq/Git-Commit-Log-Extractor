@@ -46,6 +46,10 @@ keyring = { version = "3.6.3", default-features = false, features = ["apple-nati
 [target.'cfg(target_os = "linux")'.dependencies]
 keyring = { version = "3.6.3", default-features = false, features = ["linux-native-sync-persistent", "crypto-rust"] }
 
+[features]
+cli = []
+
 [[bin]]
 name = "gitpulse-cli"
 path = "src/cli.rs"
+required-features = ["cli"]
