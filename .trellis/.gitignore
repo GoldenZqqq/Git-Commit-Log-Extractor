@@ -30,3 +30,6 @@
 # Python cache
 **/__pycache__/
 **/*.pyc
+
+# Private task directories
+tasks/07-10-ruanyf-submission-v2/
