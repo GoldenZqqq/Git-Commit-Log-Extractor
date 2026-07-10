@@ -28,6 +28,7 @@ export function InsightsView({
   onRefresh,
 }: Props) {
   const anyLoading = heatmapLoading || rhythmLoading || trendLoading;
+  const hasAnyData = heatmapData || rhythmData || trendData;
 
   return (
     <section className="insights-view" aria-label="数据洞察">
@@ -49,25 +50,32 @@ export function InsightsView({
         </button>
       </div>
 
-      <div className="insights-content">
-        <div className="insights-heatmap-section">
-          <ContributionHeatmap data={heatmapData} loading={heatmapLoading} fullWidth />
+      {anyLoading && !hasAnyData ? (
+        <div className="insights-loading">
+          <Loader2 className="spin" size={28} />
+          <span>正在加载洞察数据...</span>
         </div>
+      ) : (
+        <div className="insights-content">
+          <div className="insights-heatmap-section">
+            <ContributionHeatmap data={heatmapData} loading={false} fullWidth />
+          </div>
 
-        <div className="insights-bottom-grid">
-          <div className="insights-rhythm-section">
-            <WorkRhythmPanel data={rhythmData} loading={rhythmLoading} />
-          </div>
-          <div className="insights-trend-section">
-            <TrendPanel
-              data={trendData}
-              loading={trendLoading}
-              granularity={trendGranularity}
-              onGranularityChange={onTrendGranularityChange}
-            />
+          <div className="insights-bottom-grid">
+            <div className="insights-rhythm-section">
+              <WorkRhythmPanel data={rhythmData} loading={false} />
+            </div>
+            <div className="insights-trend-section">
+              <TrendPanel
+                data={trendData}
+                loading={false}
+                granularity={trendGranularity}
+                onGranularityChange={onTrendGranularityChange}
+              />
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </section>
   );
 }
