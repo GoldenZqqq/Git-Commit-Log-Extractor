@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { AppMessageHost, type AppMessage, type AppMessageTone } from "./components/AppMessageHost";
 import { BatchDialog } from "./components/BatchDialog";
+import { BlankDayFillDialog } from "./components/BlankDayFillDialog";
 import { OnboardingWizard } from "./components/OnboardingWizard";
 import { RepoMappingDialog } from "./components/RepoMappingDialog";
 import { SettingsDialog } from "./components/SettingsDialog";
@@ -96,6 +97,7 @@ function App() {
   const [extractProgress, setExtractProgress] = useState<CommitExtractProgress | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [batchOpen, setBatchOpen] = useState(false);
+  const [blankDayOpen, setBlankDayOpen] = useState(false);
   const [updateBannerDismissed, setUpdateBannerDismissed] = useState(false);
   const [editingRepo, setEditingRepo] = useState<RepoInfo | null>(null);
   const [lastOutputFile, setLastOutputFile] = useState("");
@@ -784,6 +786,46 @@ function App() {
 
   const showUpdateBanner = Boolean(updateSummary) && !updateBannerDismissed;
 
+
+  function handleBlankDayGenerated(payload: {
+    draftText: string;
+    targetDate: string;
+    sourceRange: DateRange;
+    commitCount: number;
+    repoCount: number;
+  }) {
+    const entry: ReportHistoryEntry = {
+      id: createHistoryId(),
+      mode: "summary",
+      title: `空白日补写 · ${payload.targetDate}`,
+      range: getSingleDayRange(payload.targetDate),
+      periodLabel: `补写草稿 · ${payload.targetDate}`,
+      generatedAt: new Date().toISOString(),
+      repoCount: payload.repoCount,
+      projectCount: payload.repoCount,
+      commitCount: payload.commitCount,
+      aiEnhanced: true,
+      outputFile: "",
+      reportText: payload.draftText,
+    };
+    rememberHistory(entry);
+    setStatus(`空白日补写草稿已生成：${payload.targetDate}`);
+  }
+
+  function handleBlankDayApply(draftText: string, targetDate: string) {
+    if (summaryText.trim() && !window.confirm("将用补写草稿替换当前预览内容？")) {
+      return;
+    }
+    setDailyDate(targetDate);
+    setSummaryText(draftText);
+    setWarnings([]);
+    setLastOutputFile("");
+    setCommitCount(0);
+    setProjectCount(0);
+    setActivePreview("summary");
+    setBlankDayOpen(false);
+    setStatus(`已应用空白日补写草稿：${targetDate}`);
+  }
   return (
     <main className="app-root">
       <AppMessageHost message={appMessage} onDismiss={dismissAppMessage} />
@@ -801,6 +843,7 @@ function App() {
           onDismiss={() => setUpdateBannerDismissed(true)}
         />
       )}
+
       <Workbench
         repos={repos}
         projectNames={projectNames}
@@ -857,6 +900,7 @@ function App() {
         onPreviewChange={changePreview}
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenBatch={() => setBatchOpen(true)}
+        onOpenBlankDayFill={() => setBlankDayOpen(true)}
       />
       <SettingsDialog
         open={settingsOpen}
@@ -881,6 +925,21 @@ function App() {
         indexedRepos={repos}
         onNotify={(message, tone) => showMessage(message, tone, 1800)}
         onClose={() => setBatchOpen(false)}
+      />
+      <BlankDayFillDialog
+        open={blankDayOpen}
+        settings={settings}
+        indexedRepos={repos}
+        targetDate={dailyDate}
+        aiConfigured={aiConfigured}
+        onClose={() => setBlankDayOpen(false)}
+        onOpenSettings={() => {
+          setBlankDayOpen(false);
+          setSettingsOpen(true);
+        }}
+        onGenerated={handleBlankDayGenerated}
+        onApply={handleBlankDayApply}
+        onNotify={(message, tone) => showMessage(message, tone, 1800)}
       />
       <RepoMappingDialog
         open={editingRepo !== null}
@@ -973,3 +1032,5 @@ function formatExtractProgress(progress: CommitExtractProgress) {
 }
 
 export default App;
+
+

@@ -44,7 +44,25 @@ _Avoid_: source note, commit detail
 A report saved outside the app for submission, sharing, or archiving. Exporting is separate from generating or polishing a report.
 _Avoid_: saved output, generated file
 
+**Blank Day Fill**:
+An AI-assisted draft mode for daily reports when the target day has little or no new commit evidence. It continues themes from a user-selected historical source period and selected repositories. The output is an editable continuity draft, not proof of same-day commits.
+_Avoid_: fabricate report, invent worklog, something-from-nothing generator
+
+**Source Period**:
+The historical date range whose commits supply themes for blank day fill. It is separate from the target report day.
+_Avoid_: lookback window (in UI copy), fake date range
+
+**Continuity Draft**:
+The editable blank-day-fill output. Users must review it before export or submission. It must not be presented as a normal same-day report draft without disclosure.
+_Avoid_: final report, auto timesheet
+
 ## Flagged Ambiguities
+
+**Blank day / empty day**:
+In product language, use **Blank Day Fill** for the feature and **Continuity Draft** for its output. Do not market it as inventing work with no historical basis.
+
+**AI generation vs polishing**:
+Keep **AI Polishing** for rewrite-only of an existing report draft. Use **Blank Day Fill** when AI creates a continuity draft from historical commit themes for a low-activity target day.
 
 **Project**:
 In product language, prefer **Repository** for a local Git source and **Project Name Mapping** for the display name shown in a report. Use "project" only in user-facing prose where it naturally means the work area represented by commits.
@@ -65,3 +83,7 @@ Domain expert: "No. First check author scope, report period, and whether the rep
 Developer: "The report says `api-service(main)` but the user wants a Chinese name."
 
 Domain expert: "Add or update a project name mapping. Keep evidence detail tied to the original repository, branch, date, and commit."
+
+Developer: "The user had no commits today. Should AI polishing invent a daily report?"
+
+Domain expert: "No. AI polishing only rewrites an existing report draft. Offer Blank Day Fill so the user can select a source period, choose repositories, and generate a continuity draft with disclosure."

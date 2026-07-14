@@ -1472,3 +1472,61 @@
     justify-content: flex-start;
   }
 }
+
+.blank-day-entry {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.blank-day-tip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 220px;
+  max-width: 280px;
+  padding: 10px 12px;
+  border: 1px solid rgba(63, 140, 255, 0.28);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f7fbff, #eef6ff);
+  box-shadow: 0 10px 28px rgba(20, 48, 90, 0.12);
+  color: #1d3b66;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.blank-day-tip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 24px;
+  border: 7px solid transparent;
+  border-top-color: #eef6ff;
+}
+
+.blank-day-tip-close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  border: 0;
+  background: transparent;
+  color: #5b7598;
+  cursor: pointer;
+  padding: 0;
+}
+
+.blank-day-button {
+  background: linear-gradient(180deg, #fff8ef, #fff1df) !important;
+  border-color: rgba(214, 140, 48, 0.35) !important;
+  color: #8a4b00 !important;
+}
+
+.blank-day-button:disabled,
+.blank-day-button.warning:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

@@ -7,10 +7,11 @@ use crate::ai;
 use crate::git_ops;
 use crate::models::{
     AuthorAliasGroup, BatchFailure, BatchReportOptions, BatchReportProgress, BatchReportResult,
-    CommitExtractProgress, CommitRecord, ExtractOptions, ExtractResult, HeatmapEntry,
-    HeatmapOptions, HeatmapResult, MonthlyReportOptions, MonthlyReportResult, PeriodReportOptions,
-    PeriodReportResult, RepoInfo, ReportEnhanceOptions, ReportEnhanceResult, TrendOptions,
-    TrendPeriod, TrendProjectShare, TrendResult, WorkRhythmOptions, WorkRhythmResult,
+    BlankDayFillOptions, BlankDayFillResult, CommitExtractProgress, CommitRecord, ExtractOptions,
+    ExtractResult, HeatmapEntry, HeatmapOptions, HeatmapResult, MonthlyReportOptions,
+    MonthlyReportResult, PeriodReportOptions, PeriodReportResult, RepoInfo, ReportEnhanceOptions,
+    ReportEnhanceResult, TrendOptions, TrendPeriod, TrendProjectShare, TrendResult,
+    WorkRhythmOptions, WorkRhythmResult,
 };
 use crate::report;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
@@ -156,6 +157,42 @@ where
         project_count,
         commits.len(),
     ))
+}
+
+
+pub fn fill_blank_day_report_sync(options: BlankDayFillOptions) -> Result<BlankDayFillResult, String> {
+    let evidence = options.base_evidence.trim().to_string();
+    if evidence.is_empty() {
+        return Err("素材周期内没有可用的提交线索".to_string());
+    }
+
+    let item_count = options.item_count.clamp(1, 8);
+    let report_author = report_author(&options.author_display_name, &options.author);
+    let source_commit_count = evidence
+        .lines()
+        .filter(|line| {
+            let trimmed = line.trim();
+            !trimmed.is_empty() && !trimmed.starts_with('#')
+        })
+        .count() as u32;
+
+    let draft_text = ai::fill_blank_day_report(
+        &evidence,
+        &options.target_date,
+        &options.source_start_date,
+        &options.source_end_date,
+        &report_author,
+        item_count,
+        &options.user_prompt,
+        &options.ai,
+    )?;
+
+    Ok(BlankDayFillResult {
+        draft_text: draft_text.trim().to_string(),
+        warnings: Vec::new(),
+        item_count,
+        source_commit_count,
+    })
 }
 
 pub fn enhance_report_sync(options: ReportEnhanceOptions) -> Result<ReportEnhanceResult, String> {
@@ -2276,3 +2313,6 @@ mod tests {
         assert!(dow3 >= 5); // weekend
     }
 }
+
+
+

@@ -227,6 +227,32 @@ pub struct ReportEnhanceResult {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct BlankDayFillOptions {
+    pub base_evidence: String,
+    pub target_date: String,
+    pub source_start_date: String,
+    pub source_end_date: String,
+    pub item_count: u32,
+    pub author: String,
+    #[serde(default)]
+    pub author_display_name: String,
+    #[serde(default)]
+    pub user_prompt: String,
+    pub ai: AiConfig,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BlankDayFillResult {
+    pub draft_text: String,
+    pub warnings: Vec<String>,
+    pub item_count: u32,
+    pub source_commit_count: u32,
+}
+
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DiagnosticOptions {
     pub root_dirs: Vec<String>,
     pub output_dir: String,
@@ -641,3 +667,4 @@ fn default_custom_report_template() -> String {
     ]
     .join("\n")
 }
+

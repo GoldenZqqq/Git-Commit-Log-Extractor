@@ -75,6 +75,41 @@ pub fn enhance_daily_report(
     )
 }
 
+
+pub fn fill_blank_day_report(
+    base_evidence: &str,
+    target_date: &str,
+    source_start_date: &str,
+    source_end_date: &str,
+    author: &str,
+    item_count: u32,
+    user_prompt: &str,
+    config: &AiConfig,
+) -> Result<String, String> {
+    if !config.enabled {
+        return Err("请先启用并配置 AI".to_string());
+    }
+    if base_evidence.trim().is_empty() {
+        return Err("素材周期内没有可用的提交线索".to_string());
+    }
+    let count = item_count.clamp(1, 8);
+    let prompt = blank_day_user_prompt(
+        base_evidence,
+        target_date,
+        source_start_date,
+        source_end_date,
+        author,
+        count,
+        user_prompt,
+    );
+    enhance_report(
+        base_evidence,
+        blank_day_system_prompt(),
+        &prompt,
+        config,
+    )
+}
+
 /// 自定义系统提示词非空则采用它，否则回退内置默认。默认字符串保留为同源参照与兜底。
 fn resolve_system_prompt<'a>(custom: &'a str, fallback: &'a str) -> &'a str {
     if custom.trim().is_empty() {
@@ -322,6 +357,39 @@ fn daily_system_prompt() -> &'static str {
     "你是一个严谨的工作日报写作助手。请基于 Git 提交记录润色为当天或指定周期的工作日报，不要虚构没有依据的业务结果、上线结论或百分比。最终输出保持为简洁纯文本或短列表，方便直接复制到工作汇报中。"
 }
 
+
+fn blank_day_system_prompt() -> &'static str {
+    "你是一个克制的日报延续草稿助手。请仅基于用户提供的历史 Git 提交线索，为目标日撰写可编辑的日报延续要点。禁止编造上线、验收、业务结果、百分比进度或从未出现过的模块；优先使用跟进、排查、推进、联调、整理等进行中表述。最终只输出短要点列表，不要长文复盘。"
+}
+
+fn blank_day_user_prompt(
+    base_evidence: &str,
+    target_date: &str,
+    source_start_date: &str,
+    source_end_date: &str,
+    author: &str,
+    item_count: u32,
+    user_prompt: &str,
+) -> String {
+    let instruction = if user_prompt.trim().is_empty() {
+        "无额外要求"
+    } else {
+        user_prompt.trim()
+    };
+    format!(
+        "目标日：{}\n素材周期：{} 至 {}\n作者：{}\n需要输出条数：{}\n用户要求：{}\n\n请严格输出恰好 {} 条短要点列表（每行一条，使用 - 前缀）。每条一句话，基于下列历史提交线索做合理延续，不要写成目标日真实提交记录，不要添加无法核实的结论。\n\n历史提交线索：\n{}",
+        target_date,
+        source_start_date,
+        source_end_date,
+        if author.is_empty() { "全部作者" } else { author },
+        item_count,
+        instruction,
+        item_count,
+        base_evidence
+    )
+}
+
+
 fn monthly_user_prompt(
     base_report: &str,
     start_date: &str,
@@ -391,6 +459,22 @@ fn daily_user_prompt(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn blank_day_user_prompt_includes_item_count() {
+        let prompt = blank_day_user_prompt(
+            "- repo: fix login",
+            "2026-07-14",
+            "2026-07-11",
+            "2026-07-13",
+            "alice",
+            5,
+            "偏跟进",
+        );
+        assert!(prompt.contains("需要输出条数：5"));
+        assert!(prompt.contains("恰好 5 条"));
+        assert!(prompt.contains("fix login"));
+    }
 
     #[test]
     fn parse_openai_response_reads_message_content() {
@@ -549,3 +633,4 @@ mod tests {
         assert!(message.contains("直接填写 API Key"));
     }
 }
+

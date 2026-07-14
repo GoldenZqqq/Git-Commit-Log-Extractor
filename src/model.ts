@@ -82,6 +82,30 @@ export type ReportEnhanceResult = {
   warnings: string[];
 };
 
+export type BlankDayFillResult = {
+  draftText: string;
+  warnings: string[];
+  itemCount: number;
+  sourceCommitCount: number;
+};
+
+export type BlankDayItemCount = 3 | 5 | 8;
+
+export const DEFAULT_BLANK_DAY_ITEM_COUNT: BlankDayItemCount = 5;
+
+export const BLANK_DAY_ITEM_COUNT_OPTIONS: BlankDayItemCount[] = [3, 5, 8];
+
+export const DEFAULT_BLANK_DAY_USER_PROMPT = [
+  "请基于我提供的历史 Git 提交线索，为目标日写一份克制的日报延续草稿。",
+  "要求：",
+  "1. 只围绕这些历史事项做合理延续，不编造新业务结论",
+  "2. 严格输出 N 条短要点列表（每行一条，可用 - 前缀），每条一句话，偏「跟进 / 排查 / 推进 / 整理」",
+  "3. 不要写已上线、已完成验收、百分比进度等无法核实的表述",
+  "4. 语气正式，可直接粘贴到日报",
+].join("\n");
+
+const BLANK_DAY_TIP_DISMISSED_KEY = "gitpulse.blankDayFillTipDismissed";
+
 export type PreviewMode = "summary" | "weekly" | "custom" | "monthly";
 
 export type ReportExportFormat = "markdown" | "docx" | "pdf";
@@ -997,6 +1021,93 @@ export function buildBatchReportOptions(
   };
 }
 
+export function loadBlankDayTipDismissed(): boolean {
+  try {
+    return localStorage.getItem(BLANK_DAY_TIP_DISMISSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function saveBlankDayTipDismissed(dismissed: boolean) {
+  try {
+    if (dismissed) localStorage.setItem(BLANK_DAY_TIP_DISMISSED_KEY, "1");
+    else localStorage.removeItem(BLANK_DAY_TIP_DISMISSED_KEY);
+  } catch {
+    // ignore storage failures
+  }
+}
+
+export function getBlankDaySourceRange(targetDate: string): DateRange {
+  const end = shiftDateInput(targetDate, -1);
+  const start = shiftDateInput(targetDate, -3);
+  return { startDate: start, endDate: end };
+}
+
+export function shiftDateInput(dateValue: string, days: number) {
+  const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateValue);
+  if (!parts) return dateValue;
+  const date = new Date(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3]));
+  date.setDate(date.getDate() + days);
+  return formatDateInput(date);
+}
+
+export function buildBlankDayEvidenceText(commits: CommitRecord[], selectedRepoPaths: string[]) {
+  const selected = new Set(selectedRepoPaths);
+  const lines = commits
+    .filter((commit) => selected.has(commit.repoPath))
+    .slice(0, 80)
+    .map((commit) => {
+      const project = commit.projectName || commit.repoPath;
+      const branch = commit.branchName ? `(${commit.branchName})` : "";
+      const message = commit.message.replace(/\s+/g, " ").trim();
+      return `- [${commit.date.slice(0, 10)}] ${project}${branch}: ${message}`;
+    });
+  return lines.join("\n");
+}
+
+export function collectBlankDayRepoTags(commits: CommitRecord[]) {
+  const map = new Map<string, { path: string; label: string; count: number }>();
+  for (const commit of commits) {
+    const existing = map.get(commit.repoPath);
+    if (existing) {
+      existing.count += 1;
+      continue;
+    }
+    const pathParts = commit.repoPath.split(/[/\\]/).filter(Boolean);
+    const name = commit.projectName || pathParts[pathParts.length - 1] || commit.repoPath;
+    const branch = commit.branchName ? ` (${commit.branchName})` : "";
+    map.set(commit.repoPath, {
+      path: commit.repoPath,
+      label: `${name}${branch}`,
+      count: 1,
+    });
+  }
+  return [...map.values()].sort((left, right) => left.label.localeCompare(right.label, "zh-CN"));
+}
+
+export function buildBlankDayFillOptions(
+  settings: AppSettings,
+  baseEvidence: string,
+  targetDate: string,
+  sourceRange: DateRange,
+  itemCount: BlankDayItemCount,
+  userPrompt: string,
+) {
+  const authorAliasGroups = parseAuthorAliases(settings.authorAliasesText);
+  return {
+    baseEvidence,
+    targetDate,
+    sourceStartDate: sourceRange.startDate,
+    sourceEndDate: sourceRange.endDate,
+    itemCount,
+    author: buildAuthorFilter(settings.author, authorAliasGroups),
+    authorDisplayName: buildAuthorDisplayName(settings.author, authorAliasGroups),
+    userPrompt,
+    ai: buildAiOptions(settings, true),
+  };
+}
+
 export function buildReportEnhanceOptions(
   settings: AppSettings,
   mode: PreviewMode,
@@ -1391,3 +1502,5 @@ function getIsoWeekParts(date: Date) {
   const week = Math.ceil(((target.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
   return { year: target.getUTCFullYear(), week };
 }
+
+

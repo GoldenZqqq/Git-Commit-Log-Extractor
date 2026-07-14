@@ -20,13 +20,16 @@ import {
   Sparkles,
   TerminalSquare,
   Trash2,
+  Wand2,
   UserRound,
   XCircle,
 } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
+  loadBlankDayTipDismissed,
   resolveRepoDisplayName,
+  saveBlankDayTipDismissed,
   type CommitExtractProgress,
   type DateRange,
   type PreviewMode,
@@ -100,6 +103,7 @@ type Props = {
   rootDirs: string[];
   onAddRootDirs: () => void;
   onOpenBatch: () => void;
+  onOpenBlankDayFill: () => void;
 };
 
 type AssistPanel = "repos" | "history" | "quality";
@@ -109,6 +113,7 @@ type WorkbenchView = "report" | "insights";
 export function Workbench(props: Props) {
   const previewMeta = props.aiConfigured ? "AI 可润色" : "Markdown 渲染";
   const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
+  const [blankDayTipOpen, setBlankDayTipOpen] = useState(() => !loadBlankDayTipDismissed());
   const [customDialogOpen, setCustomDialogOpen] = useState(false);
   const [polishMenuOpen, setPolishMenuOpen] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
@@ -411,6 +416,37 @@ export function Workbench(props: Props) {
                   <Layers size={15} />
                   批量
                 </button>
+                {props.activePreview === "summary" && (
+                  <div className="blank-day-entry">
+                    {blankDayTipOpen && (
+                      <div className="blank-day-tip" role="status">
+                        <span>今天仓库静悄悄？用近几天的工作线索补一份日报草稿</span>
+                        <button
+                          type="button"
+                          className="blank-day-tip-close"
+                          aria-label="关闭提示"
+                          onClick={() => {
+                            setBlankDayTipOpen(false);
+                            saveBlankDayTipDismissed(true);
+                          }}
+                        >
+                          <XCircle size={13} />
+                        </button>
+                      </div>
+                    )}
+                    <button
+                      className={`preview-generate-button blank-day-button ${!props.aiConfigured ? "warning" : ""}`}
+                      type="button"
+                      onClick={props.onOpenBlankDayFill}
+                      disabled={props.isBusy || !props.aiConfigured}
+                      title={props.aiConfigured ? "基于近期 Git 线索，生成可编辑的日报延续草稿" : "请先配置 AI"}
+                      style={{ marginLeft: 4 }}
+                    >
+                      <Wand2 size={15} />
+                      空白日补写
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="canvas-actions-group">
                 {props.previewText && (
@@ -1378,3 +1414,5 @@ function PanelTitle({ icon, title, meta, action }: { icon: ReactNode; title: str
     </div>
   );
 }
+
+

@@ -1690,3 +1690,234 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Blank day fill */
+.blank-day-entry {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.blank-day-tip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 220px;
+  max-width: 280px;
+  padding: 10px 12px;
+  border: 1px solid rgba(63, 140, 255, 0.28);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f7fbff, #eef6ff);
+  box-shadow: 0 10px 28px rgba(20, 48, 90, 0.12);
+  color: #1d3b66;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.blank-day-tip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 24px;
+  border: 7px solid transparent;
+  border-top-color: #eef6ff;
+}
+
+.blank-day-tip-close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: #5b7598;
+  cursor: pointer;
+  padding: 0;
+}
+
+.blank-day-tip-close:hover {
+  color: #1d3b66;
+}
+
+.blank-day-button {
+  background: linear-gradient(180deg, #fff8ef, #fff1df) !important;
+  border-color: rgba(214, 140, 48, 0.35) !important;
+  color: #8a4b00 !important;
+}
+
+.blank-day-button:hover:not(:disabled) {
+  background: linear-gradient(180deg, #fff3df, #ffe8c4) !important;
+}
+
+.blank-day-dialog {
+  width: min(720px, 94vw);
+  max-height: min(90vh, 900px);
+  overflow: auto;
+}
+
+.blank-day-subtitle {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.blank-day-disclaimer,
+.blank-day-soft-warning {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 620;
+}
+
+.blank-day-disclaimer {
+  background: #f3f7ff;
+  border: 1px solid rgba(63, 140, 255, 0.22);
+  color: #234876;
+}
+
+.blank-day-soft-warning {
+  background: #fff8e8;
+  border: 1px solid rgba(214, 140, 48, 0.28);
+  color: #7a4a00;
+}
+
+.blank-day-repo-field,
+.blank-day-prompt-field,
+.blank-day-result-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.blank-day-repo-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 720;
+  color: var(--text);
+}
+
+.blank-day-repo-actions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.blank-day-link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--primary-dark);
+  font-size: 12px;
+  font-weight: 720;
+  cursor: pointer;
+  padding: 0;
+}
+
+.blank-day-link-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.blank-day-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.blank-day-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper-soft, var(--paper, #f6faff));
+  color: var(--ink, var(--text, #182334));
+  font-size: 12px;
+  font-weight: 650;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.blank-day-tag:hover {
+  border-color: rgba(63, 140, 255, 0.36);
+  background: var(--primary-soft);
+}
+
+.blank-day-tag.selected {
+  border-color: rgba(63, 140, 255, 0.45);
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+
+.blank-day-tag-count {
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(24, 35, 52, 0.08);
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+}
+
+.blank-day-tag.selected .blank-day-tag-count {
+  background: rgba(63, 140, 255, 0.18);
+}
+
+.blank-day-prompt,
+.blank-day-result {
+  width: 100%;
+  resize: vertical;
+  min-height: 120px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  background: var(--paper, #fff);
+  color: var(--ink, var(--text, #182334));
+}
+
+.blank-day-result {
+  min-height: 220px;
+}
+
+.blank-day-muted {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.blank-day-result-actions {
+  flex-wrap: wrap;
+}
+
+.spin {
+  animation: blank-day-spin 0.8s linear infinite;
+}
+
+@keyframes blank-day-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+

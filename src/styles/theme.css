@@ -1076,3 +1076,86 @@
   border-color: rgba(52, 74, 103, 0.9);
   background: rgba(20, 31, 48, 0.6);
 }
+
+/* Blank day fill — dark theme */
+:root[data-theme="dark"] .blank-day-tag {
+  border-color: rgba(145, 164, 192, 0.28);
+  color: #cfe0f7;
+  background: rgba(10, 18, 31, 0.78);
+}
+
+:root[data-theme="dark"] .blank-day-tag:hover {
+  border-color: rgba(109, 168, 255, 0.4);
+  color: #e5f0ff;
+  background: rgba(63, 140, 255, 0.16);
+}
+
+:root[data-theme="dark"] .blank-day-tag.selected {
+  border-color: rgba(109, 168, 255, 0.5);
+  color: #d8e8ff;
+  background: rgba(63, 140, 255, 0.24);
+}
+
+:root[data-theme="dark"] .blank-day-tag-count {
+  background: rgba(255, 255, 255, 0.1);
+  color: #b7c9e0;
+}
+
+:root[data-theme="dark"] .blank-day-tag.selected .blank-day-tag-count {
+  background: rgba(109, 168, 255, 0.28);
+  color: #e5f0ff;
+}
+
+:root[data-theme="dark"] .blank-day-prompt,
+:root[data-theme="dark"] .blank-day-result {
+  border-color: rgba(109, 168, 255, 0.22);
+  background: rgba(10, 18, 31, 0.72);
+  color: #dce8f8;
+}
+
+:root[data-theme="dark"] .blank-day-disclaimer {
+  border-color: rgba(109, 168, 255, 0.28);
+  background: rgba(63, 140, 255, 0.12);
+  color: #c7dcff;
+}
+
+:root[data-theme="dark"] .blank-day-soft-warning {
+  border-color: rgba(245, 158, 11, 0.36);
+  background: rgba(68, 44, 14, 0.58);
+  color: #f5d08a;
+}
+
+:root[data-theme="dark"] .blank-day-tip {
+  border-color: rgba(109, 168, 255, 0.3);
+  background: linear-gradient(180deg, rgba(28, 42, 64, 0.98), rgba(20, 31, 48, 0.98));
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  color: #d5e6ff;
+}
+
+:root[data-theme="dark"] .blank-day-tip::after {
+  border-top-color: rgba(20, 31, 48, 0.98);
+}
+
+:root[data-theme="dark"] .blank-day-tip-close {
+  color: #9fb4d0;
+}
+
+:root[data-theme="dark"] .blank-day-tip-close:hover {
+  color: #e5f0ff;
+}
+
+:root[data-theme="dark"] .blank-day-button {
+  background: linear-gradient(180deg, rgba(72, 48, 18, 0.9), rgba(56, 36, 12, 0.92)) !important;
+  border-color: rgba(245, 158, 11, 0.36) !important;
+  color: #ffd89a !important;
+}
+
+:root[data-theme="dark"] .blank-day-button:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(88, 58, 20, 0.95), rgba(68, 44, 14, 0.95)) !important;
+}
+
+:root[data-theme="dark"] .blank-day-button:disabled,
+:root[data-theme="dark"] .blank-day-button.warning:disabled {
+  opacity: 0.55;
+  filter: grayscale(0.15);
+}

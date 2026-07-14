@@ -16,7 +16,7 @@ use crate::models::{
     DiagnosticResult, ExtractOptions, ExtractResult, GitIdentity, HeatmapOptions, HeatmapResult,
     MappingEntry, MonthlyReportOptions, MonthlyReportResult, PeriodReportOptions,
     PeriodReportResult, ProxyCandidate, ProxyConfig, ProxyTestResult, RepoInfo, RepoScanProgress,
-    ReportEnhanceOptions, ReportEnhanceResult, TrendOptions, TrendResult, WorkRhythmOptions,
+    BlankDayFillOptions, BlankDayFillResult, ReportEnhanceOptions, ReportEnhanceResult, TrendOptions, TrendResult, WorkRhythmOptions,
     WorkRhythmResult,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -145,6 +145,13 @@ async fn enhance_report(options: ReportEnhanceOptions) -> Result<ReportEnhanceRe
     async_runtime::spawn_blocking(move || commit_pipeline::enhance_report_sync(options))
         .await
         .map_err(|err| format!("AI 润色任务中断：{}", err))?
+}
+
+#[tauri::command]
+async fn fill_blank_day_report(options: BlankDayFillOptions) -> Result<BlankDayFillResult, String> {
+    async_runtime::spawn_blocking(move || commit_pipeline::fill_blank_day_report_sync(options))
+        .await
+        .map_err(|err| format!("空白日补写任务中断：{}", err))?
 }
 
 #[tauri::command]
@@ -367,6 +374,7 @@ pub fn run() {
             batch_generate_reports,
             open_output_directory,
             enhance_report,
+            fill_blank_day_report,
             list_ai_models,
             run_diagnostics,
             get_heatmap_data,
@@ -392,3 +400,4 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
