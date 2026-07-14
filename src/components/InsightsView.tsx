@@ -2,6 +2,8 @@ import { Activity, RefreshCw, Loader2 } from "lucide-react";
 import { ContributionHeatmap, type HeatmapResult } from "./ContributionHeatmap";
 import { WorkRhythmPanel, type WorkRhythmResult } from "./WorkRhythmPanel";
 import { TrendPanel, type TrendResult } from "./TrendPanel";
+import { ReportCalendar } from "./ReportCalendar";
+import type { ReportHistoryEntry } from "../model";
 import "./InsightsView.css";
 
 type Props = {
@@ -14,6 +16,12 @@ type Props = {
   trendGranularity: "weekly" | "monthly";
   onTrendGranularityChange: (g: "weekly" | "monthly") => void;
   onRefresh: () => void;
+  reportHistory: ReportHistoryEntry[];
+  aiConfigured: boolean;
+  isBusy: boolean;
+  onOpenHistory: (entry: ReportHistoryEntry) => void;
+  onGenerateDaily: (date: string) => void;
+  onOpenBlankDayFill: (date: string) => void;
 };
 
 export function InsightsView({
@@ -26,9 +34,15 @@ export function InsightsView({
   trendGranularity,
   onTrendGranularityChange,
   onRefresh,
+  reportHistory,
+  aiConfigured,
+  isBusy,
+  onOpenHistory,
+  onGenerateDaily,
+  onOpenBlankDayFill,
 }: Props) {
   const anyLoading = heatmapLoading || rhythmLoading || trendLoading;
-  const hasAnyData = heatmapData || rhythmData || trendData;
+  const hasAnyData = heatmapData || rhythmData || trendData || reportHistory.length > 0;
 
   return (
     <section className="insights-view" aria-label="数据洞察">
@@ -59,6 +73,17 @@ export function InsightsView({
         <div className="insights-content">
           <div className="insights-heatmap-section">
             <ContributionHeatmap data={heatmapData} loading={heatmapLoading} fullWidth />
+          </div>
+
+          <div className="insights-calendar-section">
+            <ReportCalendar
+              entries={reportHistory}
+              aiConfigured={aiConfigured}
+              isBusy={isBusy}
+              onOpenHistory={onOpenHistory}
+              onGenerateDaily={onGenerateDaily}
+              onOpenBlankDayFill={onOpenBlankDayFill}
+            />
           </div>
 
           <div className="insights-bottom-grid">

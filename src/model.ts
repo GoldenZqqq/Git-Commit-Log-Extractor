@@ -108,6 +108,12 @@ const BLANK_DAY_TIP_DISMISSED_KEY = "gitpulse.blankDayFillTipDismissed";
 
 export type PreviewMode = "summary" | "weekly" | "custom" | "monthly";
 
+export type ReportHistoryLimit = 30 | 60 | 120 | 200;
+
+export const REPORT_HISTORY_LIMIT_OPTIONS: ReportHistoryLimit[] = [30, 60, 120, 200];
+
+export const DEFAULT_REPORT_HISTORY_LIMIT: ReportHistoryLimit = 120;
+
 export type ReportExportFormat = "markdown" | "docx" | "pdf";
 
 export type SplitGranularity = "daily" | "weekly" | "monthly" | "custom";
@@ -284,6 +290,7 @@ export type AppSettings = {
   proxyUsername: string;
   proxyPassword: string;
   proxyPasswordSaved: boolean;
+  reportHistoryLimit: ReportHistoryLimit;
 };
 
 export type LoadedSettingsState = {
@@ -295,7 +302,6 @@ export type LoadedSettingsState = {
 export const STORAGE_KEY = "gitpulse-settings";
 const REPO_INDEX_CACHE_KEY = "gitpulse-repo-index-cache";
 const REPORT_HISTORY_KEY = "gitpulse-report-history";
-const REPORT_HISTORY_LIMIT = 30;
 const LEGACY_STORAGE_KEY = "git-report-studio-settings";
 const ENV_VAR_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const EVIDENCE_PRESERVATION_INSTRUCTION =
@@ -362,6 +368,7 @@ export const defaultSettings: AppSettings = {
   proxyUsername: "",
   proxyPassword: "",
   proxyPasswordSaved: false,
+  reportHistoryLimit: DEFAULT_REPORT_HISTORY_LIMIT,
 };
 
 export function loadSettingsState(): LoadedSettingsState {
@@ -446,6 +453,7 @@ export function loadSettingsState(): LoadedSettingsState {
     DEFAULT_CUSTOM_REPORT_FORMAT_TEMPLATE,
   );
   parsed.aiTemperature = Number.isFinite(parsed.aiTemperature) ? parsed.aiTemperature : defaultSettings.aiTemperature;
+  parsed.reportHistoryLimit = normalizeReportHistoryLimit(parsed.reportHistoryLimit);
   // 旧版本只持久化单个 rootDir 字符串，迁移为 rootDirs 数组，避免老用户工作区配置失效。
   if (parsed.rootDirs.length === 0 && rawSettings.rootDir?.trim()) {
     parsed.rootDirs = [rawSettings.rootDir.trim()];
@@ -531,7 +539,15 @@ export function clearRepoIndexCache() {
   localStorage.removeItem(REPO_INDEX_CACHE_KEY);
 }
 
-export function loadReportHistory(): ReportHistoryEntry[] {
+export function normalizeReportHistoryLimit(value: unknown): ReportHistoryLimit {
+  const numeric = typeof value === "number" ? value : Number(value);
+  if (numeric === 30 || numeric === 60 || numeric === 120 || numeric === 200) {
+    return numeric;
+  }
+  return DEFAULT_REPORT_HISTORY_LIMIT;
+}
+
+export function loadReportHistory(limit: ReportHistoryLimit = DEFAULT_REPORT_HISTORY_LIMIT): ReportHistoryEntry[] {
   const saved = localStorage.getItem(REPORT_HISTORY_KEY);
   if (!saved) return [];
 
@@ -544,11 +560,14 @@ export function loadReportHistory(): ReportHistoryEntry[] {
   }
 
   if (!Array.isArray(rawHistory)) return [];
-  return rawHistory.filter(isReportHistoryEntry).slice(0, REPORT_HISTORY_LIMIT);
+  return rawHistory.filter(isReportHistoryEntry).slice(0, normalizeReportHistoryLimit(limit));
 }
 
-export function saveReportHistory(entries: ReportHistoryEntry[]): ReportHistoryEntry[] {
-  let nextEntries = entries.filter(isReportHistoryEntry).slice(0, REPORT_HISTORY_LIMIT);
+export function saveReportHistory(
+  entries: ReportHistoryEntry[],
+  limit: ReportHistoryLimit = DEFAULT_REPORT_HISTORY_LIMIT,
+): ReportHistoryEntry[] {
+  let nextEntries = entries.filter(isReportHistoryEntry).slice(0, normalizeReportHistoryLimit(limit));
   while (nextEntries.length > 0) {
     try {
       localStorage.setItem(REPORT_HISTORY_KEY, JSON.stringify(nextEntries));
@@ -564,22 +583,57 @@ export function saveReportHistory(entries: ReportHistoryEntry[]): ReportHistoryE
 export function rememberReportHistoryEntry(
   entries: ReportHistoryEntry[],
   entry: ReportHistoryEntry,
+  limit: ReportHistoryLimit = DEFAULT_REPORT_HISTORY_LIMIT,
 ): ReportHistoryEntry[] {
-  return saveReportHistory([entry, ...entries.filter((item) => item.id !== entry.id)]);
+  return saveReportHistory([entry, ...entries.filter((item) => item.id !== entry.id)], limit);
 }
 
 export function updateReportHistoryEntry(
   entries: ReportHistoryEntry[],
   id: string,
   patch: Partial<Pick<ReportHistoryEntry, "outputFile" | "reportText" | "commitCount" | "generatedAt">>,
+  limit: ReportHistoryLimit = DEFAULT_REPORT_HISTORY_LIMIT,
 ): ReportHistoryEntry[] {
   if (!id) return entries;
   const nextEntries = entries.map((entry) => (entry.id === id ? { ...entry, ...patch } : entry));
-  return saveReportHistory(nextEntries);
+  return saveReportHistory(nextEntries, limit);
 }
 
 export function clearReportHistory() {
   localStorage.removeItem(REPORT_HISTORY_KEY);
+}
+
+export function isBlankDayHistoryEntry(entry: ReportHistoryEntry) {
+  return entry.title.startsWith("空白日补写") || entry.periodLabel.includes("补写草稿");
+}
+
+export function getReportCalendarAnchorDate(entry: ReportHistoryEntry) {
+  if (entry.mode === "summary") return entry.range.startDate;
+  return entry.range.endDate || entry.range.startDate;
+}
+
+export function getReportCalendarKind(entry: ReportHistoryEntry): "daily" | "blank" | "weekly" | "monthly" | "custom" {
+  if (entry.mode === "weekly") return "weekly";
+  if (entry.mode === "monthly") return "monthly";
+  if (entry.mode === "custom") return "custom";
+  if (isBlankDayHistoryEntry(entry)) return "blank";
+  return "daily";
+}
+
+export function groupReportHistoryByAnchorDate(entries: ReportHistoryEntry[]) {
+  const map = new Map<string, ReportHistoryEntry[]>();
+  for (const entry of entries) {
+    const day = getReportCalendarAnchorDate(entry);
+    if (!day) continue;
+    const list = map.get(day) ?? [];
+    list.push(entry);
+    map.set(day, list);
+  }
+  for (const [day, list] of map) {
+    list.sort((left, right) => right.generatedAt.localeCompare(left.generatedAt));
+    map.set(day, list);
+  }
+  return map;
 }
 
 export type MappingEntry = {

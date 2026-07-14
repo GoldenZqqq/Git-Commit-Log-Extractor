@@ -32,6 +32,7 @@ import {
   buildReportEnhanceOptions,
   clearReportHistory,
   clearRepoIndexCache,
+  isBlankDayHistoryEntry,
   countCommitProjects,
   formatMonthLabel,
   getMonthRange,
@@ -44,9 +45,11 @@ import {
   isAiKeyReference,
   loadReportHistory,
   loadRepoIndexCache,
+  normalizeReportHistoryLimit,
   loadSettingsState,
   parseProjectNames,
   rememberReportHistoryEntry,
+  saveReportHistory,
   saveRepoIndexCache,
   settingsForPersistence,
   updateReportHistoryEntry,
@@ -79,7 +82,7 @@ function App() {
   const [monthlyReport, setMonthlyReport] = useState("");
   const [monthlyMonth, setMonthlyMonth] = useState(getPreviousMonthInput);
   const [monthlyLabel, setMonthlyLabel] = useState("");
-  const [reportHistory, setReportHistory] = useState<ReportHistoryEntry[]>(loadReportHistory);
+  const [reportHistory, setReportHistory] = useState<ReportHistoryEntry[]>(() => loadReportHistory(loadedSettings.settings.reportHistoryLimit));
   const [activeHistoryId, setActiveHistoryId] = useState("");
   const [activePreview, setActivePreview] = useState<PreviewMode>("summary");
   const [status, setStatusText] = useState(
@@ -370,13 +373,13 @@ function App() {
   }
 
   function rememberHistory(entry: ReportHistoryEntry) {
-    setReportHistory((current) => rememberReportHistoryEntry(current, entry));
+    setReportHistory((current) => rememberReportHistoryEntry(current, entry, settings.reportHistoryLimit));
     setActiveHistoryId(entry.id);
   }
 
   function updateActiveHistory(patch: Partial<Pick<ReportHistoryEntry, "outputFile" | "reportText" | "commitCount" | "generatedAt">>) {
     if (!activeHistoryId) return;
-    setReportHistory((current) => updateReportHistoryEntry(current, activeHistoryId, patch));
+    setReportHistory((current) => updateReportHistoryEntry(current, activeHistoryId, patch, settings.reportHistoryLimit));
   }
 
   function buildHistoryEntry(
@@ -666,6 +669,12 @@ function App() {
   }
 
   function updateSetting<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
+    if (key === "reportHistoryLimit") {
+      const limit = normalizeReportHistoryLimit(value);
+      setSettings((current) => ({ ...current, reportHistoryLimit: limit }));
+      setReportHistory((current) => saveReportHistory(current, limit));
+      return;
+    }
     if (key === "aiApiKey") {
       const aiApiKey = String(value);
       setSettings((current) => ({
@@ -794,7 +803,19 @@ function App() {
   const showUpdateBanner = Boolean(updateSummary) && !updateBannerDismissed;
 
 
-  function handleBlankDayGenerated(payload: {
+  
+  function handleGenerateDailyFromCalendar(date: string) {
+    setBlankDayDraftActive(false);
+    setActivePreview("summary");
+    void extractCommits(date);
+  }
+
+  function handleOpenBlankDayFillFromCalendar(date: string) {
+    setDailyDate(date);
+    setActivePreview("summary");
+    setBlankDayOpen(true);
+  }
+function handleBlankDayGenerated(payload: {
     draftText: string;
     targetDate: string;
     sourceRange: DateRange;
@@ -910,6 +931,8 @@ function App() {
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenBatch={() => setBatchOpen(true)}
         onOpenBlankDayFill={() => setBlankDayOpen(true)}
+        onGenerateDailyFromCalendar={handleGenerateDailyFromCalendar}
+        onOpenBlankDayFillFromCalendar={handleOpenBlankDayFillFromCalendar}
       />
       <SettingsDialog
         open={settingsOpen}
@@ -926,6 +949,7 @@ function App() {
         onChooseOutputDir={chooseOutputDir}
         onCheckForUpdates={checkForUpdates}
         onInstallUpdate={installUpdate}
+        onClearHistory={clearHistoryRecords}
         onClose={() => setSettingsOpen(false)}
       />
       <BatchDialog
@@ -1013,9 +1037,6 @@ function hasAiWarning(warnings: string[]) {
   return warnings.some((warning) => warning.includes("AI 润色失败"));
 }
 
-function isBlankDayHistoryEntry(entry: ReportHistoryEntry) {
-  return entry.title.startsWith("空白日补写") || entry.periodLabel.includes("补写草稿");
-}
 
 function createHistoryId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {

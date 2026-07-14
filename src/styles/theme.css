@@ -253,6 +253,15 @@
   color: #f5d08a;
 }
 
+:root[data-theme="dark"] .empty-report-advice-close {
+  color: #f5d08a;
+}
+
+:root[data-theme="dark"] .empty-report-advice-close:hover {
+  background: rgba(245, 208, 138, 0.12);
+  color: #ffe0a3;
+}
+
 :root[data-theme="dark"] .empty-report-advice strong {
   color: #ffe0a3;
 }

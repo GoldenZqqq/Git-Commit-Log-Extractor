@@ -105,6 +105,8 @@ type Props = {
   onAddRootDirs: () => void;
   onOpenBatch: () => void;
   onOpenBlankDayFill: () => void;
+  onGenerateDailyFromCalendar: (date: string) => void;
+  onOpenBlankDayFillFromCalendar: (date: string) => void;
 };
 
 type AssistPanel = "repos" | "history" | "quality";
@@ -122,6 +124,7 @@ export function Workbench(props: Props) {
   const [polishExtra, setPolishExtra] = useState("");
   const [activeAssistPanel, setActiveAssistPanel] = useState<AssistPanel>("repos");
   const [workbenchView, setWorkbenchView] = useState<WorkbenchView>("report");
+  const [emptyAdviceDismissedKey, setEmptyAdviceDismissedKey] = useState("");
   const [heatmapData, setHeatmapData] = useState<HeatmapResult | null>(null);
   const [heatmapLoading, setHeatmapLoading] = useState(false);
   const [rhythmData, setRhythmData] = useState<WorkRhythmResult | null>(null);
@@ -295,6 +298,10 @@ export function Workbench(props: Props) {
       enabledRepoCount,
     })
     : null;
+  const emptyAdviceKey = emptyReportAdvice
+    ? `${props.activePreview}|${emptyReportAdvice.scope}|${props.previewText.length}`
+    : "";
+  const showEmptyReportAdvice = Boolean(emptyReportAdvice && emptyAdviceKey !== emptyAdviceDismissedKey);
   const hasQualityPanel = Boolean(props.previewText && props.commitCount > 0);
   const visibleAssistPanel = activeAssistPanel === "quality" && !hasQualityPanel ? "repos" : activeAssistPanel;
 
@@ -795,14 +802,38 @@ export function Workbench(props: Props) {
           loadTrendData(g);
         }}
         onRefresh={refreshInsightsData}
+        reportHistory={props.reportHistory}
+        aiConfigured={props.aiConfigured}
+        isBusy={props.isBusy}
+        onOpenHistory={(entry) => {
+          setWorkbenchView("report");
+          props.onOpenHistory(entry);
+        }}
+        onGenerateDaily={(date) => {
+          setWorkbenchView("report");
+          props.onGenerateDailyFromCalendar(date);
+        }}
+        onOpenBlankDayFill={(date) => {
+          setWorkbenchView("report");
+          props.onOpenBlankDayFillFromCalendar(date);
+        }}
       />
       )}
 
-      {(props.warnings.length > 0 || props.lastOutputFile || emptyReportAdvice) && (
+      {(props.warnings.length > 0 || props.lastOutputFile || showEmptyReportAdvice) && (
         <footer className="event-log">
           {props.lastOutputFile && <p>输出文件：{props.lastOutputFile}</p>}
-          {emptyReportAdvice && (
+          {showEmptyReportAdvice && emptyReportAdvice && (
             <div className="empty-report-advice" role="status" aria-live="polite">
+              <button
+                type="button"
+                className="empty-report-advice-close"
+                aria-label="关闭空提交提示"
+                title="关闭提示"
+                onClick={() => setEmptyAdviceDismissedKey(emptyAdviceKey)}
+              >
+                <XCircle size={15} />
+              </button>
               <div>
                 <AlertCircle size={15} />
                 <strong>{emptyReportAdvice.title}</strong>

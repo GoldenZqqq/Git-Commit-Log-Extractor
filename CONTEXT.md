@@ -56,6 +56,10 @@ _Avoid_: lookback window (in UI copy), fake date range
 The editable blank-day-fill output. Users must review it before export or submission. It must not be presented as a normal same-day report draft without disclosure.
 _Avoid_: final report, auto timesheet
 
+**Report Calendar**:
+A month-grid module in Insights that visualizes when local reports were generated (daily, weekly, monthly, custom, and blank-day continuity drafts). It is about report delivery, not Git commit activity. Retention count is user-configurable in settings; clearing history is explicit and local-only.
+_Avoid_: attendance calendar, timesheet, punch clock
+
 ## Flagged Ambiguities
 
 **Blank day / empty day**:
@@ -87,3 +91,5 @@ Domain expert: "Add or update a project name mapping. Keep evidence detail tied 
 Developer: "The user had no commits today. Should AI polishing invent a daily report?"
 
 Domain expert: "No. AI polishing only rewrites an existing report draft. Offer Blank Day Fill so the user can select a source period, choose repositories, and generate a continuity draft with disclosure."
+
+

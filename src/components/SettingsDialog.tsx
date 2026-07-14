@@ -39,7 +39,9 @@ import {
   parseMappingText,
   serializeMappingText,
   type AiModelInfo,
+  REPORT_HISTORY_LIMIT_OPTIONS,
   type AppSettings,
+  type ReportHistoryLimit,
   type MappingEntry,
   type MappingSuggestion,
   type ProxyCandidate,
@@ -67,6 +69,7 @@ type Props = {
   onChooseOutputDir: () => void;
   onCheckForUpdates: () => void;
   onInstallUpdate: () => void;
+  onClearHistory: () => void;
   onClose: () => void;
 };
 
@@ -110,6 +113,7 @@ export function SettingsDialog({
   onChooseOutputDir,
   onCheckForUpdates,
   onInstallUpdate,
+  onClearHistory,
   onClose,
 }: Props) {
   const [importNote, setImportNote] = useState("");
@@ -996,6 +1000,35 @@ export function SettingsDialog({
             {activeTab === "general" && (
               <>
                 <section className="settings-section">
+                  <SectionTitle icon={<FileText size={16} />} title="报告历史" />
+                  <Field label="保留最近报告">
+                    <select
+                      value={settings.reportHistoryLimit}
+                      onChange={(event) => updateSetting("reportHistoryLimit", Number(event.target.value) as ReportHistoryLimit)}
+                    >
+                      {REPORT_HISTORY_LIMIT_OPTIONS.map((limit) => (
+                        <option key={limit} value={limit}>
+                          {limit} 条
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <p className="mapping-hint">仅存本机。超出后自动去掉更早的记录，不影响 Git 仓库。</p>
+                  <button
+                    type="button"
+                    className="mapping-import"
+                    onClick={() => {
+                      if (window.confirm("确定清空本机全部报告历史？此操作不可恢复。")) {
+                        onClearHistory();
+                      }
+                    }}
+                  >
+                    <Trash2 size={15} />
+                    清空全部历史
+                  </button>
+                </section>
+
+                <section className="settings-section">
                   <SectionTitle icon={<Monitor size={16} />} title="外观" />
                   <div className="theme-mode-control" aria-label="颜色模式">
                     <ThemeModeButton
@@ -1100,7 +1133,7 @@ function LocalDataBoundarySection({ settings, repos }: { settings: AppSettings; 
         <BoundaryItem
           title="报告与历史"
           body="生成的报告、最近历史、项目映射、模板和设置偏好保存在本机应用数据中。"
-          detail="清空历史只移除 GitPulse 内的历史记录，不会改动你的仓库。"
+          detail="可在通用设置中调整保留条数或清空历史；只影响本机记录，不会改动仓库。"
         />
         <BoundaryItem
           title="凭据存储"

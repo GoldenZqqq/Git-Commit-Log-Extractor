@@ -55,7 +55,7 @@
 
 .insights-content {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 14px;
   min-height: 0;
   overflow-y: auto;
@@ -106,4 +106,8 @@
   .insights-bottom-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.insights-calendar-section {
+  min-width: 0;
 }
