@@ -63,6 +63,7 @@ type Props = {
   activeHistoryId: string;
   repoCount: number;
   commitCount: number;
+  blankDayDraftActive?: boolean;
   projectCount: number;
   author: string;
   dailyDate: string;
@@ -283,7 +284,7 @@ export function Workbench(props: Props) {
   const extractProgressText = props.extractProgress && !props.extractProgress.done
     ? `${props.extractProgress.completedRepos}/${props.extractProgress.totalRepos} 仓库 · ${props.extractProgress.concurrency} 并发 · ${props.extractProgress.commitCount} 条提交`
     : props.status;
-  const emptyReportAdvice = props.previewText && props.commitCount === 0
+  const emptyReportAdvice = props.previewText && props.commitCount === 0 && !props.blankDayDraftActive
     ? buildEmptyReportAdvice({
       activePreview: props.activePreview,
       dailyDate: props.dailyDate,
@@ -1414,5 +1415,6 @@ function PanelTitle({ icon, title, meta, action }: { icon: ReactNode; title: str
     </div>
   );
 }
+
 
 

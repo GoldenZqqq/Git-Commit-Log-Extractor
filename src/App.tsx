@@ -102,6 +102,7 @@ function App() {
   const [editingRepo, setEditingRepo] = useState<RepoInfo | null>(null);
   const [lastOutputFile, setLastOutputFile] = useState("");
   const [commitCount, setCommitCount] = useState(0);
+  const [blankDayDraftActive, setBlankDayDraftActive] = useState(false);
   const [projectCount, setProjectCount] = useState(0);
   const aiApiKeySaveTimer = useRef<number | null>(null);
   const proxyPasswordSaveTimer = useRef<number | null>(null);
@@ -355,6 +356,7 @@ function App() {
   function changeDailyDate(date: string) {
     setDailyDate(date);
     setActiveHistoryId("");
+    setBlankDayDraftActive(false);
   }
 
   function changeWeeklyWeek(week: string) {
@@ -422,6 +424,7 @@ function App() {
       setLastOutputFile("");
       setCommitCount(result.commits.length);
       setProjectCount(projectTotal);
+      setBlankDayDraftActive(false);
       setActivePreview("summary");
       rememberHistory(buildHistoryEntry("summary", range, dateValue, reportText, result.commits.length, projectTotal, false));
       setStatus(`${dateValue} 日报已生成`);
@@ -443,6 +446,7 @@ function App() {
       setLastOutputFile("");
       setCommitCount(result.commits.length);
       setProjectCount(projectTotal);
+      setBlankDayDraftActive(false);
       setActivePreview("custom");
       rememberHistory(buildHistoryEntry("custom", range, periodLabel, reportText, result.commits.length, projectTotal, false));
       setStatus("自定义报告已生成");
@@ -463,6 +467,7 @@ function App() {
       setLastOutputFile(result.outputFile);
       setCommitCount(result.commitCount);
       setProjectCount(result.projectCount);
+      setBlankDayDraftActive(false);
       setActivePreview("weekly");
       rememberHistory(buildHistoryEntry("weekly", range, result.periodLabel, result.reportText, result.commitCount, result.projectCount, false, result.outputFile));
       setStatus(result.outputFile ? `${result.periodLabel} 周报已生成` : `${result.periodLabel} 周报已生成，未写入文件`);
@@ -484,6 +489,7 @@ function App() {
       setLastOutputFile(result.outputFile);
       setCommitCount(result.commitCount);
       setProjectCount(result.projectCount);
+      setBlankDayDraftActive(false);
       setActivePreview("monthly");
       rememberHistory(buildHistoryEntry("monthly", range, result.periodLabel, result.reportText, result.commitCount, result.projectCount, false, result.outputFile));
       setStatus(result.outputFile ? `${result.periodLabel} 月报已生成` : `${result.periodLabel} 月报已生成，未写入文件`);
@@ -595,6 +601,7 @@ function App() {
     setLastOutputFile(entry.outputFile);
     setCommitCount(entry.commitCount);
     setProjectCount(entry.projectCount ?? entry.repoCount);
+    setBlankDayDraftActive(isBlankDayHistoryEntry(entry));
 
     if (entry.mode === "monthly") {
       setMonthlyMonth(entry.periodLabel);
@@ -822,6 +829,7 @@ function App() {
     setLastOutputFile("");
     setCommitCount(0);
     setProjectCount(0);
+    setBlankDayDraftActive(true);
     setActivePreview("summary");
     setBlankDayOpen(false);
     setStatus(`已应用空白日补写草稿：${targetDate}`);
@@ -862,6 +870,7 @@ function App() {
         rootDirs={settings.rootDirs}
         repoCount={repos.length}
         commitCount={commitCount}
+        blankDayDraftActive={blankDayDraftActive}
         projectCount={projectCount}
         author={settings.author}
         dailyDate={dailyDate}
@@ -1004,6 +1013,10 @@ function hasAiWarning(warnings: string[]) {
   return warnings.some((warning) => warning.includes("AI 润色失败"));
 }
 
+function isBlankDayHistoryEntry(entry: ReportHistoryEntry) {
+  return entry.title.startsWith("空白日补写") || entry.periodLabel.includes("补写草稿");
+}
+
 function createHistoryId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
@@ -1032,5 +1045,7 @@ function formatExtractProgress(progress: CommitExtractProgress) {
 }
 
 export default App;
+
+
 
 
