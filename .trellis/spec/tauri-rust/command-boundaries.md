@@ -486,3 +486,93 @@ report_text = apply_ai_to_period_report(
     &mut warnings,
 );
 ```
+
+## Scenario: On-Demand Workspace Health Inspection
+
+### 1. Scope / Trigger
+
+- Trigger: the workbench needs a transient health read model for configured roots and cached repositories.
+- The inspection is local and read-only: it may read path metadata, `.git` markers, and the current branch, but must not read commit history, mutate repositories, persist results, or call AI.
+
+### 2. Signatures
+
+```rust
+pub struct WorkspaceHealthOptions {
+    pub root_dirs: Vec<String>,
+    pub indexed_repos: Vec<RepoInfo>,
+    pub disabled_repos: Vec<String>,
+}
+
+pub struct WorkspaceHealthResult {
+    pub roots: Vec<WorkspaceRootHealth>,
+    pub repos: Vec<WorkspaceRepoHealth>,
+}
+
+async fn inspect_workspace_health(
+    options: WorkspaceHealthOptions,
+) -> Result<WorkspaceHealthResult, String>;
+
+pub(crate) fn repo_path_is_valid(repo: &RepoInfo) -> bool;
+```
+
+The command wrapper calls `workspace_health::inspect(options)` through `async_runtime::spawn_blocking`. TypeScript invokes `inspect_workspace_health` with `{ options: { rootDirs, indexedRepos, disabledRepos } }`.
+
+### 3. Contracts
+
+- IPC fields use camelCase; status enum values use snake_case.
+- Root status is `healthy | missing | inaccessible | not_directory`.
+- Repository status is `healthy | missing | inaccessible | not_git | branch_unknown | branch_changed`.
+- A `.git` directory or file is valid so ordinary repositories and Git worktrees share the same path contract.
+- `currentBranch` is empty when the branch cannot be read; `cachedBranch` always mirrors the indexed `RepoInfo.branch`.
+- `disabled` is derived from the current `disabledRepos` input. The command never changes settings.
+- `scannedAt` is excluded from this command. Repository cache time remains a frontend-owned scan timestamp, while health results remain in memory only.
+- Settings diagnostics must reuse `repo_path_is_valid` instead of defining a second `.git` validity rule.
+
+### 4. Validation & Error Matrix
+
+- Root metadata is a directory -> `healthy`.
+- Root metadata returns `NotFound` -> `missing`; another I/O error -> `inaccessible`; an existing non-directory -> `not_directory`.
+- Repository directory returns `NotFound` -> `missing`; another directory metadata error -> `inaccessible`; an existing non-directory -> `not_git`.
+- `.git` marker returns `NotFound` -> `not_git`; another marker metadata error -> `inaccessible`.
+- Current branch is empty or `unknown` -> `branch_unknown`; differs from cached branch -> `branch_changed`; otherwise -> `healthy`.
+- Per-item filesystem/Git failures become item statuses and details, not a whole-command failure.
+- Blocking task join failure -> command returns `检查工作区健康状态失败：<cause>`.
+
+### 5. Good/Base/Bad Cases
+
+- Good: one missing root and two valid repositories return all three rows, allowing the UI to repair only the affected index entry.
+- Base: empty inputs return empty root/repository arrays without reading Git or AI state.
+- Good: a worktree with `.git` as a file remains valid.
+- Bad: call recursive repository discovery or Git log extraction from the health command; inspection must stay bounded to configured inputs.
+- Bad: return only aggregate counts; repair actions require stable per-path rows.
+
+### 6. Tests Required
+
+- Rust tests cover healthy/missing/non-directory/inaccessible roots and healthy/missing/non-Git/branch-unknown/branch-changed repositories.
+- Assert disabled-state projection and `.git` file/directory compatibility through the shared validity helper.
+- Playwright asserts the exact camelCase payload and snake_case response statuses.
+- Run `npm run build`, `npm run test:e2e`, `cargo fmt -- --check`, `cargo check`, and `cargo test` after changing this contract.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+#[tauri::command]
+fn inspect_workspace_health(options: WorkspaceHealthOptions) -> WorkspaceHealthResult {
+    scan_and_read_all_commits(options.root_dirs)
+}
+```
+
+#### Correct
+
+```rust
+#[tauri::command]
+async fn inspect_workspace_health(
+    options: WorkspaceHealthOptions,
+) -> Result<WorkspaceHealthResult, String> {
+    async_runtime::spawn_blocking(move || workspace_health::inspect(options))
+        .await
+        .map_err(|err| format!("检查工作区健康状态失败：{err}"))
+}
+```

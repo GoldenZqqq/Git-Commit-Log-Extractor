@@ -2,7 +2,7 @@ use crate::{
     diagnostics::item,
     git_ops,
     models::{DiagnosticItem, DiagnosticSeverity, RepoInfo},
-    pdf,
+    pdf, workspace_health,
 };
 use std::{
     fs,
@@ -120,7 +120,7 @@ pub fn repo_index(indexed_repos: &[RepoInfo]) -> DiagnosticItem {
 
     let invalid = indexed_repos
         .iter()
-        .filter(|repo| !is_valid_repo_path(repo))
+        .filter(|repo| !workspace_health::repo_path_is_valid(repo))
         .collect::<Vec<_>>();
     if invalid.is_empty() {
         return item(
@@ -275,15 +275,6 @@ fn validate_output_dir(output_dir: &str) -> Result<(), (String, String)> {
             "更换输出目录，或检查当前用户对该目录的写入权限。".to_string(),
         )
     })
-}
-
-fn is_valid_repo_path(repo: &RepoInfo) -> bool {
-    let path = PathBuf::from(repo.path.trim());
-    if !path.is_dir() {
-        return false;
-    }
-    let marker = path.join(".git");
-    marker.is_dir() || marker.is_file()
 }
 
 fn probe_writable_dir(path: &Path) -> Result<(), String> {

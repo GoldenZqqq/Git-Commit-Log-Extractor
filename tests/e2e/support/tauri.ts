@@ -36,6 +36,7 @@ type MockScenario = {
   secureApiKey?: string | null;
   scanRepos?: RepoInfo[];
   scanWarnings?: string[];
+  workspaceHealthResult?: Record<string, unknown>;
   extractResults?: Array<{
     repos?: RepoInfo[];
     summaryText: string;
@@ -148,6 +149,7 @@ export async function launchApp(page: Page, scenario: MockScenario) {
     secureApiKey: scenario.secureApiKey ?? null,
     scanRepos: scenario.scanRepos ?? scenario.repoCache?.repos ?? [],
     scanWarnings: scenario.scanWarnings ?? [],
+    workspaceHealthResult: scenario.workspaceHealthResult ?? { roots: [], repos: [] },
     extractResults: scenario.extractResults ?? [],
     periodResults: scenario.periodResults ?? {},
     diagnosticsResult: scenario.diagnosticsResult ?? {
@@ -345,6 +347,8 @@ export async function launchApp(page: Page, scenario: MockScenario) {
                 repos: state.scanRepos ?? [],
                 warnings: state.scanWarnings ?? [],
               };
+            case "inspect_workspace_health":
+              return state.workspaceHealthResult;
             case "extract_commits":
               return nextExtractResult();
             case "generate_period_report":

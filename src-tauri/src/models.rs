@@ -27,6 +27,64 @@ pub struct RepoScanResult {
     pub warnings: Vec<String>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceHealthOptions {
+    #[serde(default)]
+    pub root_dirs: Vec<String>,
+    #[serde(default)]
+    pub indexed_repos: Vec<RepoInfo>,
+    #[serde(default)]
+    pub disabled_repos: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkspaceRootStatus {
+    Healthy,
+    Missing,
+    Inaccessible,
+    NotDirectory,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkspaceRepoStatus {
+    Healthy,
+    Missing,
+    Inaccessible,
+    NotGit,
+    BranchUnknown,
+    BranchChanged,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceRootHealth {
+    pub path: String,
+    pub status: WorkspaceRootStatus,
+    pub detail: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceRepoHealth {
+    pub path: String,
+    pub name: String,
+    pub cached_branch: String,
+    pub current_branch: String,
+    pub status: WorkspaceRepoStatus,
+    pub detail: String,
+    pub disabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceHealthResult {
+    pub roots: Vec<WorkspaceRootHealth>,
+    pub repos: Vec<WorkspaceRepoHealth>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommitExtractProgress {

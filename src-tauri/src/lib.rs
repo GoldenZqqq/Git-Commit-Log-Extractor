@@ -9,6 +9,7 @@ mod network;
 mod pdf;
 pub mod report;
 mod secure_store;
+mod workspace_health;
 mod zip_store;
 
 use crate::models::{
@@ -17,7 +18,8 @@ use crate::models::{
     GitIdentity, HeatmapOptions, HeatmapResult, MappingEntry, MonthlyReportOptions,
     MonthlyReportResult, PeriodReportOptions, PeriodReportResult, ProxyCandidate, ProxyConfig,
     ProxyTestResult, RepoScanProgress, RepoScanResult, ReportEnhanceOptions, ReportEnhanceResult,
-    TrendOptions, TrendResult, WorkRhythmOptions, WorkRhythmResult,
+    TrendOptions, TrendResult, WorkRhythmOptions, WorkRhythmResult, WorkspaceHealthOptions,
+    WorkspaceHealthResult,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -68,6 +70,15 @@ async fn scan_repos(
 #[tauri::command]
 fn cancel_repo_scan(state: State<'_, RepoScanState>) {
     state.cancel_requested.store(true, Ordering::Relaxed);
+}
+
+#[tauri::command]
+async fn inspect_workspace_health(
+    options: WorkspaceHealthOptions,
+) -> Result<WorkspaceHealthResult, String> {
+    async_runtime::spawn_blocking(move || workspace_health::inspect(options))
+        .await
+        .map_err(|err| format!("检查工作区健康状态失败：{err}"))
 }
 
 #[tauri::command]
@@ -367,6 +378,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             scan_repos,
             cancel_repo_scan,
+            inspect_workspace_health,
             get_git_identity,
             extract_commits,
             generate_monthly_report,

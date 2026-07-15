@@ -17,6 +17,7 @@ import {
   RotateCcw,
   Search,
   Settings2,
+  ShieldCheck,
   Sparkles,
   TerminalSquare,
   Trash2,
@@ -38,6 +39,7 @@ import {
   type ReportPolishReview,
   type RepoInfo,
   type RepoScanProgress,
+  type WorkspaceHealthResult,
 } from "../model";
 import {
   activeTaskLabel,
@@ -56,6 +58,7 @@ import { ReportQualityPanel } from "./ReportQualityPanel";
 import { SupplementalItemsEditor } from "./SupplementalItemsEditor";
 import { type TrendResult } from "./TrendPanel";
 import { type WorkRhythmResult } from "./WorkRhythmPanel";
+import { WorkspaceHealthView } from "./WorkspaceHealthView";
 
 type Props = {
   repos: RepoInfo[];
@@ -72,6 +75,10 @@ type Props = {
   reportHistory: ReportHistoryEntry[];
   activeHistoryId: string;
   repoCount: number;
+  repoScannedAt: string;
+  workspaceHealth: WorkspaceHealthResult | null;
+  workspaceHealthLoading: boolean;
+  workspaceHealthError: string;
   commitCount: number;
   blankDayDraftActive?: boolean;
   projectCount: number;
@@ -113,6 +120,8 @@ type Props = {
   onEditRepo: (repo: RepoInfo) => void;
   onRefreshRepos: () => void;
   onCancelRepoScan: () => void;
+  onRefreshWorkspaceHealth: () => void;
+  onRemoveRepoFromIndex: (path: string) => void;
   onPreviewChange: (preview: PreviewMode) => void;
   onOpenSettings: () => void;
   rootDirs: string[];
@@ -125,7 +134,7 @@ type Props = {
 
 type AssistPanel = "repos" | "history" | "quality";
 
-type WorkbenchView = "report" | "insights";
+type WorkbenchView = "report" | "insights" | "health";
 
 export function Workbench(props: Props) {
   const previewMeta = props.aiConfigured ? "AI 可润色" : "Markdown 渲染";
@@ -235,6 +244,11 @@ export function Workbench(props: Props) {
       loadAllInsightsData();
     }
   }
+
+  useEffect(() => {
+    if (workbenchView !== "health" || props.workspaceHealth || props.workspaceHealthLoading || props.workspaceHealthError) return;
+    props.onRefreshWorkspaceHealth();
+  }, [workbenchView, props.workspaceHealth, props.workspaceHealthLoading, props.workspaceHealthError, props.onRefreshWorkspaceHealth]);
 
   useEffect(() => {
     if (!isPreviewExpanded) return;
@@ -411,6 +425,17 @@ export function Workbench(props: Props) {
         >
           <Activity size={14} />
           洞察
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={workbenchView === "health"}
+          className={workbenchView === "health" ? "active" : ""}
+          disabled={reviewPending}
+          onClick={() => handleViewChange("health")}
+        >
+          <ShieldCheck size={14} />
+          健康
         </button>
       </div>
 
@@ -847,7 +872,7 @@ export function Workbench(props: Props) {
           </div>
         </aside>
       </div>
-      ) : (
+      ) : workbenchView === "insights" ? (
       <InsightsView
         heatmapData={heatmapData}
         heatmapLoading={heatmapLoading}
@@ -877,6 +902,21 @@ export function Workbench(props: Props) {
           setWorkbenchView("report");
           props.onOpenBlankDayFillFromCalendar(date);
         }}
+      />
+      ) : (
+      <WorkspaceHealthView
+        result={props.workspaceHealth}
+        loading={props.workspaceHealthLoading}
+        error={props.workspaceHealthError}
+        scannedAt={props.repoScannedAt}
+        rootDirs={props.rootDirs}
+        rescanning={isRepoScanning}
+        scanBlocked={scanBlocked}
+        onRefresh={props.onRefreshWorkspaceHealth}
+        onRescan={props.onRefreshRepos}
+        onOpenSettings={props.onOpenSettings}
+        onToggleRepo={props.onToggleRepo}
+        onRemoveRepo={props.onRemoveRepoFromIndex}
       />
       )}
 

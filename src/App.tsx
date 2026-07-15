@@ -11,6 +11,7 @@ import { SettingsDialog } from "./components/SettingsDialog";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { Workbench } from "./components/Workbench";
 import { useAppRuntime } from "./hooks/useAppRuntime";
+import { useWorkspaceHealth } from "./hooks/useWorkspaceHealth";
 import {
   taskIsActive,
   type AppTaskKind,
@@ -55,6 +56,7 @@ import {
   normalizeReportHistoryLimit,
   loadSettingsState,
   parseProjectNames,
+  persistRepoIndexCache,
   rememberReportHistoryEntry,
   saveReportHistory,
   saveRepoIndexCache,
@@ -94,7 +96,9 @@ type RunTaskInput = {
 function App() {
   const [loadedSettings] = useState<LoadedSettingsState>(loadSettingsState);
   const [settings, setSettings] = useState<AppSettings>(loadedSettings.settings);
-  const [repos, setRepos] = useState<RepoInfo[]>(() => loadRepoIndexCache(loadedSettings.settings.rootDirs)?.repos ?? []);
+  const [initialRepoCache] = useState(() => loadRepoIndexCache(loadedSettings.settings.rootDirs));
+  const [repos, setRepos] = useState<RepoInfo[]>(() => initialRepoCache?.repos ?? []);
+  const [repoScannedAt, setRepoScannedAt] = useState(() => initialRepoCache?.scannedAt ?? "");
   const [summaryText, setSummaryText] = useState("");
   const [dailyDate, setDailyDate] = useState(getToday);
   const [customReport, setCustomReport] = useState("");
@@ -118,6 +122,11 @@ function App() {
   );
   const [appMessage, setAppMessage] = useState<AppMessage | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const workspaceHealth = useWorkspaceHealth({
+    rootDirs: settings.rootDirs,
+    indexedRepos: repos,
+    disabledRepos: settings.disabledRepos,
+  });
   const { activeTasks, tryStartTask, finishTask } = useTaskActivity();
   const isRepoScanning = taskIsActive(activeTasks, "scan");
   const [scanProgress, setScanProgress] = useState<RepoScanProgress | null>(null);
@@ -288,6 +297,7 @@ function App() {
   useEffect(() => {
     if (settings.rootDirs.length === 0) {
       setRepos([]);
+      setRepoScannedAt("");
       clearRepoIndexCache();
       return;
     }
@@ -295,11 +305,13 @@ function App() {
     const repoCache = loadRepoIndexCache(settings.rootDirs);
     if (repoCache) {
       setRepos(repoCache.repos);
+      setRepoScannedAt(repoCache.scannedAt);
       setStatus(`已载入 ${repoCache.repos.length} 个缓存仓库索引`);
       return;
     }
 
     setRepos([]);
+    setRepoScannedAt("");
     if (settings.onboardingDone) {
       setStatus("工作目录已更新，请点击重新扫描仓库索引");
       return;
@@ -370,6 +382,7 @@ function App() {
             : `已发现 ${result.repos.length} 个仓库`,
           result.warnings.length > 0 ? { tone: "warning", notify: true, duration: 4200 } : undefined,
         );
+        workspaceHealth.refreshIfLoaded(result.repos);
       },
       validate: () => validateWorkspaceSettings(settings),
     });
@@ -888,11 +901,27 @@ function App() {
       if (!enabled) disabled.push(repoPath);
       return { ...current, disabledRepos: disabled };
     });
+    workspaceHealth.setRepoDisabled(repoPath, !enabled);
   }
 
   function updateRepoIndex(nextRepos: RepoInfo[]) {
     setRepos(nextRepos);
-    saveRepoIndexCache(settings.rootDirs, nextRepos);
+    const cache = saveRepoIndexCache(settings.rootDirs, nextRepos);
+    setRepoScannedAt(cache.scannedAt);
+  }
+
+  function removeRepoFromIndex(repoPath: string) {
+    const repo = repos.find((item) => item.path === repoPath);
+    if (!repo || !window.confirm(`仅从 GitPulse 索引移除“${repo.name}”？本地仓库目录不会被删除。`)) return;
+    const nextRepos = repos.filter((item) => item.path !== repoPath);
+    setRepos(nextRepos);
+    persistRepoIndexCache({ rootDirs: settings.rootDirs, repos: nextRepos, scannedAt: repoScannedAt });
+    setSettings((current) => ({
+      ...current,
+      disabledRepos: current.disabledRepos.filter((path) => path !== repoPath),
+    }));
+    workspaceHealth.removeRepo(repoPath);
+    setStatus(`已从索引移除“${repo.name}”，本地目录未删除`, { tone: "success", notify: true });
   }
 
   function saveRepoMapping(scope: MappingScope, displayName: string) {
@@ -1067,6 +1096,10 @@ function handleBlankDayGenerated(payload: {
         activeHistoryId={activeHistoryId}
         rootDirs={settings.rootDirs}
         repoCount={repos.length}
+        repoScannedAt={repoScannedAt}
+        workspaceHealth={workspaceHealth.result}
+        workspaceHealthLoading={workspaceHealth.loading}
+        workspaceHealthError={workspaceHealth.error}
         commitCount={commitCount}
         blankDayDraftActive={blankDayDraftActive}
         projectCount={projectCount}
@@ -1107,6 +1140,8 @@ function handleBlankDayGenerated(payload: {
         onEditRepo={setEditingRepo}
         onRefreshRepos={scanWorkspace}
         onCancelRepoScan={cancelRepoScan}
+        onRefreshWorkspaceHealth={() => void workspaceHealth.refresh()}
+        onRemoveRepoFromIndex={removeRepoFromIndex}
         onAddRootDirs={addRootDirs}
         onPreviewChange={changePreview}
         onOpenSettings={() => setSettingsOpen(true)}

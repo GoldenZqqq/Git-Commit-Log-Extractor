@@ -164,3 +164,87 @@ rememberHistory(buildHistoryEntry(result.reportText));
 - Cover accept, reject, `Escape`, AI failure, focus return, and pending-review operation locks.
 - Cover added/removed/unchanged rendering, all heuristic categories, and the visible bounded-fallback state.
 - Verify light and dark themes for the inline review surface.
+
+## Workspace Health Projection and Repository Cache Ownership
+
+### 1. Scope / Trigger
+
+- Trigger: the UI needs to inspect cached repository paths without turning health status into persisted source-of-truth state.
+- `App.tsx` continues to own roots, repositories, disabled paths, and scan time. `useWorkspaceHealth` owns only the transient command result and request lifecycle.
+
+### 2. Signatures
+
+```ts
+useWorkspaceHealth(params: {
+  rootDirs: string[];
+  indexedRepos: RepoInfo[];
+  disabledRepos: string[];
+}): {
+  result: WorkspaceHealthResult | null;
+  loading: boolean;
+  error: string;
+  refresh(reposOverride?: RepoInfo[]): Promise<void>;
+  refreshIfLoaded(reposOverride: RepoInfo[]): void;
+  setRepoDisabled(path: string, disabled: boolean): void;
+  removeRepo(path: string): void;
+};
+
+saveRepoIndexCache(rootDirs, repos): RepoIndexCache;
+persistRepoIndexCache(cache): RepoIndexCache;
+```
+
+### 3. Contracts
+
+- Opening the health tab with no result triggers one on-demand inspection. Health results are never written to localStorage.
+- The hook reads the latest roots/repos/disabled paths through refs so long-running callers do not reuse stale render closures.
+- One request version owns each result. A root change invalidates the prior version, clears the old result/error/loading state, and permits a new request even if the old promise is still pending.
+- Same-context duplicate refreshes are ignored while one request is active. A superseded request must not clear or overwrite a newer request.
+- Scan completion calls `refreshIfLoaded(scannedRepos)`: refresh an already initialized or in-flight health view with the exact scan result, superseding the older request when necessary, but do not inspect for users who never opened health.
+- Toggle and remove actions update the App source of truth and optimistically project the same change into the health result.
+- `scannedAt` changes only through `saveRepoIndexCache` after a real scan. Removing an index entry calls `persistRepoIndexCache` with the original timestamp.
+- Removing an index entry requires confirmation, removes only GitPulse cache/settings state, and never deletes the local directory.
+
+### 4. Validation & Error Matrix
+
+- No roots and no indexed repositories -> show the actionable workspace empty state.
+- First inspection pending -> show a bounded skeleton while keeping header actions available.
+- First inspection fails -> show the Chinese error with retry; do not invent a healthy summary.
+- Refresh fails with an existing result -> keep the last result in memory and expose the error state for retry behavior.
+- Roots change while a request is pending -> issue a new-version request; ignore the old response.
+- Scan completes after the health tab loaded mid-scan -> refresh with `RepoScanResult.repos`, not the pre-scan closure.
+- Malformed/missing cache time -> render `尚未完成扫描`; do not derive health time in Rust.
+
+### 5. Good/Base/Bad Cases
+
+- Good: health opens lazily, then a rescan refreshes repository rows and scan time together.
+- Base: users who stay on report/insights never pay for branch health inspection.
+- Good: removing a missing repository updates the health table, repository drawer, generation scope, disabled paths, and cache while preserving `scannedAt`.
+- Bad: persist `WorkspaceHealthResult`; path/branch status becomes stale as soon as the filesystem changes.
+- Bad: guard all requests with one boolean that survives a root change; the new workspace request can be swallowed by the old one.
+- Bad: test `workspaceHealth.result` from a scan-start render; users opening health during the scan can retain old repository rows.
+
+### 6. Tests Required
+
+- Playwright covers empty, healthy, partially invalid, light, and dark states plus refresh, toggle, remove, and generation-scope synchronization.
+- Defer `inspect_workspace_health` and assert a root change starts a second request whose payload uses empty/new roots and repositories.
+- Defer `scan_repos`, open health while it is pending, then assert scan completion refreshes health with returned repositories.
+- Assert removal preserves the stored `scannedAt`, while a real scan produces a new timestamp.
+- Run `npm run build` and full `npm run test:e2e` after changing this contract.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```ts
+if (workspaceHealth.result) {
+  void workspaceHealth.refresh(scanResult.repos); // Captures scan-start render state.
+}
+```
+
+#### Correct
+
+```ts
+workspaceHealth.refreshIfLoaded(scanResult.repos);
+
+// The hook reads current result/params refs and request version internally.
+```

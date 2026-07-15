@@ -45,6 +45,36 @@ export type RepoScanResult = {
   warnings: string[];
 };
 
+export type WorkspaceRootStatus = "healthy" | "missing" | "inaccessible" | "not_directory";
+export type WorkspaceRepoStatus =
+  | "healthy"
+  | "missing"
+  | "inaccessible"
+  | "not_git"
+  | "branch_unknown"
+  | "branch_changed";
+
+export type WorkspaceRootHealth = {
+  path: string;
+  status: WorkspaceRootStatus;
+  detail: string;
+};
+
+export type WorkspaceRepoHealth = {
+  path: string;
+  name: string;
+  cachedBranch: string;
+  currentBranch: string;
+  status: WorkspaceRepoStatus;
+  detail: string;
+  disabled: boolean;
+};
+
+export type WorkspaceHealthResult = {
+  roots: WorkspaceRootHealth[];
+  repos: WorkspaceRepoHealth[];
+};
+
 export type CommitExtractProgress = {
   totalRepos: number;
   completedRepos: number;
@@ -556,7 +586,17 @@ export function saveRepoIndexCache(rootDirs: string[], repos: RepoInfo[]) {
     repos,
     scannedAt: new Date().toISOString(),
   };
-  localStorage.setItem(REPO_INDEX_CACHE_KEY, JSON.stringify(cache));
+  return persistRepoIndexCache(cache);
+}
+
+export function persistRepoIndexCache(cache: RepoIndexCache) {
+  const normalized: RepoIndexCache = {
+    rootDirs: cache.rootDirs.filter(isNonEmptyString).map(stripWindowsVerbatimPrefix),
+    repos: cache.repos.filter(isRepoInfo),
+    scannedAt: typeof cache.scannedAt === "string" ? cache.scannedAt : "",
+  };
+  localStorage.setItem(REPO_INDEX_CACHE_KEY, JSON.stringify(normalized));
+  return normalized;
 }
 
 export function clearRepoIndexCache() {
