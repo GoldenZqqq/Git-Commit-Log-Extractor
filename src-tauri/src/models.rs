@@ -667,4 +667,3 @@ fn default_custom_report_template() -> String {
     ]
     .join("\n")
 }
-

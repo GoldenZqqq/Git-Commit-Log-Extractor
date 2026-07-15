@@ -2313,6 +2313,3 @@ mod tests {
         assert!(dow3 >= 5); // weekend
     }
 }
-
-
-

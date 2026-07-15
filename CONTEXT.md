@@ -91,5 +91,3 @@ Domain expert: "Add or update a project name mapping. Keep evidence detail tied 
 Developer: "The user had no commits today. Should AI polishing invent a daily report?"
 
 Domain expert: "No. AI polishing only rewrites an existing report draft. Offer Blank Day Fill so the user can select a source period, choose repositories, and generate a continuity draft with disclosure."
-
-

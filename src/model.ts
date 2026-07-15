@@ -1556,5 +1556,3 @@ function getIsoWeekParts(date: Date) {
   const week = Math.ceil(((target.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
   return { year: target.getUTCFullYear(), week };
 }
-
-

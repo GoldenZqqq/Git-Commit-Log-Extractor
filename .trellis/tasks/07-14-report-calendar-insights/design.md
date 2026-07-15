@@ -64,9 +64,9 @@ Map<string /* YYYY-MM-DD */, ReportHistoryEntry[]>
 reportHistoryLimit: 30 | 60 | 120 | 200; // default 120
 ```
 
-- 持久化：随现有 `settings` localStorage 方案  
-- UI：`SettingsDialog` →「报告历史」或扩展「报告与历史」  
-  - `<select>`：30 / 60 / 120 / 200  
+- 持久化：随现有 `settings` localStorage 方案
+- UI：`SettingsDialog` →「报告历史」或扩展「报告与历史」
+  - `<select>`：30 / 60 / 120 / 200
   - 按钮「清空全部历史」→ `window.confirm` → `clearReportHistory` + 清空 React state
 
 ### Read/Write
@@ -85,10 +85,10 @@ reportHistoryLimit: 30 | 60 | 120 | 200; // default 120
 
 ## Layout Order
 
-1. Insights header + refresh  
-2. ContributionHeatmap  
-3. **ReportCalendar**（通栏）  
-4. bottom-grid：WorkRhythm | Trend  
+1. Insights header + refresh
+2. ContributionHeatmap
+3. **ReportCalendar**（通栏）
+4. bottom-grid：WorkRhythm | Trend
 
 ## Empty Day Actions
 
@@ -113,11 +113,11 @@ isBusy: boolean;
 
 ## UI States
 
-1. Loading：不必，历史已在内存  
-2. Empty：无 entries  
-3. Month with dots  
-4. Day popover when `entries.length > 1`  
-5. Dark theme tokens 与 insights 卡片一致  
+1. Loading：不必，历史已在内存
+2. Empty：无 entries
+3. Month with dots
+4. Day popover when `entries.length > 1`
+5. Dark theme tokens 与 insights 卡片一致
 
 ## Risks
 
@@ -129,16 +129,13 @@ isBusy: boolean;
 
 ## Implementation Order（预告）
 
-1. model：`reportHistoryLimit` 设置字段 + normalize + load/save 使用动态 limit  
-2. SettingsDialog：保留条数 + 清空  
-3. App：limit 变更裁剪、清空回调统一  
-4. ReportCalendar 纯展示 + anchor helper  
-5. InsightsView / Workbench 接入  
-6. 明暗色与 AC 手工验收  
+1. model：`reportHistoryLimit` 设置字段 + normalize + load/save 使用动态 limit
+2. SettingsDialog：保留条数 + 清空
+3. App：limit 变更裁剪、清空回调统一
+4. ReportCalendar 纯展示 + anchor helper
+5. InsightsView / Workbench 接入
+6. 明暗色与 AC 手工验收
 
 ## Open for design freeze
 
 见 `prd.md`：Open Questions 已全部关闭，规划可进入 implement.md 细化或 `task.py start`。
-
-
-

@@ -1446,6 +1446,3 @@ function PanelTitle({ icon, title, meta, action }: { icon: ReactNode; title: str
     </div>
   );
 }
-
-
-

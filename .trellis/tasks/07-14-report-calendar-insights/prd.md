@@ -4,8 +4,8 @@
 
 在 **洞察（Insights）** 视图中新增「报告日历」模块，以月历方式呈现用户本地历史报告（日报 / 周报 / 月报 / 自定义 / 空白日补写），支持点击回看已有报告。与提交热力图形成双轴叙事：
 
-- **提交热力图**：你写了多少代码  
-- **报告日历**：你产出了多少报告  
+- **提交热力图**：你写了多少代码
+- **报告日历**：你产出了多少报告
 
 本任务先完成规划收敛与 PRD；实现阶段另经 `task.py start` 批准后进行。
 
@@ -49,8 +49,8 @@
    - **月报**：周期结束日 `range.endDate`（月末）
    - **自定义**：优先 `range.endDate`，若单日则 start
 5. **交互**：
-   - 点击有报告的日期 → 若仅 1 条：直接 `onOpenHistory(entry)` 打开到工作台预览  
-   - 若多条：弹出轻量列表（标题 / 类型 / 时间），再选中打开  
+   - 点击有报告的日期 → 若仅 1 条：直接 `onOpenHistory(entry)` 打开到工作台预览
+   - 若多条：弹出轻量列表（标题 / 类型 / 时间），再选中打开
    - 点击无报告日期：**弹出轻量操作**（非阻断）
      - 文案：该日暂无报告
      - 操作：「生成日报」→ 以该日为日报目标日触发生成
@@ -67,37 +67,37 @@
 
 ### Out of Scope（MVP）
 
-- 云同步、多设备、团队共享  
-- 与提交热力图像素级叠加为同一张图  
-- 单条删除、按类型筛选保留、按天/月自动过期  
-- 关闭「自动写入历史」开关（二期可选）  
-- 年视图、议程列表主视图  
-- 导出日历 ICS / 历史归档到磁盘  
+- 云同步、多设备、团队共享
+- 与提交热力图像素级叠加为同一张图
+- 单条删除、按类型筛选保留、按天/月自动过期
+- 关闭「自动写入历史」开关（二期可选）
+- 年视图、议程列表主视图
+- 导出日历 ICS / 历史归档到磁盘
 
 ## Requirements
 
-1. **R0 报告历史设置**  
+1. **R0 报告历史设置**
    在设置中提供「保留最近 N 条」（30/60/120/200，默认 120）与「清空全部历史」（二次确认）。偏好持久化到本机设置；清空与写入切片均遵守当前 N。
 
-2. **R1 洞察接入**  
+2. **R1 洞察接入**
    `InsightsView` 在提交热力图正下方增加报告日历通栏；由上层传入 `reportHistory` 与打开/生成/补写回调。
 
-3. **R2 月历渲染**  
+3. **R2 月历渲染**
    按月展示日期格；标记当日有报告；支持月份切换。
 
-4. **R3 类型区分**  
+4. **R3 类型区分**
    至少区分：日报、补写草稿、周报、月报、自定义（可用颜色/缩写点）。
 
-5. **R4 打开报告**  
+5. **R4 打开报告**
    单击有报告的日期 → 单条直开 / 多条先选后开；打开后行为与侧栏历史一致（含补写标记恢复逻辑若已有）。
 
-5b. **R4b 空日快捷**  
+5b. **R4b 空日快捷**
    单击无报告的日期 → 展示「该日暂无报告」+「生成日报」「空白日补写」；生成日报将该日设为日报日期并走现有提取；补写打开现有弹窗并预填目标日。
 
-6. **R5 历史上限生效**  
+6. **R5 历史上限生效**
    所有 `save`/`load` 路径使用用户配置的 N，不再写死 30；改小 N 时立即裁剪内存与持久化列表。
 
-7. **R6 可访问与主题**  
+7. **R6 可访问与主题**
    支持明暗色；键盘可聚焦日期格（至少 tab + enter）；中文 UI。
 
 ## Acceptance Criteria
@@ -133,12 +133,12 @@
 
 ## Technical Notes（详设见 design.md）
 
-- 设置：`AppSettings` 增加 `reportHistoryLimit`（number 联合类型 30|60|120|200）；`SettingsDialog` 报告相关分区展示。  
-- 历史读写：`load/saveReportHistory` 使用配置的 limit，不再依赖单一模块常量硬编码。  
-- 前端组件建议：`ReportCalendar.tsx` + 样式；挂入 `InsightsView`。  
-- 数据：`ReportHistoryEntry[]` 纯派生，按 anchor day 聚合 `Map<date, entries[]>`。  
-- 补写识别：与现有一致 — `title.startsWith("空白日补写")` 或 `periodLabel.includes("补写草稿")`。  
-- Workbench 需把 `reportHistory`、`onOpenHistory` 传入 InsightsView。  
+- 设置：`AppSettings` 增加 `reportHistoryLimit`（number 联合类型 30|60|120|200）；`SettingsDialog` 报告相关分区展示。
+- 历史读写：`load/saveReportHistory` 使用配置的 limit，不再依赖单一模块常量硬编码。
+- 前端组件建议：`ReportCalendar.tsx` + 样式；挂入 `InsightsView`。
+- 数据：`ReportHistoryEntry[]` 纯派生，按 anchor day 聚合 `Map<date, entries[]>`。
+- 补写识别：与现有一致 — `title.startsWith("空白日补写")` 或 `periodLabel.includes("补写草稿")`。
+- Workbench 需把 `reportHistory`、`onOpenHistory` 传入 InsightsView。
 - 不必新增 Rust command。
 
 ## Open Questions
@@ -167,8 +167,3 @@
 ## Non-Goals 再强调
 
 这不是考勤、绩效评分或强制日报检查工具；是 **个人本地报告产出回看** 的可视化。
-
-
-
-
-

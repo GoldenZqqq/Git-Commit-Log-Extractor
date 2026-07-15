@@ -803,7 +803,7 @@ function App() {
   const showUpdateBanner = Boolean(updateSummary) && !updateBannerDismissed;
 
 
-  
+
   function handleGenerateDailyFromCalendar(date: string) {
     setBlankDayDraftActive(false);
     setActivePreview("summary");
@@ -1066,7 +1066,3 @@ function formatExtractProgress(progress: CommitExtractProgress) {
 }
 
 export default App;
-
-
-
-
