@@ -62,16 +62,20 @@ function useWorkspaceHealthRequest(params: Params) {
 export function useWorkspaceHealth(params: Params) {
   const request = useWorkspaceHealthRequest(params);
 
-  const setRepoDisabled = useCallback((path: string, disabled: boolean) => {
+  const setReposDisabled = useCallback((paths: string[], disabled: boolean) => {
+    const pathSet = new Set(paths);
     request.setResult((current) => {
       const next = current ? {
         ...current,
-        repos: current.repos.map((repo) => repo.path === path ? { ...repo, disabled } : repo),
+        repos: current.repos.map((repo) => pathSet.has(repo.path) ? { ...repo, disabled } : repo),
       } : current;
       request.resultRef.current = next;
       return next;
     });
   }, [request.resultRef, request.setResult]);
+  const setRepoDisabled = useCallback((path: string, disabled: boolean) => {
+    setReposDisabled([path], disabled);
+  }, [setReposDisabled]);
 
   const removeRepo = useCallback((path: string) => {
     request.setResult((current) => {
@@ -98,6 +102,7 @@ export function useWorkspaceHealth(params: Params) {
     refresh,
     refreshIfLoaded,
     setRepoDisabled,
+    setReposDisabled,
     removeRepo,
   };
 }

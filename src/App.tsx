@@ -904,6 +904,23 @@ function App() {
     workspaceHealth.setRepoDisabled(repoPath, !enabled);
   }
 
+  function setReposEnabled(repoPaths: string[], enabled: boolean) {
+    const uniquePaths = [...new Set(repoPaths.filter(Boolean))];
+    const disabledPaths = new Set(settings.disabledRepos);
+    const changedPaths = uniquePaths.filter((path) => enabled ? disabledPaths.has(path) : !disabledPaths.has(path));
+    if (changedPaths.length === 0) return;
+    setSettings((current) => {
+      const nextDisabled = new Set(current.disabledRepos);
+      for (const path of changedPaths) {
+        if (enabled) nextDisabled.delete(path);
+        else nextDisabled.add(path);
+      }
+      return { ...current, disabledRepos: [...nextDisabled] };
+    });
+    workspaceHealth.setReposDisabled(changedPaths, !enabled);
+    setStatus(`已${enabled ? "启用" : "禁用"}当前结果中的 ${changedPaths.length} 个仓库`, { tone: "success", notify: true });
+  }
+
   function updateRepoIndex(nextRepos: RepoInfo[]) {
     setRepos(nextRepos);
     const cache = saveRepoIndexCache(settings.rootDirs, nextRepos);
@@ -1137,6 +1154,7 @@ function handleBlankDayGenerated(payload: {
         canExport={settings.outputEnabled && Boolean(settings.outputDir.trim())}
         disabledRepos={settings.disabledRepos}
         onToggleRepo={toggleRepo}
+        onSetReposEnabled={setReposEnabled}
         onEditRepo={setEditingRepo}
         onRefreshRepos={scanWorkspace}
         onCancelRepoScan={cancelRepoScan}

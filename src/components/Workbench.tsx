@@ -6,14 +6,12 @@ import {
   Clipboard,
   FileDown,
   FileText,
-  FolderPlus,
   GitBranch,
   History,
   Layers,
   Loader2,
   Maximize2,
   Minimize2,
-  RefreshCw,
   RotateCcw,
   Search,
   Settings2,
@@ -29,7 +27,6 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { invoke } from "@tauri-apps/api/core";
 import {
   loadBlankDayTipDismissed,
-  resolveRepoDisplayName,
   saveBlankDayTipDismissed,
   type CommitExtractProgress,
   type DateRange,
@@ -55,6 +52,7 @@ import { InsightsView } from "./InsightsView";
 import { MarkdownPreview } from "./MarkdownPreview";
 import { ReportPolishReviewPanel } from "./ReportPolishReviewPanel";
 import { ReportQualityPanel } from "./ReportQualityPanel";
+import { RepositoryPanel } from "./RepositoryPanel";
 import { SupplementalItemsEditor } from "./SupplementalItemsEditor";
 import { type TrendResult } from "./TrendPanel";
 import { type WorkRhythmResult } from "./WorkRhythmPanel";
@@ -117,6 +115,7 @@ type Props = {
   disabledRepos: string[];
   projectNames: Record<string, string>;
   onToggleRepo: (path: string, enabled: boolean) => void;
+  onSetReposEnabled: (paths: string[], enabled: boolean) => void;
   onEditRepo: (repo: RepoInfo) => void;
   onRefreshRepos: () => void;
   onCancelRepoScan: () => void;
@@ -337,12 +336,6 @@ export function Workbench(props: Props) {
     : props.outputEnabled
       ? "请选择输出目录后再导出报告"
       : "请先开启输出到文件并选择输出目录";
-  const repoMeta = enabledRepoCount === props.repos.length
-    ? `${props.repos.length} repos`
-    : `${enabledRepoCount}/${props.repos.length} repos`;
-  const scanProgressText = props.scanProgress
-    ? `已检查 ${props.scanProgress.scannedDirs} 个目录 · 发现 ${props.scanProgress.foundRepos} 个仓库`
-    : "";
   const extractProgressText = props.extractProgress && !props.extractProgress.done
     ? `${props.extractProgress.completedRepos}/${props.extractProgress.totalRepos} 仓库 · ${props.extractProgress.concurrency} 并发 · ${props.extractProgress.commitCount} 条提交`
     : visibleStatus;
@@ -764,84 +757,22 @@ export function Workbench(props: Props) {
 
           <div className="assist-panel">
             {visibleAssistPanel === "repos" && (
-              <section className="repo-drawer" aria-label="仓库索引">
-                <PanelTitle
-                  icon={<TerminalSquare size={17} />}
-                  title="仓库索引"
-                  meta={repoMeta}
-                  action={(
-                    <button
-                      className="repo-refresh-button"
-                      type="button"
-                      onClick={isRepoScanning ? props.onCancelRepoScan : props.onRefreshRepos}
-                      disabled={scanBlocked && !isRepoScanning}
-                      aria-label={isRepoScanning ? "取消仓库扫描" : "重新扫描仓库索引"}
-                      title={isRepoScanning ? "取消仓库扫描" : "重新扫描仓库索引"}
-                    >
-                      {isRepoScanning ? <XCircle size={14} /> : <RefreshCw size={14} />}
-                      {isRepoScanning ? "取消扫描" : "重新扫描"}
-                    </button>
-                  )}
-                />
-                {isRepoScanning && props.scanProgress && (
-                  <div className="repo-scan-progress" role="status" aria-live="polite">
-                    <div>
-                      <Loader2 className="spin" size={14} />
-                      <span>{scanProgressText}</span>
-                    </div>
-                    {props.scanProgress.currentPath && (
-                      <span className="repo-scan-path" title={props.scanProgress.currentPath}>
-                        {props.scanProgress.currentPath}
-                      </span>
-                    )}
-                  </div>
-                )}
-                <div className="repo-list">
-                  {props.repos.length === 0 && (
-                    <RepoEmptyState
-                      hasRootDirs={props.rootDirs.length > 0}
-                      scanBlocked={scanBlocked}
-                      isRepoScanning={isRepoScanning}
-                      onAddRootDirs={props.onAddRootDirs}
-                      onRefreshRepos={props.onRefreshRepos}
-                      onOpenSettings={props.onOpenSettings}
-                    />
-                  )}
-                  {props.repos.map((repo) => {
-                    const enabled = !props.disabledRepos.includes(repo.path);
-                    const displayName = resolveRepoDisplayName(repo, props.projectNames);
-                    const isMapped = displayName !== repo.name;
-                    return (
-                      <article className={`repo-row ${enabled ? "" : "disabled"}`} key={repo.path}>
-                        <label
-                          className="repo-toggle"
-                          title={enabled ? "已纳入报告，点击排除该仓库" : "已排除，点击重新纳入报告"}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={enabled}
-                            onChange={(event) => props.onToggleRepo(repo.path, event.target.checked)}
-                          />
-                          <span aria-hidden="true" />
-                        </label>
-                        <button
-                          type="button"
-                          className="repo-info"
-                          onClick={() => props.onEditRepo(repo)}
-                          title="点击编辑项目映射名称"
-                        >
-                          <strong className="repo-display-name">{displayName}</strong>
-                          <span className="repo-meta">
-                            {isMapped && <em className="repo-origin">{repo.name}</em>}
-                            <em className="repo-branch" title={repo.branch}>{repo.branch}</em>
-                          </span>
-                          <span className="repo-path">{repo.path}</span>
-                        </button>
-                      </article>
-                    );
-                  })}
-                </div>
-              </section>
+              <RepositoryPanel
+                repos={props.repos}
+                disabledRepos={props.disabledRepos}
+                projectNames={props.projectNames}
+                rootDirs={props.rootDirs}
+                isScanning={isRepoScanning}
+                scanBlocked={scanBlocked}
+                scanProgress={props.scanProgress}
+                onToggleRepo={props.onToggleRepo}
+                onSetReposEnabled={props.onSetReposEnabled}
+                onEditRepo={props.onEditRepo}
+                onRefreshRepos={props.onRefreshRepos}
+                onCancelRepoScan={props.onCancelRepoScan}
+                onAddRootDirs={props.onAddRootDirs}
+                onOpenSettings={props.onOpenSettings}
+              />
             )}
 
             {visibleAssistPanel === "history" && (
@@ -1117,68 +1048,6 @@ function HistoryFilterBar({
         </button>
       )}
     </div>
-  );
-}
-
-function RepoEmptyState({
-  hasRootDirs,
-  scanBlocked,
-  isRepoScanning,
-  onAddRootDirs,
-  onRefreshRepos,
-  onOpenSettings,
-}: {
-  hasRootDirs: boolean;
-  scanBlocked: boolean;
-  isRepoScanning: boolean;
-  onAddRootDirs: () => void;
-  onRefreshRepos: () => void;
-  onOpenSettings: () => void;
-}) {
-  const scanningDisabled = scanBlocked || isRepoScanning;
-  return (
-    <section className="repo-empty-state" aria-label="仓库索引为空">
-      <div className="repo-empty-icon" aria-hidden="true">
-        <TerminalSquare size={18} />
-      </div>
-      <div className="repo-empty-copy">
-        <strong>{hasRootDirs ? "还没有扫描到 Git 仓库" : "先添加仓库根目录"}</strong>
-        <p>
-          {hasRootDirs
-            ? "已配置目录，但当前索引为空。通常是目录层级不对、目录下没有 .git，或扫描还没有重新执行。"
-            : "选择存放代码项目的文件夹后，GitPulse 会扫描其中的本地 Git 仓库。"}
-        </p>
-      </div>
-      {hasRootDirs ? (
-        <ul className="repo-empty-checks">
-          <li>确认选择的是包含项目的上层目录。</li>
-          <li>确认项目目录内存在 `.git`。</li>
-          <li>移动或新增仓库后请重新扫描。</li>
-        </ul>
-      ) : (
-        <ul className="repo-empty-checks">
-          <li>可以选择 `D:\workspace` 这类项目集合目录。</li>
-          <li>多个工作区可分次添加。</li>
-        </ul>
-      )}
-      <div className="repo-empty-actions">
-        <button type="button" onClick={onAddRootDirs} disabled={scanBlocked}>
-          <FolderPlus size={14} />
-          {hasRootDirs ? "添加其他目录" : "添加目录"}
-        </button>
-        {hasRootDirs ? (
-          <button type="button" onClick={onRefreshRepos} disabled={scanningDisabled}>
-            <RefreshCw size={14} />
-            重新扫描
-          </button>
-        ) : (
-          <button type="button" onClick={onOpenSettings}>
-            <Settings2 size={14} />
-            打开设置
-          </button>
-        )}
-      </div>
-    </section>
   );
 }
 

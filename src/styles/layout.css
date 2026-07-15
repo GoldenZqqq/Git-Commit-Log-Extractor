@@ -574,7 +574,7 @@
 
 .repo-drawer {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   row-gap: 10px;
   max-height: 100%;
 }

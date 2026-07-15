@@ -186,6 +186,7 @@ useWorkspaceHealth(params: {
   refresh(reposOverride?: RepoInfo[]): Promise<void>;
   refreshIfLoaded(reposOverride: RepoInfo[]): void;
   setRepoDisabled(path: string, disabled: boolean): void;
+  setReposDisabled(paths: string[], disabled: boolean): void;
   removeRepo(path: string): void;
 };
 
@@ -200,7 +201,7 @@ persistRepoIndexCache(cache): RepoIndexCache;
 - One request version owns each result. A root change invalidates the prior version, clears the old result/error/loading state, and permits a new request even if the old promise is still pending.
 - Same-context duplicate refreshes are ignored while one request is active. A superseded request must not clear or overwrite a newer request.
 - Scan completion calls `refreshIfLoaded(scannedRepos)`: refresh an already initialized or in-flight health view with the exact scan result, superseding the older request when necessary, but do not inspect for users who never opened health.
-- Toggle and remove actions update the App source of truth and optimistically project the same change into the health result.
+- Single/bulk toggle and remove actions update the App source of truth and optimistically project the same change into the health result.
 - `scannedAt` changes only through `saveRepoIndexCache` after a real scan. Removing an index entry calls `persistRepoIndexCache` with the original timestamp.
 - Removing an index entry requires confirmation, removes only GitPulse cache/settings state, and never deletes the local directory.
 
@@ -248,3 +249,46 @@ workspaceHealth.refreshIfLoaded(scanResult.repos);
 
 // The hook reads current result/params refs and request version internally.
 ```
+
+## Filtered Repository Batch Scope
+
+### Signatures
+
+```ts
+type RepoStatusFilter = "all" | "enabled" | "disabled";
+
+setReposEnabled(repoPaths: string[], enabled: boolean): void;
+
+type RepositoryPanelProps = {
+  repos: RepoInfo[];
+  disabledRepos: string[];
+  projectNames: Record<string, string>;
+  onSetReposEnabled(paths: string[], enabled: boolean): void;
+};
+```
+
+### Contracts
+
+- `RepositoryPanel` owns transient query/status UI state. Search is trimmed, case-insensitive substring matching over original name, `resolveRepoDisplayName`, path, and cached branch.
+- Status filtering and query matching produce one `visibleEntries` collection. Batch paths must be mapped directly from that final collection; do not re-run a second filter in App.
+- “启用当前结果” and “禁用当前结果” are disabled when no visible repository would actually change.
+- App deduplicates the received paths and performs one functional `settings.disabledRepos` update.
+- Enabling removes only received paths. Disabling appends only received paths. Unmatched repositories and stale disabled paths remain untouched.
+- The same changed-path list is sent to `useWorkspaceHealth.setReposDisabled`; generation scope, health projection, repository rows, and persisted settings therefore converge in one render cycle.
+- Bulk toggle is reversible and does not require confirmation. Status feedback includes the actual changed count.
+- When every indexed repository is disabled, the UI states that generation scope is zero and routes users to the disabled filter before bulk recovery.
+
+### Good / Base / Bad Cases
+
+- Good: query `api` with two matches disables those two paths, keeps three unmatched repositories unchanged, and preserves a stale disabled path.
+- Base: blank query + `all` targets the whole current index.
+- Good: `disabled` filter + query restores only the disabled matches and leaves other disabled repositories unchanged.
+- Bad: pass every repository path to App and ask App to repeat the component filter; mapping/search semantics can drift.
+- Bad: replace `disabledRepos` with only the visible result; hidden and stale disabled paths are silently lost.
+
+### Tests Required
+
+- Playwright searches by original/mapped name, path, and branch and combines each with status filters.
+- Assert batch disable/restore updates generation scope, repository counts, localStorage, and an already-loaded workspace health result.
+- Assert unmatched repositories and stale disabled paths survive the round trip.
+- Cover the all-disabled dark-theme recovery path and search-empty reset action.
