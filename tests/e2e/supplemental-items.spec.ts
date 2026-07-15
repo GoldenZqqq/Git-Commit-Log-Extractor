@@ -74,6 +74,8 @@ test("adds non-Git supplemental facts to every report mode and history", async (
   const [enhanceCall] = await commandCalls(page, "enhance_report");
   expect(enhanceCall.args.options.baseReport).toContain("用户补充事项（非 Git）");
   expect(enhanceCall.args.options.refinementInstruction).toContain("用户明确提供的事实");
+  await page.getByRole("button", { name: "接受润色" }).click();
+  await expect(page.getByRole("region", { name: "AI 润色对照" })).toHaveCount(0);
 
   await generateWithSupplement(page, "周报", "参加周会并同步风险");
   await generateWithSupplement(page, "月报", "完成月度复盘会议");

@@ -717,6 +717,276 @@
   box-shadow: 0 14px 32px rgba(24, 35, 52, 0.18);
 }
 
+.polish-review {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  color: var(--ink);
+  background: var(--canvas);
+}
+
+.polish-review:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.polish-review-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--canvas-line);
+  background: var(--paper);
+  box-shadow: var(--shadow-sm);
+}
+
+.polish-review-toolbar h3,
+.polish-review-toolbar p,
+.polish-review h4,
+.polish-risk-panel p {
+  margin: 0;
+}
+
+.polish-review-toolbar h3 {
+  font-size: 15px;
+  font-weight: 860;
+}
+
+.polish-review-toolbar p {
+  margin-top: 3px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.polish-review-summary,
+.polish-review-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.polish-review-summary span {
+  border-radius: var(--radius-xs);
+  padding: 4px 6px;
+  color: var(--ink-soft);
+  background: var(--paper-soft);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 760;
+}
+
+.polish-review-summary .added {
+  color: var(--primary-dark);
+  background: var(--primary-soft);
+}
+
+.polish-review-summary .removed {
+  color: var(--danger-strong);
+  background: var(--danger-soft);
+}
+
+.polish-review-summary .attention {
+  color: var(--ink);
+  background: rgba(245, 158, 11, 0.18);
+}
+
+.polish-review-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 32px;
+  border: 1px solid var(--canvas-line);
+  border-radius: var(--radius-sm);
+  padding: 6px 9px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.polish-review-reject {
+  color: var(--ink-soft);
+  background: var(--paper-soft);
+}
+
+.polish-review-accept {
+  border-color: var(--primary) !important;
+  color: #fff;
+  background: var(--primary-dark);
+}
+
+.polish-review-actions button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.polish-review-actions button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.polish-risk-panel {
+  display: grid;
+  gap: 6px;
+  margin: 12px 14px 0;
+  border: 1px solid rgba(245, 158, 11, 0.34);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  color: var(--ink-soft);
+  background: rgba(245, 158, 11, 0.1);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.polish-risk-panel > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+}
+
+.polish-risk-panel ul {
+  display: grid;
+  gap: 6px;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.polish-risk-panel li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 3px 8px;
+  border-top: 1px solid rgba(245, 158, 11, 0.24);
+  padding-top: 6px;
+}
+
+.polish-risk-panel li strong {
+  color: var(--ink);
+}
+
+.polish-risk-panel li code {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.polish-risk-clear {
+  color: var(--ink-soft);
+}
+
+.polish-review-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  margin: 12px 14px 0;
+}
+
+.polish-review-columns section,
+.polish-diff {
+  min-width: 0;
+  border: 1px solid var(--canvas-line);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+}
+
+.polish-review h4 {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--canvas-line);
+  font-size: 11px;
+  font-weight: 840;
+}
+
+.polish-review-columns pre {
+  min-height: 150px;
+  max-height: 240px;
+  margin: 0;
+  overflow: auto;
+  padding: 10px;
+  color: var(--canvas-text);
+  background: var(--paper-soft);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.polish-diff {
+  margin: 10px 14px 14px;
+}
+
+.polish-diff-list {
+  overflow: auto;
+  background: var(--paper-soft);
+}
+
+.polish-diff-fallback {
+  margin: 0;
+  border-bottom: 1px solid var(--canvas-line);
+  padding: 8px 10px;
+  color: var(--ink-soft);
+  background: rgba(245, 158, 11, 0.1);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.polish-diff-line {
+  display: grid;
+  grid-template-columns: 34px 34px 20px minmax(0, 1fr);
+  min-height: 25px;
+  border-bottom: 1px solid var(--canvas-line);
+  color: var(--canvas-text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.polish-diff-line:last-child {
+  border-bottom: 0;
+}
+
+.polish-diff-line > span {
+  padding: 4px 6px;
+  color: var(--muted);
+  text-align: right;
+  user-select: none;
+}
+
+.polish-diff-line code {
+  min-width: 0;
+  padding: 4px 8px;
+  color: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.polish-diff-line.added {
+  color: var(--primary-dark);
+  background: var(--primary-soft);
+}
+
+.polish-diff-line.removed {
+  color: var(--danger-strong);
+  background: var(--danger-soft);
+}
+
+.polish-diff-line.added .polish-diff-marker,
+.polish-diff-line.removed .polish-diff-marker {
+  color: inherit;
+  font-weight: 900;
+}
+
 .preview-loading {
   display: flex;
   flex-direction: column;

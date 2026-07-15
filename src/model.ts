@@ -177,6 +177,19 @@ export type ReportHistoryEntry = {
   supplementalItems?: string[];
 };
 
+export type ReportPolishReview = {
+  mode: PreviewMode;
+  range: DateRange;
+  periodLabel: string;
+  originalText: string;
+  polishedText: string;
+  warnings: string[];
+  repoCount: number;
+  commitCount: number;
+  projectCount: number;
+  supplementalItems: string[];
+};
+
 export type UpdateSummary = {
   currentVersion: string;
   version: string;

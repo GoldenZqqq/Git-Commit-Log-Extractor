@@ -71,7 +71,11 @@ test("keeps the original preview and unrelated controls available while polishin
   await expect(page.getByRole("button", { name: "打开设置" })).toBeEnabled();
 
   await releaseCommand(page, "enhance_report");
-  await expect(page.getByText("保留事实并优化表达")).toBeVisible();
+  const review = page.getByRole("region", { name: "AI 润色对照" });
+  await expect(review).toBeVisible();
+  await expect(review.getByRole("region", { name: "原稿" })).toContainText("保留当前报告上下文");
+  await expect(review.getByRole("region", { name: "润色稿" })).toContainText("保留事实并优化表达");
+  await review.getByRole("button", { name: "保留原稿" }).click();
 });
 
 test("keeps the preview readable and copyable while exporting", async ({ page }) => {

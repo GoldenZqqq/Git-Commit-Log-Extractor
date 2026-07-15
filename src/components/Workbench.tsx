@@ -24,7 +24,7 @@ import {
   UserRound,
   XCircle,
 } from "lucide-react";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   loadBlankDayTipDismissed,
@@ -35,6 +35,7 @@ import {
   type PreviewMode,
   type ReportExportFormat,
   type ReportHistoryEntry,
+  type ReportPolishReview,
   type RepoInfo,
   type RepoScanProgress,
 } from "../model";
@@ -50,6 +51,7 @@ import { type HeatmapResult } from "./ContributionHeatmap";
 import { CustomRangeDialog } from "./CustomRangeDialog";
 import { InsightsView } from "./InsightsView";
 import { MarkdownPreview } from "./MarkdownPreview";
+import { ReportPolishReviewPanel } from "./ReportPolishReviewPanel";
 import { ReportQualityPanel } from "./ReportQualityPanel";
 import { SupplementalItemsEditor } from "./SupplementalItemsEditor";
 import { type TrendResult } from "./TrendPanel";
@@ -62,6 +64,7 @@ type Props = {
   status: string;
   warnings: string[];
   activeTasks: ActiveTaskState;
+  polishReview: ReportPolishReview | null;
   scanProgress: RepoScanProgress | null;
   extractProgress: CommitExtractProgress | null;
   lastOutputFile: string;
@@ -95,6 +98,8 @@ type Props = {
   onGenerateCustom: (range: DateRange) => void;
   onGenerateMonthly: (month: string) => void;
   onPolish: (extraInstruction?: string) => void;
+  onAcceptPolishReview: () => void;
+  onRejectPolishReview: () => void;
   onCopy: () => void;
   onExport: (format: ReportExportFormat) => void;
   onOpenHistory: (entry: ReportHistoryEntry) => void;
@@ -129,9 +134,10 @@ export function Workbench(props: Props) {
   const isExporting = taskIsActive(props.activeTasks, "export");
   const isInteracting = taskIsActive(props.activeTasks, "interaction");
   const isRepoScanning = taskIsActive(props.activeTasks, "scan");
-  const generateBlocked = !taskCanStart(props.activeTasks, "generate");
-  const polishBlocked = !taskCanStart(props.activeTasks, "polish");
-  const exportBlocked = !taskCanStart(props.activeTasks, "export");
+  const reviewPending = Boolean(props.polishReview);
+  const generateBlocked = reviewPending || !taskCanStart(props.activeTasks, "generate");
+  const polishBlocked = reviewPending || !taskCanStart(props.activeTasks, "polish");
+  const exportBlocked = reviewPending || !taskCanStart(props.activeTasks, "export");
   const interactionBlocked = !taskCanStart(props.activeTasks, "interaction");
   const scanBlocked = !taskCanStart(props.activeTasks, "scan");
   const visibleStatus = activeTaskLabel(props.activeTasks) || props.status;
@@ -152,6 +158,17 @@ export function Workbench(props: Props) {
   const [trendData, setTrendData] = useState<TrendResult | null>(null);
   const [trendLoading, setTrendLoading] = useState(false);
   const [trendGranularity, setTrendGranularity] = useState<"weekly" | "monthly">("weekly");
+  const polishButtonRef = useRef<HTMLButtonElement>(null);
+  const hadPolishReviewRef = useRef(false);
+
+  useEffect(() => {
+    if (props.polishReview) {
+      hadPolishReviewRef.current = true;
+    } else if (hadPolishReviewRef.current && !isExporting) {
+      hadPolishReviewRef.current = false;
+      polishButtonRef.current?.focus();
+    }
+  }, [isExporting, props.polishReview]);
 
   const loadHeatmapData = useCallback(() => {
     if (heatmapLoading) return;
@@ -389,6 +406,7 @@ export function Workbench(props: Props) {
           role="tab"
           aria-selected={workbenchView === "insights"}
           className={workbenchView === "insights" ? "active" : ""}
+          disabled={reviewPending}
           onClick={() => handleViewChange("insights")}
         >
           <Activity size={14} />
@@ -403,19 +421,19 @@ export function Workbench(props: Props) {
             <div className="canvas-topline">
               <PanelTitle icon={<Sparkles size={17} />} title="报告预览" meta={previewMeta} />
               <div className="report-switch" aria-label="报告类型切换">
-                <button type="button" aria-pressed={props.activePreview === "summary"} className={props.activePreview === "summary" ? "active" : ""} onClick={() => handlePreviewChange("summary")}>
+                <button type="button" aria-pressed={props.activePreview === "summary"} className={props.activePreview === "summary" ? "active" : ""} disabled={reviewPending} onClick={() => handlePreviewChange("summary")}>
                   <span>Daily</span>
                   日报
                 </button>
-                <button type="button" aria-pressed={props.activePreview === "weekly"} className={props.activePreview === "weekly" ? "active" : ""} onClick={() => handlePreviewChange("weekly")}>
+                <button type="button" aria-pressed={props.activePreview === "weekly"} className={props.activePreview === "weekly" ? "active" : ""} disabled={reviewPending} onClick={() => handlePreviewChange("weekly")}>
                   <span>Weekly</span>
                   周报
                 </button>
-                <button type="button" aria-pressed={props.activePreview === "monthly"} className={props.activePreview === "monthly" ? "active" : ""} onClick={() => handlePreviewChange("monthly")}>
+                <button type="button" aria-pressed={props.activePreview === "monthly"} className={props.activePreview === "monthly" ? "active" : ""} disabled={reviewPending} onClick={() => handlePreviewChange("monthly")}>
                   <span>Monthly</span>
                   月报
                 </button>
-                <button type="button" aria-pressed={props.activePreview === "custom"} className={props.activePreview === "custom" ? "active" : ""} onClick={() => handlePreviewChange("custom")}>
+                <button type="button" aria-pressed={props.activePreview === "custom"} className={props.activePreview === "custom" ? "active" : ""} disabled={reviewPending} onClick={() => handlePreviewChange("custom")}>
                   <span>Custom</span>
                   自定义
                 </button>
@@ -431,7 +449,7 @@ export function Workbench(props: Props) {
                   monthlyMonth={props.monthlyMonth}
                   monthlyRange={props.monthlyRange}
                   customRange={props.customRange}
-                  periodLocked={isGenerating}
+                  periodLocked={isGenerating || reviewPending}
                   onDailyDateChange={props.onDailyDateChange}
                   onWeeklyWeekChange={props.onWeeklyWeekChange}
                   onMonthlyMonthChange={props.onMonthlyMonthChange}
@@ -488,6 +506,7 @@ export function Workbench(props: Props) {
                 {props.previewText && (
                   <div className="polish-split">
                     <button
+                      ref={polishButtonRef}
                       className={`preview-polish-button ${!props.aiConfigured ? "warning" : ""}`}
                       type="button"
                       onClick={() => props.onPolish()}
@@ -636,7 +655,7 @@ export function Workbench(props: Props) {
             </div>
             <SupplementalItemsEditor
               value={props.supplementalItemsText}
-              disabled={isGenerating || isPolishing}
+              disabled={isGenerating || isPolishing || reviewPending}
               onChange={props.onSupplementalItemsChange}
             />
             <GenerationScopeStrip
@@ -653,7 +672,14 @@ export function Workbench(props: Props) {
             />
           </div>
           <div className="preview-shell">
-            {isGenerating ? (
+            {props.polishReview ? (
+              <ReportPolishReviewPanel
+                review={props.polishReview}
+                accepting={isExporting}
+                onAccept={props.onAcceptPolishReview}
+                onReject={props.onRejectPolishReview}
+              />
+            ) : isGenerating ? (
               <div className="preview-loading">
                 <Loader2 className="spin" size={32} />
                 <p>{extractProgressText}</p>
@@ -798,6 +824,7 @@ export function Workbench(props: Props) {
                 entries={props.reportHistory}
                 activeHistoryId={props.activeHistoryId}
                 generationBlocked={generateBlocked}
+                reportLocked={reviewPending}
                 onOpen={props.onOpenHistory}
                 onCopy={props.onCopyHistory}
                 onRegenerate={props.onRegenerateHistory}
@@ -903,6 +930,7 @@ function ReportHistoryPanel({
   entries,
   activeHistoryId,
   generationBlocked,
+  reportLocked,
   onOpen,
   onCopy,
   onRegenerate,
@@ -911,6 +939,7 @@ function ReportHistoryPanel({
   entries: ReportHistoryEntry[];
   activeHistoryId: string;
   generationBlocked: boolean;
+  reportLocked: boolean;
   onOpen: (entry: ReportHistoryEntry) => void;
   onCopy: (entry: ReportHistoryEntry) => void;
   onRegenerate: (entry: ReportHistoryEntry) => void;
@@ -953,7 +982,7 @@ function ReportHistoryPanel({
         title="最近报告"
         meta={entries.length > 0 ? (hasFilters ? `${filteredEntries.length}/${entries.length} 条` : `${entries.length} 条`) : "生成后自动记录"}
         action={(
-          <button className="history-clear-button" type="button" onClick={onClear} disabled={entries.length === 0 || generationBlocked}>
+          <button className="history-clear-button" type="button" onClick={onClear} disabled={entries.length === 0 || generationBlocked || reportLocked}>
             <Trash2 size={13} />
             清空
           </button>
@@ -980,6 +1009,7 @@ function ReportHistoryPanel({
               entries={filteredEntries}
               activeHistoryId={activeHistoryId}
               generationBlocked={generationBlocked}
+              reportLocked={reportLocked}
               onOpen={onOpen}
               onCopy={onCopy}
               onRegenerate={onRegenerate}
@@ -1116,6 +1146,7 @@ function HistoryList({
   entries,
   activeHistoryId,
   generationBlocked,
+  reportLocked,
   onOpen,
   onCopy,
   onRegenerate,
@@ -1123,6 +1154,7 @@ function HistoryList({
   entries: ReportHistoryEntry[];
   activeHistoryId: string;
   generationBlocked: boolean;
+  reportLocked: boolean;
   onOpen: (entry: ReportHistoryEntry) => void;
   onCopy: (entry: ReportHistoryEntry) => void;
   onRegenerate: (entry: ReportHistoryEntry) => void;
@@ -1135,6 +1167,7 @@ function HistoryList({
           entry={entry}
           active={entry.id === activeHistoryId}
           generationBlocked={generationBlocked}
+          reportLocked={reportLocked}
           onOpen={onOpen}
           onCopy={onCopy}
           onRegenerate={onRegenerate}
@@ -1148,6 +1181,7 @@ function HistoryRow({
   entry,
   active,
   generationBlocked,
+  reportLocked,
   onOpen,
   onCopy,
   onRegenerate,
@@ -1155,13 +1189,14 @@ function HistoryRow({
   entry: ReportHistoryEntry;
   active: boolean;
   generationBlocked: boolean;
+  reportLocked: boolean;
   onOpen: (entry: ReportHistoryEntry) => void;
   onCopy: (entry: ReportHistoryEntry) => void;
   onRegenerate: (entry: ReportHistoryEntry) => void;
 }) {
   return (
     <article className={`history-row ${active ? "active" : ""}`}>
-      <button className="history-open-button" type="button" onClick={() => onOpen(entry)} aria-pressed={active} title="打开这份历史报告">
+      <button className="history-open-button" type="button" onClick={() => onOpen(entry)} disabled={reportLocked} aria-pressed={active} title="打开这份历史报告">
         <span className="history-kind">{getHistoryKindLabel(entry.mode)}</span>
         <span className="history-mainline">
           <strong>{entry.title}</strong>

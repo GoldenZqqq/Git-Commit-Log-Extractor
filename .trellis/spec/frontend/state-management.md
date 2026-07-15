@@ -52,9 +52,17 @@ type ActiveTaskState = Partial<Record<AppTaskKind, string>>;
 taskCanStart(activeTasks, nextKind): boolean;
 taskIsActive(activeTasks, kind): boolean;
 useTaskActivity(): { activeTasks, tryStartTask, finishTask };
+
+type RunTaskInput = {
+  kind: AppTaskKind;
+  label: string;
+  task: () => Promise<void>;
+  validate?: () => void;
+  allowDuringPolishReview?: boolean;
+};
 ```
 
-`App.tsx` owns the activity hook and calls `runTask(kind, label, task, validate)`. Components receive `ActiveTaskState` and derive button-specific disabled/loading behavior through the shared helpers.
+`App.tsx` owns the activity hook and calls `runTask(input)`. Components receive `ActiveTaskState` and derive button-specific disabled/loading behavior through the shared helpers. Keep task arguments in the input object so validation and narrow policy exceptions do not grow positional parameters.
 
 ### Contracts
 
@@ -93,3 +101,61 @@ return isBusy ? <PreviewLoading /> : <MarkdownPreview />;
 - Use the Playwright Tauri mock's `deferredCommands` and `releaseCommand()` support to assert UI state while a command is genuinely pending.
 - Cover at least one blocking `generate` task, two non-blocking tasks (`polish` and `export`), same-tick duplicate prevention, and scan cancellation/progress ownership.
 - Assert both sides of the policy: conflicting actions are disabled, while copy/settings/preview remain available where the matrix allows them.
+
+## Pending AI Polish Review
+
+AI output is an untrusted draft until the user explicitly accepts it. `App.tsx` owns one in-memory review snapshot and never persists it across restarts.
+
+### Signatures
+
+```ts
+type ReportPolishReview = {
+  mode: PreviewMode;
+  range: DateRange;
+  periodLabel: string;
+  originalText: string;
+  polishedText: string;
+  warnings: string[];
+  repoCount: number;
+  commitCount: number;
+  projectCount: number;
+  supplementalItems: string[];
+};
+
+buildReportDiff(originalText, polishedText): ReportDiffResult;
+detectPolishFactRisks(originalText, lines): PolishFactRisk[];
+```
+
+### Contracts
+
+- A successful `enhance_report` call creates `ReportPolishReview`; it must not update preview text, report history, or an output file.
+- Capture the source mode, range, counts, and supplemental facts when the review is created. Scan/settings changes may remain available, so acceptance must not recompute source metadata from current state.
+- Accepting may write the configured output file, then applies the polished text and creates the AI history entry. If saving fails, keep the review open for retry.
+- Rejecting or pressing `Escape` only clears the review and returns focus to the AI polish button; it must not write history or files.
+- While a review is pending, block generation, another polish, export, report type/period changes, and history opening. Keep scan, copy, settings, and review scrolling available.
+- An AI warning/failure keeps the local draft and does not create a review.
+
+### Bounded Diff and Risk Hints
+
+- Normalize CRLF/CR to LF and preserve blank lines.
+- Use line-level LCS only while `oldLineCount * newLineCount <= 200_000`.
+- Above that limit, preserve the common prefix/suffix and present the middle as whole-block removal/addition with a visible fallback explanation.
+- Risk detection is heuristic only: new metrics, new strong conclusions, and removed evidence/user-fact lines. Show at most eight unique hints and never mutate the polished text.
+
+### Good / Bad
+
+```ts
+// Good: AI success creates a review with zero persistence side effects.
+setPolishReview({ originalText: baseReport, polishedText: result.reportText, ...sourceSnapshot });
+
+// Bad: applying AI output before the user can audit it.
+setActivePreviewText(activePreview, result.reportText);
+rememberHistory(buildHistoryEntry(result.reportText));
+```
+
+### Tests Required
+
+- Assert preview, history, and `save_report_file` remain unchanged before acceptance.
+- Cover accept, reject, `Escape`, AI failure, focus return, and pending-review operation locks.
+- Cover added/removed/unchanged rendering, all heuristic categories, and the visible bounded-fallback state.
+- Verify light and dark themes for the inline review surface.
