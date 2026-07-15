@@ -355,6 +355,23 @@ test("guides users when workspace has no indexed repositories", async ({ page })
   expect(scanCalls[0].args.rootDirs).toEqual(["C:/empty-workspace"]);
 });
 
+test("keeps valid repositories and shows skipped path warnings after scanning", async ({ page }) => {
+  const scanWarning = "扫描已跳过“C:/workspace/broken-link”：读取链接目标失败（找不到指定文件）";
+  await launchApp(page, {
+    settings,
+    repoCache: createRepoCache(["C:/workspace"], []),
+    scanRepos: repos,
+    scanWarnings: [scanWarning],
+  });
+
+  await expectWorkbench(page);
+  await page.getByLabel("仓库索引为空").getByRole("button", { name: "重新扫描" }).click();
+
+  await expect(page.locator(".run-status")).toContainText("已发现 1 个仓库，部分路径已跳过");
+  await expect(page.getByText(scanWarning)).toBeVisible();
+  await expect(page.getByText("gitpulse", { exact: true })).toBeVisible();
+});
+
 test("shows actionable guidance for empty daily reports", async ({ page }) => {
   await launchApp(page, {
     settings,

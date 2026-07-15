@@ -16,7 +16,7 @@ use crate::models::{
     BlankDayFillResult, DiagnosticOptions, DiagnosticResult, ExtractOptions, ExtractResult,
     GitIdentity, HeatmapOptions, HeatmapResult, MappingEntry, MonthlyReportOptions,
     MonthlyReportResult, PeriodReportOptions, PeriodReportResult, ProxyCandidate, ProxyConfig,
-    ProxyTestResult, RepoInfo, RepoScanProgress, ReportEnhanceOptions, ReportEnhanceResult,
+    ProxyTestResult, RepoScanProgress, RepoScanResult, ReportEnhanceOptions, ReportEnhanceResult,
     TrendOptions, TrendResult, WorkRhythmOptions, WorkRhythmResult,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -35,7 +35,7 @@ async fn scan_repos(
     app: AppHandle,
     state: State<'_, RepoScanState>,
     root_dirs: Vec<String>,
-) -> Result<Vec<RepoInfo>, String> {
+) -> Result<RepoScanResult, String> {
     let cancel_requested = state.cancel_requested.clone();
     cancel_requested.store(false, Ordering::Relaxed);
     let progress_app = app.clone();

@@ -12,7 +12,7 @@ The frontend is TypeScript-first and mirrors Rust command payloads manually. Run
 
 ## Type Organization
 
-- Put cross-component app types in `src/model.ts`, including `AppSettings`, `RepoInfo`, `ExtractResult`, `PeriodReportResult`, and `PreviewMode`.
+- Put cross-component app types in `src/model.ts`, including `AppSettings`, `RepoInfo`, `RepoScanResult`, `ExtractResult`, `PeriodReportResult`, and `PreviewMode`.
 - Keep component-only props and helper types inside the component file.
 - When a Tauri command payload changes, update both `src/model.ts` and the corresponding Rust struct in `src-tauri/src/models.rs`.
 - Rust structs use `#[serde(rename_all = "camelCase")]`, so frontend fields should remain camelCase.

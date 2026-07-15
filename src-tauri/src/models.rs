@@ -22,6 +22,13 @@ pub struct RepoScanProgress {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct RepoScanResult {
+    pub repos: Vec<RepoInfo>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CommitExtractProgress {
     pub total_repos: usize,
     pub completed_repos: usize,

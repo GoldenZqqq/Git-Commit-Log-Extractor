@@ -27,6 +27,102 @@
 - When adding a field, update Rust model defaults/serde behavior and frontend builders in `src/model.ts`.
 - Keep option names tied to product language: report period, author scope, project name mapping, evidence detail, export format.
 
+## Scenario: Cycle-Safe Repository Scan Results
+
+### 1. Scope / Trigger
+
+- Trigger: any Tauri or Rust path recursively discovers Git repositories from one or more user-selected roots.
+- Applies to `scan_repos`, `git_ops::find_git_repos_with_progress`, and the frontend `RepoScanResult` mirror.
+- The scanner may follow directory links, so loop prevention and partial-failure reporting are part of the command contract, not optional UI polish.
+
+### 2. Signatures
+
+```rust
+pub struct RepoScanResult {
+    pub repos: Vec<RepoInfo>,
+    pub warnings: Vec<String>,
+}
+
+pub fn find_git_repos_with_progress<F>(
+    root_dirs: &[String],
+    cancel_requested: &AtomicBool,
+    on_progress: F,
+) -> Result<RepoScanResult, String>
+where
+    F: FnMut(RepoScanProgress);
+
+async fn scan_repos(
+    app: AppHandle,
+    state: State<'_, RepoScanState>,
+    root_dirs: Vec<String>,
+) -> Result<RepoScanResult, String>;
+```
+
+TypeScript mirrors the camelCase response exactly:
+
+```ts
+type RepoScanResult = { repos: RepoInfo[]; warnings: string[] };
+```
+
+### 3. Contracts
+
+- One `RepoScanner` instance owns all roots in a scan and shares a canonical `HashSet<PathBuf>` across them.
+- A directory is canonicalized before progress counting, repository detection, or recursion. The same physical directory is visited at most once even through overlapping roots, symlinks, or Windows junctions.
+- Resolvable directory links are followed; file links are ignored; broken link targets become warnings.
+- Repository paths use canonical display paths, remain stably sorted, and are deduplicated before returning.
+- `RepoScanProgress` fields and the cancellation event remain compatible. The final progress event uses the returned repository count.
+- Warning output contains at most 49 unique details plus one omission summary. The collector must not retain an unbounded set after the detail cap.
+- React saves `result.repos` to the existing cache and shows `result.warnings`; warning data is not persisted in the repository cache by this contract.
+
+### 4. Validation & Error Matrix
+
+- Git executable missing/unusable -> return a hard Chinese `Err`; do not emit a successful result.
+- Cancellation flag set -> return `仓库扫描已取消`; `lib.rs` emits the existing cancelled progress event.
+- Root/child canonicalize failure -> append `规范化目录失败` warning and continue.
+- `read_dir` failure (including a file passed as a root) -> append `读取目录失败` warning and continue other roots.
+- Directory entry or file-type read failure -> append the matching operation warning and continue.
+- Broken symlink/junction target metadata -> append `读取链接目标失败` warning and continue.
+- Canonical identity already visited -> skip silently; this is normal deduplication, not a warning.
+- More than 49 unique path failures -> keep the first 49 details and add one `另有 N 个路径问题未逐条显示` summary.
+
+### 5. Good/Base/Bad Cases
+
+- Good: root A contains a repository and a link back to A; scanning returns the repository once, finishes with two or fewer visited directories, and reports no error.
+- Base: ordinary roots without links preserve the previous repository list, ordering, progress, and cache behavior.
+- Good partial failure: one missing root and one valid root return the valid repository plus a Chinese warning.
+- Bad: deduplicating repositories only after recursion; a directory loop may run until path-length or stack failure before the result is deduplicated.
+- Bad: storing every warning string in a `seen` set after the visible warning cap; the UI is bounded while memory remains unbounded.
+
+### 6. Tests Required
+
+- Rust tests for invalid roots, deterministic `read_dir` failure, broken directory links, warning dedupe/cap, overlapping roots, progress, and cancellation.
+- Unix symlink-cycle test and Windows conditional directory-symlink cycle test; the Windows test may return early only when the OS refuses link creation.
+- Playwright must assert a scan can update valid repositories while displaying returned warning detail and warning status.
+- Run `npm run build`, `npm run test:e2e`, `cargo check`, `cargo test`, and `cargo fmt -- --check` after changing this contract.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+if path.is_dir() {
+    visit_dir(&path)?; // Follows aliases before any physical-directory dedupe.
+}
+```
+
+#### Correct
+
+```rust
+let Some(canonical_dir) = self.canonicalize_dir(dir) else {
+    return Ok(());
+};
+if !self.visited_dirs.insert(canonical_dir.clone()) {
+    return Ok(());
+}
+self.scanned_dirs += 1;
+self.emit_current_progress(root_dir, &canonical_dir);
+```
+
 ## Scenario: App-Level Outbound Proxy
 
 ### 1. Scope / Trigger

@@ -89,7 +89,12 @@ The matrix is the single source of truth for both UI disabled states and the `ru
 ```ts
 // Good: preview policy and invoke guard use the same task kind.
 const exportBlocked = !taskCanStart(activeTasks, "export");
-await runTask("export", "正在导出报告", saveReport, validateOutput);
+await runTask({
+  kind: "export",
+  label: "正在导出报告",
+  task: saveReport,
+  validate: validateOutput,
+});
 
 // Bad: one boolean disables unrelated controls and hides the report.
 setIsBusy(true);

@@ -40,6 +40,11 @@ export type RepoScanProgress = {
   cancelled: boolean;
 };
 
+export type RepoScanResult = {
+  repos: RepoInfo[];
+  warnings: string[];
+};
+
 export type CommitExtractProgress = {
   totalRepos: number;
   completedRepos: number;

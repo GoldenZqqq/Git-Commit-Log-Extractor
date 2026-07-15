@@ -31,6 +31,7 @@ import {
   type ReportPolishReview,
   type RepoInfo,
   type RepoScanProgress,
+  type RepoScanResult,
   type MappingScope,
   STORAGE_KEY,
   buildExtractOptions,
@@ -352,17 +353,23 @@ function App() {
           done: false,
           cancelled: false,
         });
-        const result = await invoke<RepoInfo[]>("scan_repos", { rootDirs: settings.rootDirs });
-        updateRepoIndex(result);
+        const result = await invoke<RepoScanResult>("scan_repos", { rootDirs: settings.rootDirs });
+        updateRepoIndex(result.repos);
+        setWarnings(result.warnings);
         setScanProgress((current) => ({
           rootDir: current?.rootDir ?? "",
           currentPath: current?.currentPath ?? "",
           scannedDirs: current?.scannedDirs ?? 0,
-          foundRepos: result.length,
+          foundRepos: result.repos.length,
           done: true,
           cancelled: false,
         }));
-        setStatus(`已发现 ${result.length} 个仓库`);
+        setStatus(
+          result.warnings.length > 0
+            ? `已发现 ${result.repos.length} 个仓库，部分路径已跳过`
+            : `已发现 ${result.repos.length} 个仓库`,
+          result.warnings.length > 0 ? { tone: "warning", notify: true, duration: 4200 } : undefined,
+        );
       },
       validate: () => validateWorkspaceSettings(settings),
     });

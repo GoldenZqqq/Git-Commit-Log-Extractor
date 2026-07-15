@@ -35,6 +35,7 @@ type MockScenario = {
   gitIdentity?: { userName: string; userEmail: string };
   secureApiKey?: string | null;
   scanRepos?: RepoInfo[];
+  scanWarnings?: string[];
   extractResults?: Array<{
     repos?: RepoInfo[];
     summaryText: string;
@@ -146,6 +147,7 @@ export async function launchApp(page: Page, scenario: MockScenario) {
     },
     secureApiKey: scenario.secureApiKey ?? null,
     scanRepos: scenario.scanRepos ?? scenario.repoCache?.repos ?? [],
+    scanWarnings: scenario.scanWarnings ?? [],
     extractResults: scenario.extractResults ?? [],
     periodResults: scenario.periodResults ?? {},
     diagnosticsResult: scenario.diagnosticsResult ?? {
@@ -339,7 +341,10 @@ export async function launchApp(page: Page, scenario: MockScenario) {
             case "get_git_identity":
               return state.gitIdentity;
             case "scan_repos":
-              return state.scanRepos ?? [];
+              return {
+                repos: state.scanRepos ?? [],
+                warnings: state.scanWarnings ?? [],
+              };
             case "extract_commits":
               return nextExtractResult();
             case "generate_period_report":
