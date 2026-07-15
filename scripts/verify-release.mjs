@@ -83,13 +83,17 @@ function runStep(label, command, commandArgs, cwd) {
 }
 
 function resolveCommand(command) {
-  if (process.platform === "win32" && command === "npm") return "cmd.exe";
+  if (process.platform === "win32" && command === "npm") return process.execPath;
   return command;
 }
 
 function resolveCommandArgs(command, commandArgs) {
   if (process.platform === "win32" && command === "npm") {
-    return ["/d", "/s", "/c", ["npm", ...commandArgs].join(" ")];
+    const npmExecPath = process.env.npm_execpath;
+    if (!npmExecPath) {
+      throw new Error("无法定位当前 npm CLI，请通过 npm run verify:release 执行校验");
+    }
+    return [npmExecPath, ...commandArgs];
   }
   return commandArgs;
 }

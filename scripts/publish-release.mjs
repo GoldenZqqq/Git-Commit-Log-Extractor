@@ -140,12 +140,12 @@ function runCommand(command, args, options = {}) {
 }
 
 function runReleaseBuild(env) {
-  if (process.platform === "win32") {
-    runCommand("cmd.exe", ["/d", "/s", "/c", "npm run tauri:build:release"], { env });
-    return;
+  const npmExecPath = process.env.npm_execpath;
+  if (!npmExecPath) {
+    throw new Error("无法定位当前 npm CLI，请通过 npm run release:win 执行发布");
   }
 
-  runCommand("npm", ["run", "tauri:build:release"], { env });
+  runCommand(process.execPath, [npmExecPath, "run", "tauri:build:release"], { env });
 }
 
 function pickArtifact(directory, matcher) {
