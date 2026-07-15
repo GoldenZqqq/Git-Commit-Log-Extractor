@@ -44,6 +44,7 @@ import { CustomRangeDialog } from "./CustomRangeDialog";
 import { InsightsView } from "./InsightsView";
 import { MarkdownPreview } from "./MarkdownPreview";
 import { ReportQualityPanel } from "./ReportQualityPanel";
+import { SupplementalItemsEditor } from "./SupplementalItemsEditor";
 import { type TrendResult } from "./TrendPanel";
 import { type WorkRhythmResult } from "./WorkRhythmPanel";
 
@@ -75,6 +76,8 @@ type Props = {
   onMonthlyMonthChange: (month: string) => void;
   monthlyRange: DateRange;
   customRange: DateRange;
+  supplementalItemsText: string;
+  onSupplementalItemsChange: (value: string) => void;
   aiConfigured: boolean;
   extractAllBranches: boolean;
   showEvidenceDetails: boolean;
@@ -606,6 +609,11 @@ export function Workbench(props: Props) {
                 </div>
               </div>
             </div>
+            <SupplementalItemsEditor
+              value={props.supplementalItemsText}
+              disabled={props.isBusy}
+              onChange={props.onSupplementalItemsChange}
+            />
             <GenerationScopeStrip
               activePreview={props.activePreview}
               rangeLabel={activeRangeLabel}

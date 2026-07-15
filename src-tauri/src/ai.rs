@@ -75,7 +75,6 @@ pub fn enhance_daily_report(
     )
 }
 
-
 pub fn fill_blank_day_report(
     base_evidence: &str,
     target_date: &str,
@@ -102,12 +101,7 @@ pub fn fill_blank_day_report(
         count,
         user_prompt,
     );
-    enhance_report(
-        base_evidence,
-        blank_day_system_prompt(),
-        &prompt,
-        config,
-    )
+    enhance_report(base_evidence, blank_day_system_prompt(), &prompt, config)
 }
 
 /// 自定义系统提示词非空则采用它，否则回退内置默认。默认字符串保留为同源参照与兜底。
@@ -357,7 +351,6 @@ fn daily_system_prompt() -> &'static str {
     "你是一个严谨的工作日报写作助手。请基于 Git 提交记录润色为当天或指定周期的工作日报，不要虚构没有依据的业务结果、上线结论或百分比。最终输出保持为简洁纯文本或短列表，方便直接复制到工作汇报中。"
 }
 
-
 fn blank_day_system_prompt() -> &'static str {
     "你是一个克制的日报延续草稿助手。请仅基于用户提供的历史 Git 提交线索，为目标日撰写可编辑的日报延续要点。禁止编造上线、验收、业务结果、百分比进度或从未出现过的模块；优先使用跟进、排查、推进、联调、整理等进行中表述。最终只输出短要点列表，不要长文复盘。"
 }
@@ -388,7 +381,6 @@ fn blank_day_user_prompt(
         base_evidence
     )
 }
-
 
 fn monthly_user_prompt(
     base_report: &str,

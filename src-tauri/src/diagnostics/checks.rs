@@ -189,7 +189,11 @@ pub fn author(author: &str) -> DiagnosticItem {
         "author",
         "Git 作者",
         DiagnosticSeverity::Ok,
-        format!("将按 {} 位作者过滤提交记录：{}。", authors.len(), authors.join("、")),
+        format!(
+            "将按 {} 位作者过滤提交记录：{}。",
+            authors.len(),
+            authors.join("、")
+        ),
         "多位作者取并集；如需人人单列可分别在自定义周期生成。",
     )
 }

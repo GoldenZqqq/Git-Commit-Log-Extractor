@@ -103,6 +103,8 @@ pub struct ExtractOptions {
     pub author_display_name: String,
     #[serde(default)]
     pub author_aliases: Vec<AuthorAliasGroup>,
+    #[serde(default)]
+    pub supplemental_items: Vec<String>,
     pub start_date: String,
     pub end_date: String,
     #[serde(default)]
@@ -250,7 +252,6 @@ pub struct BlankDayFillResult {
     pub source_commit_count: u32,
 }
 
-
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DiagnosticOptions {
@@ -333,6 +334,8 @@ pub struct MonthlyReportOptions {
     pub author_display_name: String,
     #[serde(default)]
     pub author_aliases: Vec<AuthorAliasGroup>,
+    #[serde(default)]
+    pub supplemental_items: Vec<String>,
     pub disabled_repos: Vec<String>,
     pub extract_all_branches: bool,
     pub exclude_merge_commits: bool,
@@ -379,6 +382,8 @@ pub struct PeriodReportOptions {
     pub author_display_name: String,
     #[serde(default)]
     pub author_aliases: Vec<AuthorAliasGroup>,
+    #[serde(default)]
+    pub supplemental_items: Vec<String>,
     pub start_date: String,
     pub end_date: String,
     pub period_label: String,

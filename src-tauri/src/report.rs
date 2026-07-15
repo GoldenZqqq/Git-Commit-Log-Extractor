@@ -23,6 +23,59 @@ pub struct ExtractReportFormat<'a> {
     pub templates: &'a ReportFormatTemplates,
 }
 
+const MAX_SUPPLEMENTAL_ITEMS: usize = 20;
+const MAX_SUPPLEMENTAL_ITEM_CHARS: usize = 200;
+
+pub fn append_supplemental_items(
+    report_text: &str,
+    items: &[String],
+    redaction: &ReportRedactionOptions,
+) -> Result<String, String> {
+    let normalized = normalize_supplemental_items(items)?;
+    if normalized.is_empty() {
+        return Ok(report_text.to_string());
+    }
+
+    let lines = normalized
+        .iter()
+        .map(|item| format!("- {item}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let section = format!("## 用户补充事项（非 Git）\n\n{lines}");
+    let section = if redaction.enabled {
+        apply_redaction_rules_to_text(&section, &redaction.rules)
+    } else {
+        section
+    };
+    let base = report_text.trim();
+    Ok(if base.is_empty() {
+        section
+    } else {
+        format!("{base}\n\n{section}")
+    })
+}
+
+fn normalize_supplemental_items(items: &[String]) -> Result<Vec<String>, String> {
+    let normalized = items
+        .iter()
+        .map(|item| item.trim())
+        .filter(|item| !item.is_empty())
+        .collect::<Vec<_>>();
+    if normalized.len() > MAX_SUPPLEMENTAL_ITEMS {
+        return Err(format!("补充事项最多填写 {MAX_SUPPLEMENTAL_ITEMS} 项"));
+    }
+    if let Some(index) = normalized
+        .iter()
+        .position(|item| item.chars().count() > MAX_SUPPLEMENTAL_ITEM_CHARS)
+    {
+        return Err(format!(
+            "第 {} 条补充事项不能超过 {MAX_SUPPLEMENTAL_ITEM_CHARS} 个字符",
+            index + 1
+        ));
+    }
+    Ok(normalized.into_iter().map(str::to_string).collect())
+}
+
 pub fn previous_month_range() -> (String, String, String) {
     let today = Local::now().date_naive();
     previous_month_range_from(today)
@@ -1630,8 +1683,8 @@ pub fn split_date_range(
 ) -> Result<Vec<SubPeriod>, String> {
     let start_date = NaiveDate::parse_from_str(start, "%Y-%m-%d")
         .map_err(|e| format!("起始日期格式错误：{e}"))?;
-    let end_date = NaiveDate::parse_from_str(end, "%Y-%m-%d")
-        .map_err(|e| format!("结束日期格式错误：{e}"))?;
+    let end_date =
+        NaiveDate::parse_from_str(end, "%Y-%m-%d").map_err(|e| format!("结束日期格式错误：{e}"))?;
     if start_date > end_date {
         return Err("起始日期不能晚于结束日期".to_string());
     }
@@ -1681,7 +1734,11 @@ fn split_weekly(start: NaiveDate, end: NaiveDate) -> Vec<SubPeriod> {
         let week_end = {
             let days_to_sunday = 7 - week_start.weekday().num_days_from_monday() - 1;
             let natural_end = week_start + Duration::days(days_to_sunday as i64);
-            if natural_end > end { end } else { natural_end }
+            if natural_end > end {
+                end
+            } else {
+                natural_end
+            }
         };
         let iso = week_start.iso_week();
         let label = format!("{}-W{:02}", iso.year(), iso.week());
@@ -2659,5 +2716,55 @@ mod tests {
             reserve_batch_file_name(&dir.to_string_lossy(), "report.md", &mut used)
         );
         let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn supplemental_items_append_user_facts_without_changing_existing_report() {
+        let output = append_supplemental_items(
+            "# 日报\n\n- 完成 Git 功能",
+            &[
+                "  参与支付联调并确认回退路径  ".to_string(),
+                "".to_string(),
+                "完成上线后验证".to_string(),
+            ],
+            &ReportRedactionOptions::default(),
+        )
+        .unwrap();
+
+        assert!(output.starts_with("# 日报\n\n- 完成 Git 功能"));
+        assert!(output.contains("## 用户补充事项（非 Git）"));
+        assert!(output.contains("- 参与支付联调并确认回退路径"));
+        assert!(output.contains("- 完成上线后验证"));
+    }
+
+    #[test]
+    fn supplemental_items_apply_redaction_and_reject_oversized_payloads() {
+        let redaction = ReportRedactionOptions {
+            enabled: true,
+            rules: vec![ReportRedactionRule {
+                find: "内部项目".to_string(),
+                replacement: "项目A".to_string(),
+            }],
+        };
+        let output =
+            append_supplemental_items("# 周报", &["参与内部项目联调".to_string()], &redaction)
+                .unwrap();
+
+        assert!(output.contains("参与项目A联调"));
+        assert!(!output.contains("内部项目"));
+        assert!(append_supplemental_items(
+            "# 周报",
+            &vec!["事项".to_string(); 21],
+            &ReportRedactionOptions::default(),
+        )
+        .unwrap_err()
+        .contains("最多"));
+        assert!(append_supplemental_items(
+            "# 周报",
+            &["字".repeat(201)],
+            &ReportRedactionOptions::default(),
+        )
+        .unwrap_err()
+        .contains("200"));
     }
 }

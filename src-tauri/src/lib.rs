@@ -12,12 +12,12 @@ mod secure_store;
 mod zip_store;
 
 use crate::models::{
-    AiConfig, AiModelInfo, BatchReportOptions, BatchReportResult, DiagnosticOptions,
-    DiagnosticResult, ExtractOptions, ExtractResult, GitIdentity, HeatmapOptions, HeatmapResult,
-    MappingEntry, MonthlyReportOptions, MonthlyReportResult, PeriodReportOptions,
-    PeriodReportResult, ProxyCandidate, ProxyConfig, ProxyTestResult, RepoInfo, RepoScanProgress,
-    BlankDayFillOptions, BlankDayFillResult, ReportEnhanceOptions, ReportEnhanceResult, TrendOptions, TrendResult, WorkRhythmOptions,
-    WorkRhythmResult,
+    AiConfig, AiModelInfo, BatchReportOptions, BatchReportResult, BlankDayFillOptions,
+    BlankDayFillResult, DiagnosticOptions, DiagnosticResult, ExtractOptions, ExtractResult,
+    GitIdentity, HeatmapOptions, HeatmapResult, MappingEntry, MonthlyReportOptions,
+    MonthlyReportResult, PeriodReportOptions, PeriodReportResult, ProxyCandidate, ProxyConfig,
+    ProxyTestResult, RepoInfo, RepoScanProgress, ReportEnhanceOptions, ReportEnhanceResult,
+    TrendOptions, TrendResult, WorkRhythmOptions, WorkRhythmResult,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;

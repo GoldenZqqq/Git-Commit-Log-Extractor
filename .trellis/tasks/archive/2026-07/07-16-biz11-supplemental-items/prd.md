@@ -14,16 +14,19 @@
 
 ## Acceptance Criteria
 
-- [ ] 用户可为当前周期添加、编辑、清空多条补充事项。
-- [ ] 四种报告模式的最终草稿均包含补充事项，且提交/项目统计不被改变。
-- [ ] AI 请求将补充事项作为明确的用户事实传递，失败回退仍保留本地草稿。
-- [ ] 历史记录保存并恢复补充事项；旧历史记录兼容加载。
-- [ ] TypeScript/Rust 契约、单元测试和 Playwright 关键路径覆盖通过。
+- [x] 用户可为当前周期添加、编辑、清空多条补充事项。
+- [x] 四种报告模式的最终草稿均包含补充事项，且提交/项目统计不被改变。
+- [x] AI 请求将补充事项作为明确的用户事实传递，失败回退仍保留本地草稿。
+- [x] 历史记录保存并恢复补充事项；旧历史记录兼容加载。
+- [x] TypeScript/Rust 契约、单元测试和 Playwright 关键路径覆盖通过。
 
 ## Evidence
 
 - 当前 `{notes}` 由 `src-tauri/src/report.rs` 写入固定免责声明，不是用户输入。
 - 当前生成 option 与 `ReportHistoryEntry` 均没有补充事项字段。
+- 完成后证据：`supplementalItems` 已贯穿编辑器、四种报告 builder、Rust serde model、报告渲染、AI 指令和历史记录。
+- 验证结果：`npm run build`、22 条 Playwright、`cargo check`、101 条 Rust 测试、`cargo fmt -- --check` 与 `git diff --check` 均通过。
+- 视觉证据：浅色/深色展开态已截图核验，深色表面改用主题 token 后文字与焦点态清晰。
 
 ## Out of Scope
 

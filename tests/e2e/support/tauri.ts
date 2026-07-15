@@ -23,6 +23,7 @@ type ReportHistoryEntry = {
   aiEnhanced: boolean;
   outputFile: string;
   reportText: string;
+  supplementalItems?: string[];
 };
 
 type MockScenario = {
@@ -47,6 +48,7 @@ type MockScenario = {
   };
   diagnosticsResult?: Record<string, unknown>;
   batchResult?: Record<string, unknown>;
+  enhanceResult?: Record<string, unknown>;
   updateMetadata?: Record<string, unknown> | null;
   outputDir?: string;
 };
@@ -126,6 +128,7 @@ export function createHistoryEntry(
     aiEnhanced: overrides.aiEnhanced ?? false,
     outputFile: overrides.outputFile ?? "",
     reportText: overrides.reportText,
+    supplementalItems: overrides.supplementalItems,
   };
 }
 
@@ -151,6 +154,7 @@ export async function launchApp(page: Page, scenario: MockScenario) {
       errorCount: 0,
     },
     batchResult: scenario.batchResult ?? null,
+    enhanceResult: scenario.enhanceResult ?? null,
     updateMetadata: scenario.updateMetadata ?? null,
     outputDir: scenario.outputDir ?? "C:/exports",
   };
@@ -318,6 +322,8 @@ export async function launchApp(page: Page, scenario: MockScenario) {
               return resolvePeriodResult(args.options?.reportKind);
             case "batch_generate_reports":
               return state.batchResult;
+            case "enhance_report":
+              return state.enhanceResult ?? { reportText: args.options?.baseReport ?? "", warnings: [] };
             case "run_diagnostics":
               return state.diagnosticsResult;
             case "save_report_file":

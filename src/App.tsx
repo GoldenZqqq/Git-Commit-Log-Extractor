@@ -61,6 +61,13 @@ import {
   validateRequiredSettings,
   validateWorkspaceSettings,
 } from "./model";
+import {
+  buildSupplementalDraftKey,
+  formatSupplementalItemsText,
+  parseSupplementalItems,
+  supplementalItemsFromHistory,
+  validateSupplementalItems,
+} from "./supplementalItems";
 import "./styles/tokens.css";
 import "./styles/layout.css";
 import "./styles/components.css";
@@ -83,6 +90,7 @@ function App() {
   const [monthlyMonth, setMonthlyMonth] = useState(getPreviousMonthInput);
   const [monthlyLabel, setMonthlyLabel] = useState("");
   const [reportHistory, setReportHistory] = useState<ReportHistoryEntry[]>(() => loadReportHistory(loadedSettings.settings.reportHistoryLimit));
+  const [supplementalDrafts, setSupplementalDrafts] = useState<Record<string, string>>({});
   const [activeHistoryId, setActiveHistoryId] = useState("");
   const [activePreview, setActivePreview] = useState<PreviewMode>("summary");
   const [status, setStatusText] = useState(
@@ -125,6 +133,9 @@ function App() {
   const weeklyRange = useMemo(() => getWeekRange(weeklyWeek), [weeklyWeek]);
   const monthlyRange = useMemo(() => getMonthRange(monthlyMonth), [monthlyMonth]);
   const previewText = activePreview === "monthly" ? monthlyReport : activePreview === "weekly" ? weeklyReport : activePreview === "custom" ? customReport : summaryText;
+  const currentReportRange = activePreviewRange(activePreview, dailyRange, weeklyRange, monthlyRange, customRange);
+  const currentSupplementalDraftKey = buildSupplementalDraftKey(activePreview, currentReportRange);
+  const supplementalItemsText = supplementalDrafts[currentSupplementalDraftKey] ?? "";
   const aiConfigured =
     settings.aiProvider === "codex-oauth"
       ? Boolean(settings.aiModel.trim())
@@ -372,6 +383,16 @@ function App() {
     setActiveHistoryId("");
   }
 
+  function changeSupplementalItems(value: string) {
+    setSupplementalDrafts((current) => ({ ...current, [currentSupplementalDraftKey]: value }));
+  }
+
+  function supplementalItemsFor(mode: PreviewMode, range: DateRange, override?: string[]) {
+    if (override) return validateSupplementalItems(override);
+    const key = buildSupplementalDraftKey(mode, range);
+    return parseSupplementalItems(supplementalDrafts[key] ?? "");
+  }
+
   function rememberHistory(entry: ReportHistoryEntry) {
     setReportHistory((current) => rememberReportHistoryEntry(current, entry, settings.reportHistoryLimit));
     setActiveHistoryId(entry.id);
@@ -391,6 +412,7 @@ function App() {
     projectTotal: number,
     aiEnhanced: boolean,
     outputFile = "",
+    supplementalItems: string[] = [],
   ): ReportHistoryEntry {
     return {
       id: createHistoryId(),
@@ -405,6 +427,7 @@ function App() {
       aiEnhanced,
       outputFile,
       reportText,
+      supplementalItems,
     };
   }
 
@@ -412,12 +435,13 @@ function App() {
     return repos.filter((repo) => !settings.disabledRepos.includes(repo.path)).length;
   }
 
-  async function extractCommits(dateValue = dailyDate) {
+  async function extractCommits(dateValue = dailyDate, supplementalOverride?: string[]) {
     const range = getSingleDayRange(dateValue);
     setExtractProgress(null);
     await runTask("正在提取提交记录", async () => {
+      const supplementalItems = supplementalItemsFor("summary", range, supplementalOverride);
       const result = await invoke<ExtractResult>("extract_commits", {
-        options: buildExtractOptions(settings, projectNames, range, false, "", repos),
+        options: buildExtractOptions(settings, projectNames, range, false, "", repos, "daily", supplementalItems),
       });
       const reportText = result.detailedText || result.summaryText;
       const projectTotal = countCommitProjects(result.commits, projectNames);
@@ -429,16 +453,20 @@ function App() {
       setProjectCount(projectTotal);
       setBlankDayDraftActive(false);
       setActivePreview("summary");
-      rememberHistory(buildHistoryEntry("summary", range, dateValue, reportText, result.commits.length, projectTotal, false));
+      rememberHistory(buildHistoryEntry("summary", range, dateValue, reportText, result.commits.length, projectTotal, false, "", supplementalItems));
       setStatus(`${dateValue} 日报已生成`);
-    }, () => validateExtractSettings(settings, range));
+    }, () => {
+      validateExtractSettings(settings, range);
+      supplementalItemsFor("summary", range, supplementalOverride);
+    });
   }
 
-  async function generateCustomReport(range: DateRange) {
+  async function generateCustomReport(range: DateRange, supplementalOverride?: string[]) {
     setExtractProgress(null);
     await runTask("正在生成自定义报告", async () => {
+      const supplementalItems = supplementalItemsFor("custom", range, supplementalOverride);
       const result = await invoke<ExtractResult>("extract_commits", {
-        options: buildExtractOptions(settings, projectNames, range, false, "", repos, "custom"),
+        options: buildExtractOptions(settings, projectNames, range, false, "", repos, "custom", supplementalItems),
       });
       const reportText = result.detailedText || result.summaryText;
       const periodLabel = `${range.startDate} ~ ${range.endDate}`;
@@ -451,18 +479,22 @@ function App() {
       setProjectCount(projectTotal);
       setBlankDayDraftActive(false);
       setActivePreview("custom");
-      rememberHistory(buildHistoryEntry("custom", range, periodLabel, reportText, result.commits.length, projectTotal, false));
+      rememberHistory(buildHistoryEntry("custom", range, periodLabel, reportText, result.commits.length, projectTotal, false, "", supplementalItems));
       setStatus("自定义报告已生成");
-    }, () => validateExtractSettings(settings, range));
+    }, () => {
+      validateExtractSettings(settings, range);
+      supplementalItemsFor("custom", range, supplementalOverride);
+    });
   }
 
-  async function generateWeeklyReport(weekValue = weeklyWeek) {
+  async function generateWeeklyReport(weekValue = weeklyWeek, supplementalOverride?: string[]) {
     const range = getWeekRange(weekValue);
     const label = weekValue;
     setExtractProgress(null);
     await runTask("正在生成周报", async () => {
+      const supplementalItems = supplementalItemsFor("weekly", range, supplementalOverride);
       const result = await invoke<PeriodReportResult>("generate_period_report", {
-        options: buildPeriodReportOptions(settings, projectNames, "weekly", range, label, false, "", repos),
+        options: buildPeriodReportOptions(settings, projectNames, "weekly", range, label, false, "", repos, supplementalItems),
       });
       setWeeklyWeek(result.periodLabel);
       setWeeklyReport(result.reportText);
@@ -472,18 +504,22 @@ function App() {
       setProjectCount(result.projectCount);
       setBlankDayDraftActive(false);
       setActivePreview("weekly");
-      rememberHistory(buildHistoryEntry("weekly", range, result.periodLabel, result.reportText, result.commitCount, result.projectCount, false, result.outputFile));
+      rememberHistory(buildHistoryEntry("weekly", range, result.periodLabel, result.reportText, result.commitCount, result.projectCount, false, result.outputFile, supplementalItems));
       setStatus(result.outputFile ? `${result.periodLabel} 周报已生成` : `${result.periodLabel} 周报已生成，未写入文件`);
-    }, () => validatePeriodReportSettings(settings, range));
+    }, () => {
+      validatePeriodReportSettings(settings, range);
+      supplementalItemsFor("weekly", range, supplementalOverride);
+    });
   }
 
-  async function generateMonthlyReport(monthValue = monthlyMonth) {
+  async function generateMonthlyReport(monthValue = monthlyMonth, supplementalOverride?: string[]) {
     setExtractProgress(null);
     await runTask("正在生成月报", async () => {
       const range = getMonthRange(monthValue);
       const label = formatMonthLabel(monthValue);
+      const supplementalItems = supplementalItemsFor("monthly", range, supplementalOverride);
       const result = await invoke<PeriodReportResult>("generate_period_report", {
-        options: buildPeriodReportOptions(settings, projectNames, "monthly", range, label, false, "", repos),
+        options: buildPeriodReportOptions(settings, projectNames, "monthly", range, label, false, "", repos, supplementalItems),
       });
       setMonthlyMonth(result.periodLabel);
       setMonthlyReport(result.reportText);
@@ -494,9 +530,12 @@ function App() {
       setProjectCount(result.projectCount);
       setBlankDayDraftActive(false);
       setActivePreview("monthly");
-      rememberHistory(buildHistoryEntry("monthly", range, result.periodLabel, result.reportText, result.commitCount, result.projectCount, false, result.outputFile));
+      rememberHistory(buildHistoryEntry("monthly", range, result.periodLabel, result.reportText, result.commitCount, result.projectCount, false, result.outputFile, supplementalItems));
       setStatus(result.outputFile ? `${result.periodLabel} 月报已生成` : `${result.periodLabel} 月报已生成，未写入文件`);
-    }, () => validatePeriodReportSettings(settings, getMonthRange(monthValue)));
+    }, () => {
+      validatePeriodReportSettings(settings, getMonthRange(monthValue));
+      supplementalItemsFor("monthly", getMonthRange(monthValue), supplementalOverride);
+    });
   }
 
   function setActivePreviewText(mode: PreviewMode, text: string) {
@@ -528,8 +567,9 @@ function App() {
     const baseReport = previewText;
     setExtractProgress(null);
     await runTask("AI 正在润色当前报告", async () => {
+      const supplementalItems = supplementalItemsFor(activePreview, range);
       const result = await invoke<ReportEnhanceResult>("enhance_report", {
-        options: buildReportEnhanceOptions(settings, activePreview, range, baseReport, extraInstruction),
+        options: buildReportEnhanceOptions(settings, activePreview, range, baseReport, extraInstruction, supplementalItems),
       });
       const aiEnhanced = !hasAiWarning(result.warnings);
       const outputFile = await saveActivePreviewText(activePreview, range, periodLabel, result.reportText);
@@ -545,12 +585,14 @@ function App() {
         projectCount,
         aiEnhanced,
         outputFile,
+        supplementalItems,
       ));
       setStatus(hasAiWarning(result.warnings) ? "AI 润色失败，已保留当前报告" : "AI 润色已完成");
     }, () => {
       if (!baseReport.trim()) throw new Error("当前报告为空，请先生成报告再润色");
       validateAiConnectionSettings(settings);
       validateOutputSettings(settings);
+      supplementalItemsFor(activePreview, range);
     });
   }
 
@@ -605,6 +647,12 @@ function App() {
     setCommitCount(entry.commitCount);
     setProjectCount(entry.projectCount ?? entry.repoCount);
     setBlankDayDraftActive(isBlankDayHistoryEntry(entry));
+    const supplementalItems = supplementalItemsFromHistory(entry.supplementalItems);
+    const supplementalKey = buildSupplementalDraftKey(entry.mode, entry.range);
+    setSupplementalDrafts((current) => ({
+      ...current,
+      [supplementalKey]: formatSupplementalItemsText(supplementalItems),
+    }));
 
     if (entry.mode === "monthly") {
       setMonthlyMonth(entry.periodLabel);
@@ -635,14 +683,15 @@ function App() {
   }
 
   async function regenerateReportHistory(entry: ReportHistoryEntry) {
+    const supplementalItems = supplementalItemsFromHistory(entry.supplementalItems);
     if (entry.mode === "monthly") {
-      await generateMonthlyReport(entry.periodLabel);
+      await generateMonthlyReport(entry.periodLabel, supplementalItems);
     } else if (entry.mode === "weekly") {
-      await generateWeeklyReport(entry.periodLabel);
+      await generateWeeklyReport(entry.periodLabel, supplementalItems);
     } else if (entry.mode === "custom") {
-      await generateCustomReport(entry.range);
+      await generateCustomReport(entry.range, supplementalItems);
     } else {
-      await extractCommits(entry.range.startDate);
+      await extractCommits(entry.range.startDate, supplementalItems);
     }
   }
 
@@ -903,6 +952,8 @@ function handleBlankDayGenerated(payload: {
         onMonthlyMonthChange={changeMonthlyMonth}
         monthlyRange={monthlyRange}
         customRange={customRange}
+        supplementalItemsText={supplementalItemsText}
+        onSupplementalItemsChange={changeSupplementalItems}
         aiConfigured={aiConfigured}
         extractAllBranches={settings.extractAllBranches}
         showEvidenceDetails={settings.showEvidenceDetails}

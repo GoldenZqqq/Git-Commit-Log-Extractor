@@ -71,6 +71,116 @@
   border-top: 1px solid var(--canvas-line);
 }
 
+.supplemental-items-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid var(--canvas-line);
+  border-radius: var(--radius-md);
+  background: var(--paper-soft);
+}
+
+.supplemental-items-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  border: 0;
+  padding: 6px 9px;
+  color: var(--ink-soft);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 780;
+  text-align: left;
+}
+
+.supplemental-items-toggle:hover,
+.supplemental-items-toggle:focus-visible {
+  color: var(--ink);
+  background: rgba(63, 140, 255, 0.08);
+}
+
+.supplemental-items-toggle:focus-visible,
+.supplemental-items-body textarea:focus-visible,
+.supplemental-items-footer button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.supplemental-items-toggle em {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 680;
+}
+
+.supplemental-items-body {
+  display: grid;
+  gap: 6px;
+  padding: 0 9px 9px;
+}
+
+.supplemental-items-body label {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 780;
+}
+
+.supplemental-items-body textarea {
+  width: 100%;
+  min-height: 74px;
+  resize: vertical;
+  border: 1px solid var(--canvas-line);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  color: var(--ink);
+  background: var(--paper);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.supplemental-items-body textarea[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.supplemental-items-body textarea::placeholder {
+  color: var(--ink-soft);
+}
+
+.supplemental-items-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.supplemental-items-footer .has-error {
+  color: var(--danger-strong);
+}
+
+.supplemental-items-footer button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: var(--radius-xs);
+  padding: 4px 6px;
+  color: var(--danger-strong);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 740;
+}
+
+.supplemental-items-footer button:hover:not(:disabled) {
+  background: var(--danger-soft);
+}
+
 .generation-scope-strip {
   display: flex;
   align-items: center;

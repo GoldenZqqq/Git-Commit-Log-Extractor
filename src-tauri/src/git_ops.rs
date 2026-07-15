@@ -862,9 +862,7 @@ mod tests {
         let args = build_log_args(&query);
 
         assert!(
-            !args
-                .iter()
-                .any(|arg| arg.starts_with("--author=")),
+            !args.iter().any(|arg| arg.starts_with("--author=")),
             "空白作者不应传入 --author=，留空意为不过滤作者"
         );
     }
@@ -942,7 +940,8 @@ mod tests {
 
     #[test]
     fn test_parse_numstat_output() {
-        let output = "\x1eabc123\n\n3\t1\tsrc/main.rs\n10\t5\tsrc/lib.rs\n\n\x1edef456\n\n1\t0\tREADME.md\n";
+        let output =
+            "\x1eabc123\n\n3\t1\tsrc/main.rs\n10\t5\tsrc/lib.rs\n\n\x1edef456\n\n1\t0\tREADME.md\n";
         let stats = parse_numstat_output(output);
         assert_eq!(stats.len(), 2);
         assert_eq!(stats.get("abc123"), Some(&(13, 6, 2)));

@@ -14,10 +14,10 @@ use crate::models::{
     WorkRhythmOptions, WorkRhythmResult,
 };
 use crate::report;
+use chrono::Datelike;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
-use chrono::Datelike;
 
 const BATCH_MAX_OUTPUT_FILES: usize = 365;
 
@@ -60,6 +60,12 @@ where
             &options.report_format_templates.monthly,
         )
     };
+
+    report_text = report::append_supplemental_items(
+        &report_text,
+        &options.supplemental_items,
+        &options.redaction,
+    )?;
 
     report_text = apply_ai_if_enabled(report_text, &options, &dates, &report_author, &mut warnings);
     let output_file = save_monthly_if_enabled(&options, &dates.2, &report_text)?;
@@ -144,6 +150,12 @@ where
         _ => return Err(format!("未知报告类型：{}", options.report_kind)),
     };
 
+    report_text = report::append_supplemental_items(
+        &report_text,
+        &options.supplemental_items,
+        &options.redaction,
+    )?;
+
     report_text =
         apply_ai_to_period_report(report_text, &options, &dates, &report_author, &mut warnings);
     let output_file = save_period_if_enabled(&options, &report_text)?;
@@ -159,8 +171,9 @@ where
     ))
 }
 
-
-pub fn fill_blank_day_report_sync(options: BlankDayFillOptions) -> Result<BlankDayFillResult, String> {
+pub fn fill_blank_day_report_sync(
+    options: BlankDayFillOptions,
+) -> Result<BlankDayFillResult, String> {
     let evidence = options.base_evidence.trim().to_string();
     if evidence.is_empty() {
         return Err("素材周期内没有可用的提交线索".to_string());
@@ -273,6 +286,7 @@ where
             templates: &options.report_format_templates,
         },
     );
+    append_supplemental_to_extract_result(&mut result, &options)?;
     apply_ai_to_extract_result(&mut result, &options, &report_author);
     Ok(result)
 }
@@ -354,13 +368,8 @@ pub fn collect_work_rhythm(options: &WorkRhythmOptions) -> Result<WorkRhythmResu
     let mut timestamps: Vec<String> = Vec::new();
 
     for repo in &repos {
-        let entries = git_ops::get_commit_timestamps(
-            repo,
-            &start_date,
-            &end_date,
-            &options.author,
-            true,
-        );
+        let entries =
+            git_ops::get_commit_timestamps(repo, &start_date, &end_date, &options.author, true);
         let entries = match entries {
             Ok(v) => v,
             Err(_) => continue,
@@ -494,7 +503,8 @@ pub fn collect_trend_data(options: &TrendOptions) -> Result<TrendResult, String>
             active_projects: 0,
         })
         .collect();
-    let mut period_projects: Vec<HashSet<String>> = buckets.iter().map(|_| HashSet::new()).collect();
+    let mut period_projects: Vec<HashSet<String>> =
+        buckets.iter().map(|_| HashSet::new()).collect();
 
     let mut project_commits: HashMap<String, (u32, u64)> = HashMap::new();
 
@@ -514,7 +524,9 @@ pub fn collect_trend_data(options: &TrendOptions) -> Result<TrendResult, String>
         } else {
             chrono::NaiveDate::from_ymd_opt(today.year(), today.month(), 1).unwrap()
         };
-        (d - chrono::Duration::days(1)).format("%Y-%m-%d").to_string()
+        (d - chrono::Duration::days(1))
+            .format("%Y-%m-%d")
+            .to_string()
     };
 
     let this_week_start_str = this_week_start.format("%Y-%m-%d").to_string();
@@ -591,10 +603,7 @@ pub fn collect_trend_data(options: &TrendOptions) -> Result<TrendResult, String>
 }
 
 fn extract_date_prefix(date_str: &str) -> String {
-    date_str
-        .get(..10)
-        .unwrap_or(date_str)
-        .to_string()
+    date_str.get(..10).unwrap_or(date_str).to_string()
 }
 
 fn build_weekly_buckets(
@@ -674,7 +683,8 @@ fn parse_iso_date_time(ts: &str) -> Option<(String, String)> {
     let t_pos = ts.find('T')?;
     let date = ts[..t_pos].to_string();
     let rest = &ts[t_pos + 1..];
-    let time_end = rest.find('+')
+    let time_end = rest
+        .find('+')
         .or_else(|| rest.rfind('-').filter(|&p| p > 0));
     let time = match time_end {
         Some(pos) => rest[..pos].to_string(),
@@ -1043,6 +1053,7 @@ fn monthly_extract_options(
         author: options.author.clone(),
         author_display_name: options.author_display_name.clone(),
         author_aliases: options.author_aliases.clone(),
+        supplemental_items: options.supplemental_items.clone(),
         start_date: start.to_string(),
         end_date: end.to_string(),
         period_label: start.to_string(),
@@ -1073,6 +1084,7 @@ fn period_extract_options(options: &PeriodReportOptions) -> ExtractOptions {
         author: options.author.clone(),
         author_display_name: options.author_display_name.clone(),
         author_aliases: options.author_aliases.clone(),
+        supplemental_items: options.supplemental_items.clone(),
         start_date: options.start_date.clone(),
         end_date: options.end_date.clone(),
         period_label: options.period_label.clone(),
@@ -1094,6 +1106,25 @@ fn period_extract_options(options: &PeriodReportOptions) -> ExtractOptions {
         system_prompt: String::new(),
         ai: options.ai.clone(),
     }
+}
+
+fn append_supplemental_to_extract_result(
+    result: &mut ExtractResult,
+    options: &ExtractOptions,
+) -> Result<(), String> {
+    result.summary_text = report::append_supplemental_items(
+        &result.summary_text,
+        &options.supplemental_items,
+        &options.redaction,
+    )?;
+    if !result.detailed_text.is_empty() {
+        result.detailed_text = report::append_supplemental_items(
+            &result.detailed_text,
+            &options.supplemental_items,
+            &options.redaction,
+        )?;
+    }
+    Ok(())
 }
 
 fn apply_ai_to_extract_result(
@@ -1331,11 +1362,7 @@ impl BatchGroup {
         }
     }
 
-    fn includes(
-        &self,
-        commit: &CommitRecord,
-        project_names: &HashMap<String, String>,
-    ) -> bool {
+    fn includes(&self, commit: &CommitRecord, project_names: &HashMap<String, String>) -> bool {
         match self {
             Self::All => true,
             Self::Author(name) => commit.author == *name,
@@ -1687,11 +1714,7 @@ fn render_batch_report(job: BatchRenderJob<'_>) -> Result<String, String> {
     }
 }
 
-fn render_batch_extract_report(
-    job: BatchRenderJob<'_>,
-    author: &str,
-    report_kind: &str,
-) -> String {
+fn render_batch_extract_report(job: BatchRenderJob<'_>, author: &str, report_kind: &str) -> String {
     report::build_extract_result(
         Vec::new(),
         job.commits,
@@ -1754,6 +1777,7 @@ fn batch_extract_options(opts: &BatchReportOptions) -> ExtractOptions {
         author: opts.author.clone(),
         author_display_name: opts.author_display_name.clone(),
         author_aliases: opts.author_aliases.clone(),
+        supplemental_items: Vec::new(),
         start_date: opts.range_start.clone(),
         end_date: opts.range_end.clone(),
         period_label: format!("{}~{}", opts.range_start, opts.range_end),
@@ -1886,6 +1910,7 @@ mod tests {
             author: "tester".to_string(),
             author_display_name: String::new(),
             author_aliases: Vec::new(),
+            supplemental_items: Vec::new(),
             start_date: "2026-06-01".to_string(),
             end_date: "2026-06-01".to_string(),
             period_label: "2026-06-01".to_string(),
@@ -1945,6 +1970,7 @@ mod tests {
             author: "Smoke Tester".to_string(),
             author_display_name: String::new(),
             author_aliases: Vec::new(),
+            supplemental_items: vec!["参加跨团队联调并同步风险".to_string()],
             start_date: "2026-06-10".to_string(),
             end_date: "2026-06-10".to_string(),
             period_label: "2026-W24".to_string(),
@@ -1979,6 +2005,8 @@ mod tests {
         assert_eq!(result.commit_count, 1);
         assert!(result.report_text.contains("# 2026年第24周工作周报"));
         assert!(result.report_text.contains("完成 smoke 验证"));
+        assert!(result.report_text.contains("## 用户补充事项（非 Git）"));
+        assert!(result.report_text.contains("参加跨团队联调并同步风险"));
         assert!(result.report_text.contains("来源：`repo-a`"));
         assert!(result.output_file.ends_with("weekly_report_2026-W24.md"));
         assert!(Path::new(&result.output_file).exists());
@@ -2030,11 +2058,17 @@ mod tests {
         ]);
 
         assert_eq!(
-            vec![BatchGroup::Author("Alice".to_string()), BatchGroup::Author("Bob".to_string())],
+            vec![
+                BatchGroup::Author("Alice".to_string()),
+                BatchGroup::Author("Bob".to_string())
+            ],
             batch_groups("author", &commits, &project_names).unwrap()
         );
         assert_eq!(
-            vec![BatchGroup::Project("客户端".to_string()), BatchGroup::Project("平台项目".to_string())],
+            vec![
+                BatchGroup::Project("客户端".to_string()),
+                BatchGroup::Project("平台项目".to_string())
+            ],
             batch_groups("project", &commits, &project_names).unwrap()
         );
     }
@@ -2080,7 +2114,10 @@ mod tests {
 
         assert_eq!(2, result.total);
         assert_eq!(2, result.succeeded);
-        assert_eq!(Some((2, 2)), progress.last().map(|item| (item.total, item.completed)));
+        assert_eq!(
+            Some((2, 2)),
+            progress.last().map(|item| (item.total, item.completed))
+        );
         assert!(progress.last().is_some_and(|item| item.done));
         assert!(output_dir.join("2026-06-10-Second Tester-日报.md").exists());
         assert!(output_dir.join("2026-06-10-Smoke Tester-日报.md").exists());
@@ -2090,16 +2127,46 @@ mod tests {
     #[test]
     fn test_heatmap_streak_calculation() {
         let entries = vec![
-            HeatmapEntry { date: "2026-07-01".to_string(), count: 0 },
-            HeatmapEntry { date: "2026-07-02".to_string(), count: 3 },
-            HeatmapEntry { date: "2026-07-03".to_string(), count: 1 },
-            HeatmapEntry { date: "2026-07-04".to_string(), count: 5 },
-            HeatmapEntry { date: "2026-07-05".to_string(), count: 0 },
-            HeatmapEntry { date: "2026-07-06".to_string(), count: 2 },
-            HeatmapEntry { date: "2026-07-07".to_string(), count: 1 },
-            HeatmapEntry { date: "2026-07-08".to_string(), count: 4 },
-            HeatmapEntry { date: "2026-07-09".to_string(), count: 1 },
-            HeatmapEntry { date: "2026-07-10".to_string(), count: 0 },
+            HeatmapEntry {
+                date: "2026-07-01".to_string(),
+                count: 0,
+            },
+            HeatmapEntry {
+                date: "2026-07-02".to_string(),
+                count: 3,
+            },
+            HeatmapEntry {
+                date: "2026-07-03".to_string(),
+                count: 1,
+            },
+            HeatmapEntry {
+                date: "2026-07-04".to_string(),
+                count: 5,
+            },
+            HeatmapEntry {
+                date: "2026-07-05".to_string(),
+                count: 0,
+            },
+            HeatmapEntry {
+                date: "2026-07-06".to_string(),
+                count: 2,
+            },
+            HeatmapEntry {
+                date: "2026-07-07".to_string(),
+                count: 1,
+            },
+            HeatmapEntry {
+                date: "2026-07-08".to_string(),
+                count: 4,
+            },
+            HeatmapEntry {
+                date: "2026-07-09".to_string(),
+                count: 1,
+            },
+            HeatmapEntry {
+                date: "2026-07-10".to_string(),
+                count: 0,
+            },
         ];
         assert_eq!(compute_max_streak(&entries), 4);
     }
@@ -2107,9 +2174,18 @@ mod tests {
     #[test]
     fn test_heatmap_streak_all_active() {
         let entries = vec![
-            HeatmapEntry { date: "2026-07-01".to_string(), count: 1 },
-            HeatmapEntry { date: "2026-07-02".to_string(), count: 2 },
-            HeatmapEntry { date: "2026-07-03".to_string(), count: 3 },
+            HeatmapEntry {
+                date: "2026-07-01".to_string(),
+                count: 1,
+            },
+            HeatmapEntry {
+                date: "2026-07-02".to_string(),
+                count: 2,
+            },
+            HeatmapEntry {
+                date: "2026-07-03".to_string(),
+                count: 3,
+            },
         ];
         assert_eq!(compute_max_streak(&entries), 3);
     }
@@ -2123,9 +2199,18 @@ mod tests {
     #[test]
     fn test_heatmap_all_zeros() {
         let entries = vec![
-            HeatmapEntry { date: "2026-07-01".to_string(), count: 0 },
-            HeatmapEntry { date: "2026-07-02".to_string(), count: 0 },
-            HeatmapEntry { date: "2026-07-03".to_string(), count: 0 },
+            HeatmapEntry {
+                date: "2026-07-01".to_string(),
+                count: 0,
+            },
+            HeatmapEntry {
+                date: "2026-07-02".to_string(),
+                count: 0,
+            },
+            HeatmapEntry {
+                date: "2026-07-03".to_string(),
+                count: 0,
+            },
         ];
         assert_eq!(compute_max_streak(&entries), 0);
     }

@@ -8,6 +8,11 @@ import {
   type ReportTemplateProfile,
   purposeRefinementInstruction,
 } from "./reportFormat";
+import {
+  isSupplementalItemsValue,
+  SUPPLEMENTAL_FACT_PRESERVATION_INSTRUCTION,
+  validateSupplementalItems,
+} from "./supplementalItems";
 
 export type RepoInfo = {
   path: string;
@@ -169,6 +174,7 @@ export type ReportHistoryEntry = {
   aiEnhanced: boolean;
   outputFile: string;
   reportText: string;
+  supplementalItems?: string[];
 };
 
 export type UpdateSummary = {
@@ -926,6 +932,7 @@ export function buildExtractOptions(
   extraInstruction = "",
   indexedRepos: RepoInfo[] = [],
   reportKind: ExtractReportKind = "daily",
+  supplementalItems: string[] = [],
 ) {
   const range = dateRange ?? getTodayRange();
   const authorAliasGroups = parseAuthorAliases(settings.authorAliasesText);
@@ -940,6 +947,7 @@ export function buildExtractOptions(
     endDate: range.endDate,
     periodLabel: reportKind === "custom" ? `${range.startDate} ~ ${range.endDate}` : range.startDate,
     reportKind,
+    supplementalItems: validateSupplementalItems(supplementalItems),
     disabledRepos: settings.disabledRepos,
     extractAllBranches: settings.extractAllBranches,
     excludeMergeCommits: settings.excludeMergeCommits,
@@ -965,6 +973,7 @@ export function buildMonthlyOptions(
   aiEnabled: boolean,
   extraInstruction = "",
   indexedRepos: RepoInfo[] = [],
+  supplementalItems: string[] = [],
 ) {
   const authorAliasGroups = parseAuthorAliases(settings.authorAliasesText);
   const evidenceLinkRules = parseEvidenceLinkRules(settings.evidenceLinkPrefixesText);
@@ -976,6 +985,7 @@ export function buildMonthlyOptions(
     author: buildAuthorFilter(settings.author, authorAliasGroups),
     authorDisplayName: buildAuthorDisplayName(settings.author, authorAliasGroups),
     authorAliases: authorAliasGroups,
+    supplementalItems: validateSupplementalItems(supplementalItems),
     extractAllBranches: settings.extractAllBranches,
     excludeMergeCommits: settings.excludeMergeCommits,
     excludeRevertCommits: settings.excludeRevertCommits,
@@ -1002,6 +1012,7 @@ export function buildPeriodReportOptions(
   aiEnabled: boolean,
   extraInstruction = "",
   indexedRepos: RepoInfo[] = [],
+  supplementalItems: string[] = [],
 ) {
   const authorAliasGroups = parseAuthorAliases(settings.authorAliasesText);
   const evidenceLinkRules = parseEvidenceLinkRules(settings.evidenceLinkPrefixesText);
@@ -1017,6 +1028,7 @@ export function buildPeriodReportOptions(
     endDate: range.endDate,
     periodLabel,
     reportKind: kind,
+    supplementalItems: validateSupplementalItems(supplementalItems),
     extractAllBranches: settings.extractAllBranches,
     excludeMergeCommits: settings.excludeMergeCommits,
     excludeRevertCommits: settings.excludeRevertCommits,
@@ -1168,6 +1180,7 @@ export function buildReportEnhanceOptions(
   range: DateRange,
   baseReport: string,
   extraInstruction = "",
+  supplementalItems: string[] = [],
 ) {
   const authorAliasGroups = parseAuthorAliases(settings.authorAliasesText);
   const kind = mode === "summary" ? "daily" : mode;
@@ -1178,7 +1191,15 @@ export function buildReportEnhanceOptions(
     reportKind: kind,
     author: buildAuthorFilter(settings.author, authorAliasGroups),
     authorDisplayName: buildAuthorDisplayName(settings.author, authorAliasGroups),
-    refinementInstruction: buildReportRefinementInstruction(settings, extraInstruction),
+    refinementInstruction: buildReportRefinementInstruction(
+      settings,
+      mergeInstructions(
+        extraInstruction,
+        validateSupplementalItems(supplementalItems).length > 0
+          ? SUPPLEMENTAL_FACT_PRESERVATION_INSTRUCTION
+          : "",
+      ),
+    ),
     systemPrompt: buildReportSystemPrompt(settings, kind === "custom" ? "daily" : kind),
     ai: buildAiOptions(settings, true),
   };
@@ -1419,6 +1440,7 @@ function isReportHistoryEntry(value: unknown): value is ReportHistoryEntry {
     && typeof entry.aiEnhanced === "boolean"
     && typeof entry.outputFile === "string"
     && typeof entry.reportText === "string"
+    && isSupplementalItemsValue(entry.supplementalItems)
   );
 }
 

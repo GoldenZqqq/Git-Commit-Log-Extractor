@@ -315,3 +315,78 @@ report::save_report_document(&options.output_dir, &file_name, &content, format)?
 - `splitGranularity = custom` creates one custom report period covering the full selected date range and reuses the existing custom report template.
 - Rust regression coverage must include group derivation, empty group rejection, grouped real-file output, custom-range splitting, and output totals.
 - Playwright must cover group selection, group-specific default templates, custom granularity, and the exact camelCase IPC payload.
+
+## Scenario: Period-Scoped Non-Git Supplemental Facts
+
+### 1. Scope / Trigger
+
+- Trigger: a daily, weekly, monthly, or custom report must include user-provided work facts that do not have a Git commit.
+- These facts belong to one report mode and date range. They are report content, not commit evidence, workspace settings, or batch-report defaults.
+
+### 2. Signatures
+
+- Frontend builders accept a final `supplementalItems: string[] = []` argument:
+  - `buildExtractOptions(...)`
+  - `buildMonthlyOptions(...)`
+  - `buildPeriodReportOptions(...)`
+- History: `ReportHistoryEntry.supplementalItems?: string[]`.
+- Rust request models expose `#[serde(default)] supplemental_items: Vec<String>` on `ExtractOptions`, `MonthlyReportOptions`, and `PeriodReportOptions`.
+- Rendering boundary: `report::append_supplemental_items(report_text, items, redaction) -> Result<String, String>`.
+
+### 3. Contracts
+
+- IPC uses camelCase `supplementalItems`; at most 20 non-empty items are accepted and each item may contain at most 200 Unicode characters.
+- The frontend draft key is `PreviewMode + startDate + endDate`; changing mode or period must not copy facts into another report.
+- Rust appends a standard `## 用户补充事项（非 Git）` section after template rendering and before optional AI enhancement. This ordering keeps local output and AI-failure fallback truthful.
+- Supplemental facts must not change commit count, project count, line statistics, evidence links, or repository grouping.
+- When report redaction is enabled, custom literal replacement rules also apply to the appended section.
+- Batch reports do not accept supplemental facts because one batch spans several independently attributable periods.
+- Missing history fields and missing IPC fields normalize to an empty list for backward compatibility.
+
+### 4. Validation & Error Matrix
+
+- Missing field or empty list -> preserve the previous report output byte-for-byte.
+- Blank lines/items -> trim and ignore them.
+- More than 20 normalized items -> `补充事项最多填写 20 项`.
+- Item longer than 200 Unicode characters -> `第 N 条补充事项不能超过 200 个字符`.
+- Old history without `supplementalItems` -> load the record and restore an empty draft.
+- Persisted `supplementalItems` containing non-string values -> reject it through the report-history type guard instead of casting raw JSON.
+
+### 5. Good/Base/Bad Cases
+
+- Good: a weekly report appends meeting and rollout-verification facts, sends the resulting report to AI with a fact-preservation instruction, and saves the original item array in history.
+- Base: no supplemental facts keeps existing templates, statistics, and exports unchanged.
+- Bad: add supplemental text to commit arrays or evidence sections; this inflates statistics and falsely presents user statements as Git evidence.
+- Bad: reuse one global draft across report modes or periods; facts then leak into the wrong report.
+
+### 6. Tests Required
+
+- Rust unit tests assert normalized rendering, redaction, item-count rejection, and character-limit rejection.
+- A period pipeline smoke test asserts the appended section while `commit_count` remains derived only from Git commits.
+- Playwright asserts all four report-mode payloads, preview/history round-trip, period isolation, AI fact instruction, invalid-input blocking, and draft clearing.
+- Run `npm run build`, `npm run test:e2e`, `cd src-tauri && cargo check`, and `cd src-tauri && cargo test`.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+commits.push(CommitRecord::from_user_note(item));
+```
+
+#### Correct
+
+```rust
+report_text = report::append_supplemental_items(
+    &report_text,
+    &options.supplemental_items,
+    &options.redaction,
+)?;
+report_text = apply_ai_to_period_report(
+    report_text,
+    &options,
+    &dates,
+    &report_author,
+    &mut warnings,
+);
+```
