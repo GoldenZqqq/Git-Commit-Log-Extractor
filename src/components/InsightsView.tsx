@@ -18,7 +18,7 @@ type Props = {
   onRefresh: () => void;
   reportHistory: ReportHistoryEntry[];
   aiConfigured: boolean;
-  isBusy: boolean;
+  generationBlocked: boolean;
   onOpenHistory: (entry: ReportHistoryEntry) => void;
   onGenerateDaily: (date: string) => void;
   onOpenBlankDayFill: (date: string) => void;
@@ -36,7 +36,7 @@ export function InsightsView({
   onRefresh,
   reportHistory,
   aiConfigured,
-  isBusy,
+  generationBlocked,
   onOpenHistory,
   onGenerateDaily,
   onOpenBlankDayFill,
@@ -79,7 +79,7 @@ export function InsightsView({
             <ReportCalendar
               entries={reportHistory}
               aiConfigured={aiConfigured}
-              isBusy={isBusy}
+              generationBlocked={generationBlocked}
               onOpenHistory={onOpenHistory}
               onGenerateDaily={onGenerateDaily}
               onOpenBlankDayFill={onOpenBlankDayFill}

@@ -10,7 +10,7 @@ import "./ReportCalendar.css";
 type Props = {
   entries: ReportHistoryEntry[];
   aiConfigured: boolean;
-  isBusy: boolean;
+  generationBlocked: boolean;
   onOpenHistory: (entry: ReportHistoryEntry) => void;
   onGenerateDaily: (date: string) => void;
   onOpenBlankDayFill: (date: string) => void;
@@ -35,7 +35,7 @@ const KIND_LABEL: Record<string, string> = {
 export function ReportCalendar({
   entries,
   aiConfigured,
-  isBusy,
+  generationBlocked,
   onOpenHistory,
   onGenerateDaily,
   onOpenBlankDayFill,
@@ -189,7 +189,7 @@ export function ReportCalendar({
               <div className="report-calendar-empty-actions">
                 <button
                   type="button"
-                  disabled={isBusy}
+                  disabled={generationBlocked}
                   onClick={() => { onGenerateDaily(activeDate); setActiveDate(null); }}
                 >
                   <FileText size={14} />
@@ -197,7 +197,7 @@ export function ReportCalendar({
                 </button>
                 <button
                   type="button"
-                  disabled={isBusy || !aiConfigured}
+                  disabled={generationBlocked || !aiConfigured}
                   title={aiConfigured ? "基于近期 Git 线索补写" : "请先配置 AI"}
                   onClick={() => { onOpenBlankDayFill(activeDate); setActiveDate(null); }}
                 >

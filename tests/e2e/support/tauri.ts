@@ -49,6 +49,7 @@ type MockScenario = {
   diagnosticsResult?: Record<string, unknown>;
   batchResult?: Record<string, unknown>;
   enhanceResult?: Record<string, unknown>;
+  deferredCommands?: string[];
   updateMetadata?: Record<string, unknown> | null;
   outputDir?: string;
 };
@@ -155,6 +156,7 @@ export async function launchApp(page: Page, scenario: MockScenario) {
     },
     batchResult: scenario.batchResult ?? null,
     enhanceResult: scenario.enhanceResult ?? null,
+    deferredCommands: scenario.deferredCommands ?? [],
     updateMetadata: scenario.updateMetadata ?? null,
     outputDir: scenario.outputDir ?? "C:/exports",
   };
@@ -167,12 +169,24 @@ export async function launchApp(page: Page, scenario: MockScenario) {
 
       const dialogResponses = [...(state.dialogResponses ?? [])];
       const extractResults = [...(state.extractResults ?? [])];
+      const deferredCommands = new Set(state.deferredCommands ?? []);
+      const deferredResolvers = new Map();
+      const releasedCommands = new Set();
       const mockState = {
         ...state,
         dialogResponses,
         extractResults,
         calls: [],
         clipboard: "",
+        releaseCommand(cmd) {
+          const resolvers = deferredResolvers.get(cmd);
+          const resolve = resolvers?.shift();
+          if (resolve) {
+            resolve();
+          } else {
+            releasedCommands.add(cmd);
+          }
+        },
       };
 
       const mediaQueryFallback = {
@@ -250,6 +264,15 @@ export async function launchApp(page: Page, scenario: MockScenario) {
         return `${state.outputDir ?? "C:/exports"}/${args.baseName}.${extension}`;
       }
 
+      function waitForCommandRelease(cmd) {
+        if (!deferredCommands.has(cmd) || releasedCommands.delete(cmd)) return Promise.resolve();
+        return new Promise((resolve) => {
+          const resolvers = deferredResolvers.get(cmd) ?? [];
+          resolvers.push(resolve);
+          deferredResolvers.set(cmd, resolvers);
+        });
+      }
+
       function registerCallback(callback, once = false) {
         const id = nextCallbackId++;
         callbacks.set(id, { callback, once });
@@ -283,6 +306,7 @@ export async function launchApp(page: Page, scenario: MockScenario) {
         },
         async invoke(cmd, args = {}) {
           mockState.calls.push({ cmd, args });
+          await waitForCommandRelease(cmd);
 
           switch (cmd) {
             case "plugin:app|version":

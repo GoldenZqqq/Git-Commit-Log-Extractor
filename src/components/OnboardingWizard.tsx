@@ -17,7 +17,7 @@ import type { AppSettings, RepoInfo } from "../model";
 type Props = {
   settings: AppSettings;
   repos: RepoInfo[];
-  isBusy: boolean;
+  isScanning: boolean;
   updateSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
   onAddRootDirs: () => void;
   onRemoveRootDir: (dir: string) => void;
@@ -30,7 +30,7 @@ const STEPS = [
   { title: "统计作者", desc: "可选单人、多人或全部" },
 ] as const;
 
-export function OnboardingWizard({ settings, repos, isBusy, updateSetting, onAddRootDirs, onRemoveRootDir, onComplete }: Props) {
+export function OnboardingWizard({ settings, repos, isScanning, updateSetting, onAddRootDirs, onRemoveRootDir, onComplete }: Props) {
   const [step, setStep] = useState(0);
 
   const rootReady = settings.rootDirs.length > 0;
@@ -112,19 +112,19 @@ export function OnboardingWizard({ settings, repos, isBusy, updateSetting, onAdd
                   {settings.rootDirs.length > 0 ? "继续添加目录" : "点击选择文件夹，例如 D:\\workspace"}
                 </span>
               </button>
-              {rootReady && isBusy && (
+              {rootReady && isScanning && (
                 <p className="onboarding-feedback">
                   <Loader2 className="spin" size={14} />
                   正在扫描仓库……
                 </p>
               )}
-              {rootReady && !isBusy && hasRepos && (
+              {rootReady && !isScanning && hasRepos && (
                 <p className="onboarding-feedback ok">
                   <Check size={14} />
                   已发现 {repos.length} 个 Git 仓库
                 </p>
               )}
-              {rootReady && !isBusy && !hasRepos && (
+              {rootReady && !isScanning && !hasRepos && (
                 <div className="onboarding-empty-workspace" role="status" aria-live="polite">
                   <div className="onboarding-empty-title">
                     <AlertCircle size={15} />

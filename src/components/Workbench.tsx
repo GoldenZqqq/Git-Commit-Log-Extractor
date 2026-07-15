@@ -38,6 +38,13 @@ import {
   type RepoInfo,
   type RepoScanProgress,
 } from "../model";
+import {
+  activeTaskLabel,
+  hasActiveTasks,
+  taskCanStart,
+  taskIsActive,
+  type ActiveTaskState,
+} from "../hooks/useTaskActivity";
 import { convertMarkdownTo, REPORT_FORMAT_PRESETS, type IMFormatPresetId } from "../reportFormat";
 import { type HeatmapResult } from "./ContributionHeatmap";
 import { CustomRangeDialog } from "./CustomRangeDialog";
@@ -54,8 +61,7 @@ type Props = {
   activePreview: PreviewMode;
   status: string;
   warnings: string[];
-  isBusy: boolean;
-  isRepoScanning: boolean;
+  activeTasks: ActiveTaskState;
   scanProgress: RepoScanProgress | null;
   extractProgress: CommitExtractProgress | null;
   lastOutputFile: string;
@@ -118,6 +124,17 @@ type WorkbenchView = "report" | "insights";
 
 export function Workbench(props: Props) {
   const previewMeta = props.aiConfigured ? "AI 可润色" : "Markdown 渲染";
+  const isGenerating = taskIsActive(props.activeTasks, "generate");
+  const isPolishing = taskIsActive(props.activeTasks, "polish");
+  const isExporting = taskIsActive(props.activeTasks, "export");
+  const isInteracting = taskIsActive(props.activeTasks, "interaction");
+  const isRepoScanning = taskIsActive(props.activeTasks, "scan");
+  const generateBlocked = !taskCanStart(props.activeTasks, "generate");
+  const polishBlocked = !taskCanStart(props.activeTasks, "polish");
+  const exportBlocked = !taskCanStart(props.activeTasks, "export");
+  const interactionBlocked = !taskCanStart(props.activeTasks, "interaction");
+  const scanBlocked = !taskCanStart(props.activeTasks, "scan");
+  const visibleStatus = activeTaskLabel(props.activeTasks) || props.status;
   const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
   const [blankDayTipOpen, setBlankDayTipOpen] = useState(() => !loadBlankDayTipDismissed());
   const [customDialogOpen, setCustomDialogOpen] = useState(false);
@@ -264,18 +281,26 @@ export function Workbench(props: Props) {
       : props.activePreview === "custom"
         ? "请选择时间段生成自定义报告。"
         : "暂无日报内容。";
-  const generateButtonLabel = props.activePreview === "monthly"
-    ? "生成月报"
-    : props.activePreview === "weekly"
-      ? "生成周报"
-      : props.activePreview === "custom"
-        ? "生成自定义报告"
-        : "生成日报";
-  const generateButtonIcon = props.activePreview === "monthly" ? <FileDown size={15} /> : props.activePreview === "weekly" || props.activePreview === "custom" ? <CalendarDays size={15} /> : <GitBranch size={15} />;
+  const generateButtonLabel = isGenerating
+    ? "生成中"
+    : props.activePreview === "monthly"
+      ? "生成月报"
+      : props.activePreview === "weekly"
+        ? "生成周报"
+        : props.activePreview === "custom"
+          ? "生成自定义报告"
+          : "生成日报";
+  const generateButtonIcon = isGenerating
+    ? <Loader2 className="spin" size={15} />
+    : props.activePreview === "monthly"
+      ? <FileDown size={15} />
+      : props.activePreview === "weekly" || props.activePreview === "custom"
+        ? <CalendarDays size={15} />
+        : <GitBranch size={15} />;
   const enabledRepoCount = props.repos.filter((repo) => !props.disabledRepos.includes(repo.path)).length;
   const activeRangeLabel = formatActiveRange(props.activePreview, props.dailyDate, props.weeklyRange, props.monthlyRange, props.customRange);
   const exportConfigured = props.canExport;
-  const exportButtonLabel = exportConfigured ? "导出" : "设置导出";
+  const exportButtonLabel = isExporting ? "导出中" : exportConfigured ? "导出" : "设置导出";
   const exportButtonTitle = exportConfigured
     ? "导出为 Markdown"
     : props.outputEnabled
@@ -289,7 +314,7 @@ export function Workbench(props: Props) {
     : "";
   const extractProgressText = props.extractProgress && !props.extractProgress.done
     ? `${props.extractProgress.completedRepos}/${props.extractProgress.totalRepos} 仓库 · ${props.extractProgress.concurrency} 并发 · ${props.extractProgress.commitCount} 条提交`
-    : props.status;
+    : visibleStatus;
   const emptyReportAdvice = props.previewText && props.commitCount === 0 && !props.blankDayDraftActive
     ? buildEmptyReportAdvice({
       activePreview: props.activePreview,
@@ -326,8 +351,8 @@ export function Workbench(props: Props) {
         <div className="hero-aside">
           <div className="hero-actions">
             <div className="run-status">
-              {props.isBusy && <Loader2 className="spin" size={16} />}
-              <span>{props.status}</span>
+              {hasActiveTasks(props.activeTasks) && <Loader2 className="spin" size={16} />}
+              <span>{visibleStatus}</span>
             </div>
             <button className="settings-trigger" type="button" onClick={props.onOpenSettings} aria-label="打开设置">
               <Settings2 size={16} />
@@ -406,13 +431,13 @@ export function Workbench(props: Props) {
                   monthlyMonth={props.monthlyMonth}
                   monthlyRange={props.monthlyRange}
                   customRange={props.customRange}
-                  isBusy={props.isBusy}
+                  periodLocked={isGenerating}
                   onDailyDateChange={props.onDailyDateChange}
                   onWeeklyWeekChange={props.onWeeklyWeekChange}
                   onMonthlyMonthChange={props.onMonthlyMonthChange}
                   onOpenCustomRange={() => setCustomDialogOpen(true)}
                 />
-                <button className="preview-generate-button" type="button" onClick={handleGenerate} disabled={props.isBusy}>
+                <button className="preview-generate-button" type="button" onClick={handleGenerate} disabled={generateBlocked}>
                   {generateButtonIcon}
                   {generateButtonLabel}
                 </button>
@@ -420,7 +445,7 @@ export function Workbench(props: Props) {
                   className="preview-generate-button"
                   type="button"
                   onClick={props.onOpenBatch}
-                  disabled={props.isBusy}
+                  disabled={generateBlocked}
                   title="批量生成多份报告"
                   style={{ marginLeft: 4 }}
                 >
@@ -449,7 +474,7 @@ export function Workbench(props: Props) {
                       className={`preview-generate-button blank-day-button ${!props.aiConfigured ? "warning" : ""}`}
                       type="button"
                       onClick={props.onOpenBlankDayFill}
-                      disabled={props.isBusy || !props.aiConfigured}
+                      disabled={generateBlocked || !props.aiConfigured}
                       title={props.aiConfigured ? "基于近期 Git 线索，生成可编辑的日报延续草稿" : "请先配置 AI"}
                       style={{ marginLeft: 4 }}
                     >
@@ -466,17 +491,17 @@ export function Workbench(props: Props) {
                       className={`preview-polish-button ${!props.aiConfigured ? "warning" : ""}`}
                       type="button"
                       onClick={() => props.onPolish()}
-                      disabled={props.isBusy}
+                      disabled={polishBlocked || !props.aiConfigured}
                       title={props.aiConfigured ? "使用 AI 润色当前报告" : "请在设置中配置 AI"}
                     >
-                      <Sparkles size={15} />
-                      AI润色
+                      {isPolishing ? <Loader2 className="spin" size={15} /> : <Sparkles size={15} />}
+                      {isPolishing ? "润色中" : "AI润色"}
                     </button>
                     <button
                       className={`polish-split-toggle ${!props.aiConfigured ? "warning" : ""}`}
                       type="button"
                       onClick={() => setPolishMenuOpen((current) => !current)}
-                      disabled={props.isBusy}
+                      disabled={polishBlocked || !props.aiConfigured}
                       aria-expanded={polishMenuOpen}
                       aria-label="带本次额外要求润色"
                       title="带本次额外要求润色"
@@ -505,7 +530,7 @@ export function Workbench(props: Props) {
                               setPolishExtra("");
                               setPolishMenuOpen(false);
                             }}
-                            disabled={props.isBusy}
+                            disabled={polishBlocked || !props.aiConfigured}
                           >
                             <Sparkles size={14} />
                             带要求润色
@@ -517,8 +542,8 @@ export function Workbench(props: Props) {
                 )}
                 {props.previewText && (
                   <div className={`export-split ${exportConfigured ? "has-menu" : "needs-setup"}`}>
-                    <button className="preview-save-button" type="button" onClick={() => handleExport("markdown")} disabled={props.isBusy} title={exportButtonTitle}>
-                      <FileDown size={15} />
+                    <button className="preview-save-button" type="button" onClick={() => handleExport("markdown")} disabled={exportBlocked} title={exportButtonTitle}>
+                      {isExporting ? <Loader2 className="spin" size={15} /> : <FileDown size={15} />}
                       {exportButtonLabel}
                     </button>
                     {exportConfigured && (
@@ -527,7 +552,7 @@ export function Workbench(props: Props) {
                           className="export-split-toggle"
                           type="button"
                           onClick={() => setExportMenuOpen((current) => !current)}
-                          disabled={props.isBusy}
+                          disabled={exportBlocked}
                           aria-expanded={exportMenuOpen}
                           aria-label="选择导出格式"
                           title="选择导出格式"
@@ -564,9 +589,9 @@ export function Workbench(props: Props) {
                   </div>
                 )}
                 <div className="copy-split">
-                  <button className="preview-copy-button" type="button" onClick={props.onCopy} disabled={!props.previewText}>
-                    <Clipboard size={15} />
-                    复制
+                  <button className="preview-copy-button" type="button" onClick={props.onCopy} disabled={!props.previewText || interactionBlocked}>
+                    {isInteracting ? <Loader2 className="spin" size={15} /> : <Clipboard size={15} />}
+                    {isInteracting ? "复制中" : "复制"}
                   </button>
                   {props.previewText && (
                     <>
@@ -574,7 +599,7 @@ export function Workbench(props: Props) {
                         className="copy-split-toggle"
                         type="button"
                         onClick={() => setCopyAsMenuOpen((current) => !current)}
-                        disabled={!props.previewText}
+                        disabled={!props.previewText || interactionBlocked}
                         aria-expanded={copyAsMenuOpen}
                         aria-label="复制为其他格式"
                         title="复制为其他格式"
@@ -611,7 +636,7 @@ export function Workbench(props: Props) {
             </div>
             <SupplementalItemsEditor
               value={props.supplementalItemsText}
-              disabled={props.isBusy}
+              disabled={isGenerating || isPolishing}
               onChange={props.onSupplementalItemsChange}
             />
             <GenerationScopeStrip
@@ -628,7 +653,7 @@ export function Workbench(props: Props) {
             />
           </div>
           <div className="preview-shell">
-            {props.isBusy ? (
+            {isGenerating ? (
               <div className="preview-loading">
                 <Loader2 className="spin" size={32} />
                 <p>{extractProgressText}</p>
@@ -697,17 +722,17 @@ export function Workbench(props: Props) {
                     <button
                       className="repo-refresh-button"
                       type="button"
-                      onClick={props.isRepoScanning ? props.onCancelRepoScan : props.onRefreshRepos}
-                      disabled={props.isBusy && !props.isRepoScanning}
-                      aria-label={props.isRepoScanning ? "取消仓库扫描" : "重新扫描仓库索引"}
-                      title={props.isRepoScanning ? "取消仓库扫描" : "重新扫描仓库索引"}
+                      onClick={isRepoScanning ? props.onCancelRepoScan : props.onRefreshRepos}
+                      disabled={scanBlocked && !isRepoScanning}
+                      aria-label={isRepoScanning ? "取消仓库扫描" : "重新扫描仓库索引"}
+                      title={isRepoScanning ? "取消仓库扫描" : "重新扫描仓库索引"}
                     >
-                      {props.isRepoScanning ? <XCircle size={14} /> : <RefreshCw size={14} />}
-                      {props.isRepoScanning ? "取消扫描" : "重新扫描"}
+                      {isRepoScanning ? <XCircle size={14} /> : <RefreshCw size={14} />}
+                      {isRepoScanning ? "取消扫描" : "重新扫描"}
                     </button>
                   )}
                 />
-                {props.isRepoScanning && props.scanProgress && (
+                {isRepoScanning && props.scanProgress && (
                   <div className="repo-scan-progress" role="status" aria-live="polite">
                     <div>
                       <Loader2 className="spin" size={14} />
@@ -724,8 +749,8 @@ export function Workbench(props: Props) {
                   {props.repos.length === 0 && (
                     <RepoEmptyState
                       hasRootDirs={props.rootDirs.length > 0}
-                      isBusy={props.isBusy}
-                      isRepoScanning={props.isRepoScanning}
+                      scanBlocked={scanBlocked}
+                      isRepoScanning={isRepoScanning}
                       onAddRootDirs={props.onAddRootDirs}
                       onRefreshRepos={props.onRefreshRepos}
                       onOpenSettings={props.onOpenSettings}
@@ -772,7 +797,7 @@ export function Workbench(props: Props) {
               <ReportHistoryPanel
                 entries={props.reportHistory}
                 activeHistoryId={props.activeHistoryId}
-                isBusy={props.isBusy}
+                generationBlocked={generateBlocked}
                 onOpen={props.onOpenHistory}
                 onCopy={props.onCopyHistory}
                 onRegenerate={props.onRegenerateHistory}
@@ -812,7 +837,7 @@ export function Workbench(props: Props) {
         onRefresh={refreshInsightsData}
         reportHistory={props.reportHistory}
         aiConfigured={props.aiConfigured}
-        isBusy={props.isBusy}
+        generationBlocked={generateBlocked}
         onOpenHistory={(entry) => {
           setWorkbenchView("report");
           props.onOpenHistory(entry);
@@ -851,10 +876,10 @@ export function Workbench(props: Props) {
                 {emptyReportAdvice.checks.map((check) => <li key={check}>{check}</li>)}
               </ul>
               <div className="empty-report-actions">
-                <button type="button" onClick={props.onOpenSettings} disabled={props.isBusy}>
+                <button type="button" onClick={props.onOpenSettings}>
                   检查作者/分支
                 </button>
-                <button type="button" onClick={props.onRefreshRepos} disabled={props.isBusy || props.isRepoScanning}>
+                <button type="button" onClick={props.onRefreshRepos} disabled={scanBlocked}>
                   重新扫描仓库
                 </button>
               </div>
@@ -866,7 +891,7 @@ export function Workbench(props: Props) {
       <CustomRangeDialog
         open={customDialogOpen}
         initialRange={props.customRange}
-        isBusy={props.isBusy}
+        generationBlocked={generateBlocked}
         onClose={() => setCustomDialogOpen(false)}
         onConfirm={generateCustom}
       />
@@ -877,7 +902,7 @@ export function Workbench(props: Props) {
 function ReportHistoryPanel({
   entries,
   activeHistoryId,
-  isBusy,
+  generationBlocked,
   onOpen,
   onCopy,
   onRegenerate,
@@ -885,7 +910,7 @@ function ReportHistoryPanel({
 }: {
   entries: ReportHistoryEntry[];
   activeHistoryId: string;
-  isBusy: boolean;
+  generationBlocked: boolean;
   onOpen: (entry: ReportHistoryEntry) => void;
   onCopy: (entry: ReportHistoryEntry) => void;
   onRegenerate: (entry: ReportHistoryEntry) => void;
@@ -928,7 +953,7 @@ function ReportHistoryPanel({
         title="最近报告"
         meta={entries.length > 0 ? (hasFilters ? `${filteredEntries.length}/${entries.length} 条` : `${entries.length} 条`) : "生成后自动记录"}
         action={(
-          <button className="history-clear-button" type="button" onClick={onClear} disabled={entries.length === 0 || isBusy}>
+          <button className="history-clear-button" type="button" onClick={onClear} disabled={entries.length === 0 || generationBlocked}>
             <Trash2 size={13} />
             清空
           </button>
@@ -954,7 +979,7 @@ function ReportHistoryPanel({
             <HistoryList
               entries={filteredEntries}
               activeHistoryId={activeHistoryId}
-              isBusy={isBusy}
+              generationBlocked={generationBlocked}
               onOpen={onOpen}
               onCopy={onCopy}
               onRegenerate={onRegenerate}
@@ -1027,20 +1052,20 @@ function HistoryFilterBar({
 
 function RepoEmptyState({
   hasRootDirs,
-  isBusy,
+  scanBlocked,
   isRepoScanning,
   onAddRootDirs,
   onRefreshRepos,
   onOpenSettings,
 }: {
   hasRootDirs: boolean;
-  isBusy: boolean;
+  scanBlocked: boolean;
   isRepoScanning: boolean;
   onAddRootDirs: () => void;
   onRefreshRepos: () => void;
   onOpenSettings: () => void;
 }) {
-  const scanningDisabled = isBusy || isRepoScanning;
+  const scanningDisabled = scanBlocked || isRepoScanning;
   return (
     <section className="repo-empty-state" aria-label="仓库索引为空">
       <div className="repo-empty-icon" aria-hidden="true">
@@ -1067,7 +1092,7 @@ function RepoEmptyState({
         </ul>
       )}
       <div className="repo-empty-actions">
-        <button type="button" onClick={onAddRootDirs} disabled={isBusy}>
+        <button type="button" onClick={onAddRootDirs} disabled={scanBlocked}>
           <FolderPlus size={14} />
           {hasRootDirs ? "添加其他目录" : "添加目录"}
         </button>
@@ -1090,14 +1115,14 @@ function RepoEmptyState({
 function HistoryList({
   entries,
   activeHistoryId,
-  isBusy,
+  generationBlocked,
   onOpen,
   onCopy,
   onRegenerate,
 }: {
   entries: ReportHistoryEntry[];
   activeHistoryId: string;
-  isBusy: boolean;
+  generationBlocked: boolean;
   onOpen: (entry: ReportHistoryEntry) => void;
   onCopy: (entry: ReportHistoryEntry) => void;
   onRegenerate: (entry: ReportHistoryEntry) => void;
@@ -1109,7 +1134,7 @@ function HistoryList({
           key={entry.id}
           entry={entry}
           active={entry.id === activeHistoryId}
-          isBusy={isBusy}
+          generationBlocked={generationBlocked}
           onOpen={onOpen}
           onCopy={onCopy}
           onRegenerate={onRegenerate}
@@ -1122,14 +1147,14 @@ function HistoryList({
 function HistoryRow({
   entry,
   active,
-  isBusy,
+  generationBlocked,
   onOpen,
   onCopy,
   onRegenerate,
 }: {
   entry: ReportHistoryEntry;
   active: boolean;
-  isBusy: boolean;
+  generationBlocked: boolean;
   onOpen: (entry: ReportHistoryEntry) => void;
   onCopy: (entry: ReportHistoryEntry) => void;
   onRegenerate: (entry: ReportHistoryEntry) => void;
@@ -1154,7 +1179,7 @@ function HistoryRow({
           <Clipboard size={13} />
           复制
         </button>
-        <button type="button" onClick={() => onRegenerate(entry)} disabled={isBusy} title="按该周期重新生成">
+        <button type="button" onClick={() => onRegenerate(entry)} disabled={generationBlocked} title="按该周期重新生成">
           <RotateCcw size={13} />
           重跑
         </button>
@@ -1211,7 +1236,7 @@ function ReportPeriodControl({
   monthlyMonth,
   monthlyRange,
   customRange,
-  isBusy,
+  periodLocked,
   onDailyDateChange,
   onWeeklyWeekChange,
   onMonthlyMonthChange,
@@ -1224,7 +1249,7 @@ function ReportPeriodControl({
   monthlyMonth: string;
   monthlyRange: DateRange;
   customRange: DateRange;
-  isBusy: boolean;
+  periodLocked: boolean;
   onDailyDateChange: (date: string) => void;
   onWeeklyWeekChange: (week: string) => void;
   onMonthlyMonthChange: (month: string) => void;
@@ -1248,7 +1273,7 @@ function ReportPeriodControl({
         <input
           type="date"
           value={dailyDate}
-          disabled={isBusy}
+          disabled={periodLocked}
           aria-label="选择日报日期"
           onChange={(event) => event.target.value && onDailyDateChange(event.target.value)}
         />
@@ -1257,7 +1282,7 @@ function ReportPeriodControl({
         <input
           type="week"
           value={weeklyWeek}
-          disabled={isBusy}
+          disabled={periodLocked}
           aria-label="选择周报周次"
           onChange={(event) => event.target.value && onWeeklyWeekChange(event.target.value)}
         />
@@ -1266,7 +1291,7 @@ function ReportPeriodControl({
         <input
           type="month"
           value={monthlyMonth}
-          disabled={isBusy}
+          disabled={periodLocked}
           aria-label="选择月报月份"
           onChange={(event) => event.target.value && onMonthlyMonthChange(event.target.value)}
         />
@@ -1275,7 +1300,7 @@ function ReportPeriodControl({
         <button
           className="period-range-button"
           type="button"
-          disabled={isBusy}
+          disabled={periodLocked}
           onClick={onOpenCustomRange}
         >
           {rangeLabel}

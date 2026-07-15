@@ -12,6 +12,11 @@ import { UpdateBanner } from "./components/UpdateBanner";
 import { Workbench } from "./components/Workbench";
 import { useAppRuntime } from "./hooks/useAppRuntime";
 import {
+  taskIsActive,
+  type AppTaskKind,
+  useTaskActivity,
+} from "./hooks/useTaskActivity";
+import {
   type AppSettings,
   type CommitExtractProgress,
   type DateRange,
@@ -102,8 +107,8 @@ function App() {
   );
   const [appMessage, setAppMessage] = useState<AppMessage | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
-  const [isBusy, setIsBusy] = useState(false);
-  const [isRepoScanning, setIsRepoScanning] = useState(false);
+  const { activeTasks, tryStartTask, finishTask } = useTaskActivity();
+  const isRepoScanning = taskIsActive(activeTasks, "scan");
   const [scanProgress, setScanProgress] = useState<RepoScanProgress | null>(null);
   const [extractProgress, setExtractProgress] = useState<CommitExtractProgress | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -325,32 +330,27 @@ function App() {
   }
 
   async function scanWorkspace() {
-    setIsRepoScanning(true);
-    setScanProgress({
-      rootDir: "",
-      currentPath: "",
-      scannedDirs: 0,
-      foundRepos: 0,
-      done: false,
-      cancelled: false,
-    });
-    try {
-      await runTask("正在扫描仓库", async () => {
-        const result = await invoke<RepoInfo[]>("scan_repos", { rootDirs: settings.rootDirs });
-        updateRepoIndex(result);
-        setScanProgress((current) => ({
-          rootDir: current?.rootDir ?? "",
-          currentPath: current?.currentPath ?? "",
-          scannedDirs: current?.scannedDirs ?? 0,
-          foundRepos: result.length,
-          done: true,
-          cancelled: false,
-        }));
-        setStatus(`已发现 ${result.length} 个仓库`);
-      }, () => validateWorkspaceSettings(settings));
-    } finally {
-      setIsRepoScanning(false);
-    }
+    await runTask("scan", "正在扫描仓库", async () => {
+      setScanProgress({
+        rootDir: "",
+        currentPath: "",
+        scannedDirs: 0,
+        foundRepos: 0,
+        done: false,
+        cancelled: false,
+      });
+      const result = await invoke<RepoInfo[]>("scan_repos", { rootDirs: settings.rootDirs });
+      updateRepoIndex(result);
+      setScanProgress((current) => ({
+        rootDir: current?.rootDir ?? "",
+        currentPath: current?.currentPath ?? "",
+        scannedDirs: current?.scannedDirs ?? 0,
+        foundRepos: result.length,
+        done: true,
+        cancelled: false,
+      }));
+      setStatus(`已发现 ${result.length} 个仓库`);
+    }, () => validateWorkspaceSettings(settings));
   }
 
   async function cancelRepoScan() {
@@ -438,7 +438,7 @@ function App() {
   async function extractCommits(dateValue = dailyDate, supplementalOverride?: string[]) {
     const range = getSingleDayRange(dateValue);
     setExtractProgress(null);
-    await runTask("正在提取提交记录", async () => {
+    await runTask("generate", "正在提取提交记录", async () => {
       const supplementalItems = supplementalItemsFor("summary", range, supplementalOverride);
       const result = await invoke<ExtractResult>("extract_commits", {
         options: buildExtractOptions(settings, projectNames, range, false, "", repos, "daily", supplementalItems),
@@ -463,7 +463,7 @@ function App() {
 
   async function generateCustomReport(range: DateRange, supplementalOverride?: string[]) {
     setExtractProgress(null);
-    await runTask("正在生成自定义报告", async () => {
+    await runTask("generate", "正在生成自定义报告", async () => {
       const supplementalItems = supplementalItemsFor("custom", range, supplementalOverride);
       const result = await invoke<ExtractResult>("extract_commits", {
         options: buildExtractOptions(settings, projectNames, range, false, "", repos, "custom", supplementalItems),
@@ -491,7 +491,7 @@ function App() {
     const range = getWeekRange(weekValue);
     const label = weekValue;
     setExtractProgress(null);
-    await runTask("正在生成周报", async () => {
+    await runTask("generate", "正在生成周报", async () => {
       const supplementalItems = supplementalItemsFor("weekly", range, supplementalOverride);
       const result = await invoke<PeriodReportResult>("generate_period_report", {
         options: buildPeriodReportOptions(settings, projectNames, "weekly", range, label, false, "", repos, supplementalItems),
@@ -514,7 +514,7 @@ function App() {
 
   async function generateMonthlyReport(monthValue = monthlyMonth, supplementalOverride?: string[]) {
     setExtractProgress(null);
-    await runTask("正在生成月报", async () => {
+    await runTask("generate", "正在生成月报", async () => {
       const range = getMonthRange(monthValue);
       const label = formatMonthLabel(monthValue);
       const supplementalItems = supplementalItemsFor("monthly", range, supplementalOverride);
@@ -566,7 +566,7 @@ function App() {
     const periodLabel = activePreviewPeriodLabel(activePreview, dailyDate, weeklyWeek, monthlyLabel || monthlyMonth, customRange);
     const baseReport = previewText;
     setExtractProgress(null);
-    await runTask("AI 正在润色当前报告", async () => {
+    await runTask("polish", "AI 正在润色当前报告", async () => {
       const supplementalItems = supplementalItemsFor(activePreview, range);
       const result = await invoke<ReportEnhanceResult>("enhance_report", {
         options: buildReportEnhanceOptions(settings, activePreview, range, baseReport, extraInstruction, supplementalItems),
@@ -598,12 +598,10 @@ function App() {
 
   async function copyPreview() {
     if (!previewText) return;
-    try {
-      await navigator.clipboard.writeText(previewText);
+    await runTask("interaction", "正在复制当前报告", async () => {
+      await copyText(previewText, "复制失败，请重试");
       setStatus("内容已复制到剪贴板", { tone: "success", notify: true });
-    } catch {
-      setStatus("复制失败，请重试", { tone: "error", notify: true });
-    }
+    }, () => undefined);
   }
 
   async function saveReport(format: ReportExportFormat = "markdown") {
@@ -627,7 +625,7 @@ function App() {
       const range = activePreview === "custom" ? customRange : dailyRange;
       baseName = `git_commits_${range.startDate}_to_${range.endDate}`;
     }
-    await runTask("正在导出报告", async () => {
+    await runTask("export", "正在导出报告", async () => {
       const outputFile = await invoke<string>("save_report_file", {
         outputDir: settings.outputDir,
         baseName,
@@ -674,12 +672,10 @@ function App() {
   }
 
   async function copyReportHistory(entry: ReportHistoryEntry) {
-    try {
-      await navigator.clipboard.writeText(entry.reportText);
+    await runTask("interaction", "正在复制历史报告", async () => {
+      await copyText(entry.reportText, "复制历史报告失败，请重试");
       setStatus(`已复制历史报告：${entry.title}`, { tone: "success", notify: true });
-    } catch {
-      setStatus("复制历史报告失败，请重试", { tone: "error", notify: true });
-    }
+    }, () => undefined);
   }
 
   async function regenerateReportHistory(entry: ReportHistoryEntry) {
@@ -703,17 +699,31 @@ function App() {
     setStatus("最近报告记录已清空");
   }
 
-  async function runTask(label: string, task: () => Promise<void>, validate = () => validateRequiredSettings(settings)) {
-    setIsBusy(true);
-    setStatus(label, { tone: "loading", notify: true, duration: 1600 });
-    setWarnings([]);
+  async function runTask(
+    kind: AppTaskKind,
+    label: string,
+    task: () => Promise<void>,
+    validate = () => validateRequiredSettings(settings),
+  ) {
     try {
       validate();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error), { tone: "error", notify: true, duration: 4200 });
+      return;
+    }
+    const start = tryStartTask(kind, label);
+    if (!start.started) {
+      setStatus(`请等待“${start.conflictLabel}”完成后再继续`, { tone: "warning", notify: true, duration: 3200 });
+      return;
+    }
+    setStatus(label, { tone: "loading", notify: true, duration: 1600 });
+    if (kind !== "interaction") setWarnings([]);
+    try {
       await task();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error), { tone: "error", notify: true, duration: 4200 });
     } finally {
-      setIsBusy(false);
+      finishTask(kind);
     }
   }
 
@@ -840,7 +850,7 @@ function App() {
       <OnboardingWizard
         settings={settings}
         repos={repos}
-        isBusy={isBusy}
+        isScanning={isRepoScanning}
         updateSetting={updateSetting}
         onAddRootDirs={addRootDirs}
         onRemoveRootDir={removeRootDir}
@@ -929,8 +939,7 @@ function handleBlankDayGenerated(payload: {
         activePreview={activePreview}
         status={status}
         warnings={warnings}
-        isBusy={isBusy}
-        isRepoScanning={isRepoScanning}
+        activeTasks={activeTasks}
         scanProgress={scanProgress}
         extractProgress={extractProgress}
         lastOutputFile={lastOutputFile}
@@ -1066,6 +1075,14 @@ function activePreviewBaseName(mode: PreviewMode, range: DateRange, periodLabel:
   if (mode === "monthly") return `monthly_report_${periodLabel}`;
   if (mode === "weekly") return `weekly_report_${periodLabel}`;
   return `git_commits_${range.startDate}_to_${range.endDate}`;
+}
+
+async function copyText(text: string, errorMessage: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    throw new Error(errorMessage);
+  }
 }
 
 function shouldNotifyStatus(message: string) {
