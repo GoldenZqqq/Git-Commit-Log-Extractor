@@ -52,3 +52,11 @@ Components are plain React function components with explicit `Props` types. The 
 - Letting AI polishing controls imply that AI is required to generate a useful report.
 - Adding decorative cards or oversized landing-page patterns to the app shell.
 - Moving local filesystem or Git behavior into frontend code instead of Rust commands.
+
+## Experimental Provider Disclosure
+
+- Mark an experimental provider in the protocol option itself so users see the status before selecting it.
+- Before login or first use, state the eligible account, data destination, likely failure mode, and recommended stable alternatives.
+- Keep the experimental marker in the configuration label and connected status; do not let a successful login imply production stability.
+- Stable-provider fallback actions must switch configuration without logging out the experimental provider or clearing another provider's secure credentials.
+- Playwright should assert the pre-selection label, pre-login disclosure, fallback values, retained API key input, and absence of credential-clear/logout commands.

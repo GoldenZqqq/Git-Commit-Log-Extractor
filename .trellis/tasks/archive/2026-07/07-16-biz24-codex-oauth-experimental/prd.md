@@ -13,10 +13,10 @@
 
 ## Acceptance Criteria
 
-- [ ] 用户在选择 Codex OAuth 前即可看到实验标记与限制。
-- [ ] 登录区展示回退路径，主流 provider 保持默认优先级。
-- [ ] 切换 provider 不泄露或误清空其他 provider 的凭据。
-- [ ] Playwright 覆盖实验文案与 provider 切换。
+- [x] 用户在选择 Codex OAuth 前即可看到实验标记与限制。
+- [x] 登录区展示回退路径，主流 provider 保持默认优先级。
+- [x] 切换 provider 不泄露或误清空其他 provider 的凭据。
+- [x] Playwright 覆盖实验文案与 provider 切换。
 
 ## Evidence
 

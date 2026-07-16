@@ -30,6 +30,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
 import { DiagnosticsSection } from "./DiagnosticsSection";
 import { ConfigProfileSection } from "./ConfigProfileSection";
+import { CodexOAuthExperimentalNotice } from "./CodexOAuthExperimentalNotice";
 import type { ConfigProfileSettings } from "../configProfile";
 import {
   buildProxyConfig,
@@ -711,40 +712,48 @@ export function SettingsDialog({
                   <select value={settings.aiProvider} onChange={(event) => updateAiProvider(event.target.value as AppSettings["aiProvider"])}>
                     <option value="openai-compatible">OpenAI Compatible</option>
                     <option value="anthropic-native">Anthropic Native</option>
-                    <option value="codex-oauth">ChatGPT (Codex OAuth)</option>
+                    <option value="codex-oauth">ChatGPT (Codex OAuth) · 实验</option>
                   </select>
                 </Field>
+                <p className="ai-provider-experimental-note">
+                  <span className="experimental-badge">实验</span>
+                  Codex OAuth 可能随协议变化失效，建议优先使用 OpenAI Compatible 或 Anthropic Native。
+                </p>
                 {settings.aiProvider === "codex-oauth" ? (
-                  <Field label="ChatGPT 账号" hint="使用 Plus/Pro 额度，无需 API Key；非官方接入，可能失效">
-                    <div className="codex-auth">
-                      {codexAuth.authenticated ? (
-                        <div className="codex-auth-row">
-                          <span className="codex-auth-ok">
-                            <CheckCircle2 size={15} /> 已登录{codexAuth.email ? ` · ${codexAuth.email}` : ""}
-                          </span>
-                          <button type="button" className="mapping-import" onClick={() => void codexLogout()}>
-                            <LogOut size={15} /> 登出
+                  <>
+                    <CodexOAuthExperimentalNotice onSwitchProvider={updateAiProvider} />
+                    <Field label="ChatGPT 账号（实验）" hint="无需 API Key；可随时切回稳定协议，已有凭据不会被删除">
+                      <div className="codex-auth">
+                        {codexAuth.authenticated ? (
+                          <div className="codex-auth-row">
+                            <span className="codex-auth-ok">
+                              <span className="experimental-badge">实验</span>
+                              <CheckCircle2 size={15} /> 已登录{codexAuth.email ? ` · ${codexAuth.email}` : ""}
+                            </span>
+                            <button type="button" className="mapping-import" onClick={() => void codexLogout()}>
+                              <LogOut size={15} /> 登出
+                            </button>
+                          </div>
+                        ) : codexFlow ? (
+                          <div className="codex-flow">
+                            <p>请在打开的页面输入验证码完成授权：</p>
+                            <code className="codex-user-code">{codexFlow.userCode}</code>
+                            <a className="codex-link" href={codexFlow.verificationUri} target="_blank" rel="noreferrer">
+                              <ExternalLink size={13} /> {codexFlow.verificationUri}
+                            </a>
+                            <p className="codex-waiting">
+                              <Loader2 className="spin" size={14} /> 等待授权...
+                            </p>
+                          </div>
+                        ) : (
+                          <button type="button" className="mapping-add" onClick={() => void startCodexLogin()} disabled={codexBusy}>
+                            <Bot size={16} /> 使用 ChatGPT 登录（实验）
                           </button>
-                        </div>
-                      ) : codexFlow ? (
-                        <div className="codex-flow">
-                          <p>请在打开的页面输入验证码完成授权：</p>
-                          <code className="codex-user-code">{codexFlow.userCode}</code>
-                          <a className="codex-link" href={codexFlow.verificationUri} target="_blank" rel="noreferrer">
-                            <ExternalLink size={13} /> {codexFlow.verificationUri}
-                          </a>
-                          <p className="codex-waiting">
-                            <Loader2 className="spin" size={14} /> 等待授权...
-                          </p>
-                        </div>
-                      ) : (
-                        <button type="button" className="mapping-add" onClick={() => void startCodexLogin()} disabled={codexBusy}>
-                          <Bot size={16} /> 使用 ChatGPT 登录
-                        </button>
-                      )}
-                      {codexMessage && <p className="mapping-note">{codexMessage}</p>}
-                    </div>
-                  </Field>
+                        )}
+                        {codexMessage && <p className="mapping-note">{codexMessage}</p>}
+                      </div>
+                    </Field>
+                  </>
                 ) : (
                   <>
                     <Field label="Base URL">

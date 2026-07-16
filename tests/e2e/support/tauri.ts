@@ -48,6 +48,7 @@ type MockScenario = {
   appVersion?: string;
   gitIdentity?: { userName: string; userEmail: string };
   secureApiKey?: string | null;
+  codexAuthStatus?: { authenticated: boolean; email?: string };
   scanRepos?: RepoInfo[];
   scanWarnings?: string[];
   workspaceHealthResult?: Record<string, unknown>;
@@ -171,6 +172,7 @@ export async function launchApp(page: Page, scenario: MockScenario) {
       userEmail: "playwright@example.com",
     },
     secureApiKey: scenario.secureApiKey ?? null,
+    codexAuthStatus: scenario.codexAuthStatus ?? { authenticated: false },
     scanRepos: scenario.scanRepos ?? scenario.repoCache?.repos ?? [],
     scanWarnings: scenario.scanWarnings ?? [],
     workspaceHealthResult: scenario.workspaceHealthResult ?? { roots: [], repos: [] },
@@ -412,7 +414,7 @@ export async function launchApp(page: Page, scenario: MockScenario) {
               mockState.textFiles[args.path] = String(args.content ?? "");
               return null;
             case "codex_oauth_status":
-              return { authenticated: false };
+              return state.codexAuthStatus;
             case "list_ai_models":
               return [];
             case "get_git_identity":

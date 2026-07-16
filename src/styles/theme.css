@@ -525,6 +525,15 @@
   background: rgba(101, 65, 16, 0.22);
 }
 
+:root[data-theme="dark"] .experimental-badge {
+  color: #f4c978;
+  background: rgba(245, 200, 106, 0.16);
+}
+
+:root[data-theme="dark"] .codex-experimental-notice {
+  background: rgba(245, 200, 106, 0.09);
+}
+
 :root[data-theme="dark"] .proxy-tool-button {
   border-color: rgba(109, 168, 255, 0.26);
   color: var(--primary-dark);
