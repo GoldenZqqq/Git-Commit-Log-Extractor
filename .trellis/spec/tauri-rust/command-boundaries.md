@@ -578,3 +578,78 @@ async fn inspect_workspace_health(
         .map_err(|err| format!("检查工作区健康状态失败：{err}"))
 }
 ```
+
+## Scenario: Concrete Blank-Day Continuation Prompt
+
+### 1. Scope / Trigger
+
+- Trigger: changing `blank_day_system_prompt`, `blank_day_user_prompt`, or `DEFAULT_BLANK_DAY_USER_PROMPT` for the “空白日补写” workflow.
+- The feature predicts plausible next work from selected historical Git evidence. It remains an editable draft and must not claim the target day contains real commits.
+
+### 2. Signatures
+
+```rust
+fn blank_day_system_prompt() -> &'static str;
+
+fn blank_day_user_prompt(
+    base_evidence: &str,
+    target_date: &str,
+    source_start_date: &str,
+    source_end_date: &str,
+    author: &str,
+    item_count: u32,
+    user_prompt: &str,
+) -> String;
+```
+
+```ts
+export const DEFAULT_BLANK_DAY_USER_PROMPT: string;
+```
+
+### 3. Contracts
+
+- Rust system prompt and the visible frontend default must share the same concrete-work policy. “恢复默认” and the initial textarea value use the frontend constant; an empty custom input still remains under the Rust system constraint.
+- Every generated item must identify a concrete anchor found in the supplied history: an existing feature, interface, data flow, page, script, test, exceptional path, or technical object.
+- Preferred continuations are code-level actions: extend an existing branch of behavior, repair a plausible defect/regression, add exceptional/boundary/compatibility handling, strengthen tests/verification, or connect interfaces/data flows already present in history.
+- “跟进 / 排查 / 推进 / 联调 / 整理” cannot be the whole item. If used, the item must also state the concrete object, problem pattern, and intended action.
+- A potential defect is phrased as a proposed protection/fix. The prompt must not assert that an unobserved fault occurred or was fixed.
+- Multiple items should use different history anchors or actions rather than paraphrasing one generic sentence.
+- Existing rules remain: exactly N short list items, preserve mapped/repository prefixes, do not invent new modules, release/acceptance/business results, percentages, or target-day commits.
+
+### 4. Validation & Error Matrix
+
+- Empty historical evidence -> pipeline returns `素材周期内没有可用的提交线索` before AI invocation.
+- Empty user prompt -> user instruction displays `无额外要求`; system and generated wrapper still enforce concrete anchors.
+- Custom user prompt requests generic progress language -> it may refine tone/content but cannot remove the Rust system safety and anchor requirements.
+- Historical line has a project prefix -> every output item preserves the same prefix style.
+- Requested item count outside 1..=8 -> pipeline clamps it to the supported range before prompt construction.
+- Potential defect lacks historical object -> reject it at prompt level; do not introduce a post-generation fabricated classifier in this contract.
+
+### 5. Good / Base / Bad Cases
+
+- Good: `报告历史加载空值兼容` -> `补充报告历史加载的空数组回退测试，覆盖文件为空时的恢复路径`.
+- Good: `设置页代理保存` -> `为代理密码保存失败补充错误提示和安全存储回滚处理`.
+- Base: retain a mapped prefix and propose one specific extension from that project's commit message.
+- Bad: `跟进相关功能`、`排查现有问题`、`持续推进联调`、`整理代码逻辑`.
+- Bad: claim `已修复线上崩溃` when no historical evidence says a crash occurred.
+
+### 6. Tests Required
+
+- Rust unit test asserts both prompt layers contain concrete anchor, feature extension, defect/regression, test strengthening, and generic-language rejection markers; retain item-count/evidence/prefix assertions.
+- Frontend smoke asserts the visible default contains the same markers and no longer contains the old “偏跟进/排查/推进/整理” preference.
+- Playwright opens the blank-day dialog, verifies the visible default, edits it, clicks “恢复默认”, and verifies the new text returns.
+- Run full `cargo test`, `npm run build`, frontend smoke, and full Playwright before a release/checkpoint push.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```text
+优先使用跟进、排查、推进、联调、整理等进行中表述。
+```
+
+#### Correct
+
+```text
+每条必须从历史线索提取具体锚点，并写明功能延伸、缺陷/回归修复、边界兼容或测试补强等代码级动作；不得只写过程性表态。
+```
