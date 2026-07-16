@@ -69,6 +69,7 @@ type MockScenario = {
   deferredCommands?: string[];
   updateMetadata?: Record<string, unknown> | null;
   outputDir?: string;
+  textFiles?: Record<string, string>;
 };
 
 export function createSettings(overrides: Record<string, unknown> = {}) {
@@ -186,6 +187,7 @@ export async function launchApp(page: Page, scenario: MockScenario) {
     deferredCommands: scenario.deferredCommands ?? [],
     updateMetadata: scenario.updateMetadata ?? null,
     outputDir: scenario.outputDir ?? "C:/exports",
+    textFiles: { ...(scenario.textFiles ?? {}) },
   };
 
   await page.addInitScript(
@@ -205,6 +207,7 @@ export async function launchApp(page: Page, scenario: MockScenario) {
         extractResults,
         reportHistoryStore: [...(state.storedReportHistory ?? [])],
         reportHistoryStoreExists: state.storedReportHistory !== undefined,
+        textFiles: { ...(state.textFiles ?? {}) },
         calls: [],
         clipboard: "",
         releaseCommand(cmd) {
@@ -399,6 +402,14 @@ export async function launchApp(page: Page, scenario: MockScenario) {
             case "cancel_repo_scan":
             case "write_mapping_template_xlsx":
             case "codex_oauth_logout":
+              return null;
+            case "read_text_file": {
+              const content = mockState.textFiles[args.path];
+              if (typeof content !== "string") throw new Error("读取配置方案失败：文件不存在");
+              return content;
+            }
+            case "write_text_file":
+              mockState.textFiles[args.path] = String(args.content ?? "");
               return null;
             case "codex_oauth_status":
               return { authenticated: false };

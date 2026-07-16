@@ -29,6 +29,8 @@ import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialo
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
 import { DiagnosticsSection } from "./DiagnosticsSection";
+import { ConfigProfileSection } from "./ConfigProfileSection";
+import type { ConfigProfileSettings } from "../configProfile";
 import {
   buildProxyConfig,
   buildMappingKeys,
@@ -64,6 +66,7 @@ type Props = {
   updateProgress: string;
   updateBusy: "checking" | "installing" | null;
   updateSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
+  onApplyConfigProfile: (settings: ConfigProfileSettings) => void;
   onAddRootDirs: () => void;
   onRemoveRootDir: (dir: string) => void;
   onChooseOutputDir: () => void;
@@ -108,6 +111,7 @@ export function SettingsDialog({
   updateProgress,
   updateBusy,
   updateSetting,
+  onApplyConfigProfile,
   onAddRootDirs,
   onRemoveRootDir,
   onChooseOutputDir,
@@ -999,6 +1003,8 @@ export function SettingsDialog({
 
             {activeTab === "general" && (
               <>
+                <ConfigProfileSection settings={settings} onApply={onApplyConfigProfile} />
+
                 <section className="settings-section">
                   <SectionTitle icon={<FileText size={16} />} title="报告历史" />
                   <Field label="保留最近报告">

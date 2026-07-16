@@ -1,6 +1,7 @@
 mod ai;
 mod codex_oauth;
 pub mod commit_pipeline;
+mod config_profile_io;
 mod diagnostics;
 mod docx;
 pub mod git_ops;
@@ -336,6 +337,20 @@ fn save_text_file(
 }
 
 #[tauri::command]
+async fn read_text_file(path: String) -> Result<String, String> {
+    async_runtime::spawn_blocking(move || config_profile_io::read_text_file(&path))
+        .await
+        .map_err(|error| format!("读取配置方案任务中断：{error}"))?
+}
+
+#[tauri::command]
+async fn write_text_file(path: String, content: String) -> Result<(), String> {
+    async_runtime::spawn_blocking(move || config_profile_io::write_text_file(&path, &content))
+        .await
+        .map_err(|error| format!("保存配置方案任务中断：{error}"))?
+}
+
+#[tauri::command]
 fn save_report_file(
     output_dir: String,
     base_name: String,
@@ -444,6 +459,8 @@ pub fn run() {
             scan_proxy_candidates,
             test_proxy_connection,
             save_text_file,
+            read_text_file,
+            write_text_file,
             save_report_file,
             read_mapping_xlsx,
             write_mapping_template_xlsx,

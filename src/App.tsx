@@ -10,6 +10,7 @@ import { RepoMappingDialog } from "./components/RepoMappingDialog";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { Workbench } from "./components/Workbench";
+import type { ConfigProfileSettings } from "./configProfile";
 import { useAppRuntime } from "./hooks/useAppRuntime";
 import { useReportHistoryStorage } from "./hooks/useReportHistoryStorage";
 import { useWorkspaceHealth } from "./hooks/useWorkspaceHealth";
@@ -946,6 +947,10 @@ function App() {
     setSettings((current) => ({ ...current, [key]: value }));
   }
 
+  function applyConfigProfileSettings(profileSettings: ConfigProfileSettings) {
+    setSettings((current) => ({ ...current, ...profileSettings }));
+  }
+
   function toggleRepo(repoPath: string, enabled: boolean) {
     setSettings((current) => {
       const disabled = current.disabledRepos.filter((path) => path !== repoPath);
@@ -1229,6 +1234,7 @@ function handleBlankDayGenerated(payload: {
         updateProgress={updateProgress}
         updateBusy={updateBusy}
         updateSetting={updateSetting}
+        onApplyConfigProfile={applyConfigProfileSettings}
         onAddRootDirs={addRootDirs}
         onRemoveRootDir={removeRootDir}
         onChooseOutputDir={chooseOutputDir}

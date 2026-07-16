@@ -193,6 +193,137 @@
   margin-bottom: 0;
 }
 
+.config-profile-copy,
+.config-profile-safety {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.config-profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.config-profile-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.config-profile-preview-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.config-profile-preview-heading > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.config-profile-preview-heading strong,
+.config-profile-preview-heading span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.config-profile-preview-heading span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.config-profile-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 0;
+}
+
+.config-profile-summary div {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.config-profile-summary dt {
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+.config-profile-summary dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 820;
+}
+
+.config-profile-strategy {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.config-profile-strategy button {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  background: var(--paper);
+  text-align: left;
+}
+
+.config-profile-strategy button.active {
+  border-color: var(--primary);
+  color: var(--primary-dark);
+  background: var(--primary-soft);
+}
+
+.config-profile-strategy span {
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+.config-profile-apply {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: #ffffff;
+  background: var(--primary-dark);
+  font-weight: 820;
+}
+
+.config-profile-feedback {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.config-profile-feedback.success {
+  color: var(--primary-dark);
+}
+
+.config-profile-feedback.error {
+  color: var(--danger-strong);
+}
+
 .advanced-settings-section {
   padding: 0;
   overflow: hidden;
