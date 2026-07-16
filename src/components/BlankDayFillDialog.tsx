@@ -73,7 +73,10 @@ export function BlankDayFillDialog({
   const [draftText, setDraftText] = useState("");
   const [stage, setStage] = useState<Stage>("config");
 
-  const repoTags = useMemo(() => collectBlankDayRepoTags(sourceCommits), [sourceCommits]);
+  const repoTags = useMemo(
+    () => collectBlankDayRepoTags(sourceCommits, projectNames),
+    [sourceCommits, projectNames],
+  );
   const rangeInvalid = Boolean(sourceRange.startDate && sourceRange.endDate && sourceRange.startDate > sourceRange.endDate);
   const canGenerate =
     aiConfigured &&
@@ -116,7 +119,7 @@ export function BlankDayFillDialog({
         ]);
         if (cancelled) return;
         setSourceCommits(sourceResult.commits);
-        const tags = collectBlankDayRepoTags(sourceResult.commits);
+        const tags = collectBlankDayRepoTags(sourceResult.commits, projectNames);
         setSelectedRepoPaths(tags.map((tag) => tag.path));
         setTargetHasCommits(targetResult.commits.length > 0);
         if (sourceResult.commits.length === 0) {
@@ -168,7 +171,12 @@ export function BlankDayFillDialog({
       return;
     }
 
-    const evidence = buildBlankDayEvidenceText(sourceCommits, selectedRepoPaths);
+    const evidence = buildBlankDayEvidenceText(
+      sourceCommits,
+      selectedRepoPaths,
+      projectNames,
+      settings.commitItemPrefixMode,
+    );
     if (!evidence.trim()) {
       setError("当前勾选仓库在素材周期内没有提交线索。");
       return;

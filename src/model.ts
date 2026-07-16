@@ -140,8 +140,9 @@ export const DEFAULT_BLANK_DAY_USER_PROMPT = [
   "要求：",
   "1. 只围绕这些历史事项做合理延续，不编造新业务结论",
   "2. 严格输出 N 条短要点列表（每行一条，可用 - 前缀），每条一句话，偏「跟进 / 排查 / 推进 / 整理」",
-  "3. 不要写已上线、已完成验收、百分比进度等无法核实的表述",
-  "4. 语气正式，可直接粘贴到日报",
+  "3. 若历史线索条目带有项目前缀（如「映射项目名 - 」或「仓库(分支) - 」），每条输出必须保留同风格前缀，与日常日报配置一致",
+  "4. 不要写已上线、已完成验收、百分比进度等无法核实的表述",
+  "5. 语气正式，可直接粘贴到日报",
 ].join("\n");
 
 const BLANK_DAY_TIP_DISMISSED_KEY = "gitpulse.blankDayFillTipDismissed";
@@ -1176,21 +1177,80 @@ export function shiftDateInput(dateValue: string, days: number) {
   return formatDateInput(date);
 }
 
-export function buildBlankDayEvidenceText(commits: CommitRecord[], selectedRepoPaths: string[]) {
+// 与 Rust report.rs 的 display_prefix / commit_item_prefix 保持一致：
+// 映射名去掉末尾连接符后统一补 " - "；未配置映射时前缀为空。
+export function resolveCommitMappedProjectName(
+  commit: Pick<CommitRecord, "projectName" | "branchName">,
+  projectNames: Record<string, string>,
+): string {
+  const projectName = commit.projectName?.trim() ?? "";
+  const branchName = commit.branchName?.trim() ?? "";
+  if (!projectName) return "";
+  const exactKey = branchName ? `${projectName}(${branchName})` : "";
+  const mapped =
+    (exactKey ? projectNames[exactKey] : undefined)
+    ?? projectNames[`${projectName}(*)`]
+    ?? "";
+  return mapped.replace(TRAILING_CONNECTORS, "").trim();
+}
+
+function displayCommitItemPrefix(displayName: string): string {
+  const trimmed = displayName.replace(TRAILING_CONNECTORS, "").trim();
+  return trimmed ? `${trimmed} - ` : "";
+}
+
+/** 复刻日报 {commitItems} 的项目前缀规则，供空白日补写等前端侧线索拼装使用。 */
+export function buildCommitItemPrefix(
+  mode: CommitItemPrefixMode,
+  commit: Pick<CommitRecord, "projectName" | "branchName">,
+  projectNames: Record<string, string>,
+): string {
+  const mapped = resolveCommitMappedProjectName(commit, projectNames);
+  const repoBranch =
+    commit.projectName && commit.branchName
+      ? `${commit.projectName}(${commit.branchName})`
+      : commit.projectName || "";
+  switch (mode) {
+    case "mapped-project":
+      return displayCommitItemPrefix(mapped);
+    case "repo-branch-and-mapped":
+      return `${displayCommitItemPrefix(repoBranch)}${displayCommitItemPrefix(mapped)}`;
+    case "repo-branch":
+      return displayCommitItemPrefix(repoBranch);
+    case "none":
+      return "";
+    default:
+      return displayCommitItemPrefix(mapped);
+  }
+}
+
+export function buildBlankDayEvidenceText(
+  commits: CommitRecord[],
+  selectedRepoPaths: string[],
+  projectNames: Record<string, string> = {},
+  prefixMode: CommitItemPrefixMode = "mapped-project",
+) {
   const selected = new Set(selectedRepoPaths);
   const lines = commits
     .filter((commit) => selected.has(commit.repoPath))
     .slice(0, 80)
     .map((commit) => {
-      const project = commit.projectName || commit.repoPath;
-      const branch = commit.branchName ? `(${commit.branchName})` : "";
+      const prefix = buildCommitItemPrefix(prefixMode, commit, projectNames);
       const message = commit.message.replace(/\s+/g, " ").trim();
-      return `- [${commit.date.slice(0, 10)}] ${project}${branch}: ${message}`;
+      // 与日报一致：有映射时为「项目名 - 事项」；无映射时退回仓库(分支)线索，避免 AI 丢掉来源。
+      const fallback =
+        !prefix && commit.projectName
+          ? `${commit.projectName}${commit.branchName ? `(${commit.branchName})` : ""}: `
+          : "";
+      return `- [${commit.date.slice(0, 10)}] ${prefix || fallback}${message}`;
     });
   return lines.join("\n");
 }
 
-export function collectBlankDayRepoTags(commits: CommitRecord[]) {
+export function collectBlankDayRepoTags(
+  commits: CommitRecord[],
+  projectNames: Record<string, string> = {},
+) {
   const map = new Map<string, { path: string; label: string; count: number }>();
   for (const commit of commits) {
     const existing = map.get(commit.repoPath);
@@ -1199,8 +1259,9 @@ export function collectBlankDayRepoTags(commits: CommitRecord[]) {
       continue;
     }
     const pathParts = commit.repoPath.split(/[/\\]/).filter(Boolean);
-    const name = commit.projectName || pathParts[pathParts.length - 1] || commit.repoPath;
-    const branch = commit.branchName ? ` (${commit.branchName})` : "";
+    const mapped = resolveCommitMappedProjectName(commit, projectNames);
+    const name = mapped || commit.projectName || pathParts[pathParts.length - 1] || commit.repoPath;
+    const branch = !mapped && commit.branchName ? ` (${commit.branchName})` : "";
     map.set(commit.repoPath, {
       path: commit.repoPath,
       label: `${name}${branch}`,

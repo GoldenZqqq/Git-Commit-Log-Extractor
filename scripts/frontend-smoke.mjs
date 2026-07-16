@@ -74,6 +74,19 @@ const checks = [
       includes(files.app, "formatReportExportLabel");
     },
   },
+  {
+    name: "blank day fill evidence follows commit item prefix mode",
+    run: () => {
+      includes(files.model, "export function buildCommitItemPrefix");
+      includes(files.model, "export function buildBlankDayEvidenceText");
+      includes(files.model, "resolveCommitMappedProjectName");
+      includes(files.model, "项目前缀");
+      const blankDay = readSource("src/components/BlankDayFillDialog.tsx");
+      includes(blankDay, "settings.commitItemPrefixMode");
+      includes(blankDay, "buildBlankDayEvidenceText");
+      includes(blankDay, "projectNames");
+    },
+  },
 ];
 
 let failed = 0;
