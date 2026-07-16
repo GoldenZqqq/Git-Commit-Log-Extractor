@@ -45,6 +45,7 @@ import {
   taskIsActive,
   type ActiveTaskState,
 } from "../hooks/useTaskActivity";
+import { usePopover } from "../hooks/useOverlayFocus";
 import { convertMarkdownTo, REPORT_FORMAT_PRESETS, type IMFormatPresetId } from "../reportFormat";
 import { type HeatmapResult } from "./ContributionHeatmap";
 import { CustomRangeDialog } from "./CustomRangeDialog";
@@ -167,7 +168,30 @@ export function Workbench(props: Props) {
   const [trendLoading, setTrendLoading] = useState(false);
   const [trendGranularity, setTrendGranularity] = useState<"weekly" | "monthly">("weekly");
   const polishButtonRef = useRef<HTMLButtonElement>(null);
+  const polishMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const exportMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const copyMenuButtonRef = useRef<HTMLButtonElement>(null);
   const hadPolishReviewRef = useRef(false);
+  const polishPopoverRef = usePopover({
+    open: polishMenuOpen,
+    onClose: () => setPolishMenuOpen(false),
+    anchorRef: polishMenuButtonRef,
+    initialFocusSelector: "textarea",
+  });
+  const exportPopoverRef = usePopover({
+    open: exportMenuOpen,
+    onClose: () => setExportMenuOpen(false),
+    anchorRef: exportMenuButtonRef,
+    itemSelector: "[role='menuitem']",
+    initialFocusSelector: "[role='menuitem']",
+  });
+  const copyPopoverRef = usePopover({
+    open: copyAsMenuOpen,
+    onClose: () => setCopyAsMenuOpen(false),
+    anchorRef: copyMenuButtonRef,
+    itemSelector: "[role='menuitem']",
+    initialFocusSelector: "[role='menuitem']",
+  });
 
   useEffect(() => {
     if (props.polishReview) {
@@ -262,22 +286,10 @@ export function Workbench(props: Props) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isPreviewExpanded]);
 
-  useEffect(() => {
-    if (!polishMenuOpen && !exportMenuOpen && !copyAsMenuOpen) return;
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setPolishMenuOpen(false);
-        setExportMenuOpen(false);
-        setCopyAsMenuOpen(false);
-      }
-    }
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [polishMenuOpen, exportMenuOpen, copyAsMenuOpen]);
-
   function handlePreviewChange(preview: PreviewMode) {
+    setPolishMenuOpen(false);
+    setExportMenuOpen(false);
+    setCopyAsMenuOpen(false);
     props.onPreviewChange(preview);
   }
 
@@ -535,18 +547,31 @@ export function Workbench(props: Props) {
                       {isPolishing ? "润色中" : "AI润色"}
                     </button>
                     <button
+                      ref={polishMenuButtonRef}
                       className={`polish-split-toggle ${!props.aiConfigured ? "warning" : ""}`}
                       type="button"
-                      onClick={() => setPolishMenuOpen((current) => !current)}
+                      onClick={() => {
+                        setExportMenuOpen(false);
+                        setCopyAsMenuOpen(false);
+                        setPolishMenuOpen((current) => !current);
+                      }}
                       disabled={polishBlocked || !props.aiConfigured}
                       aria-expanded={polishMenuOpen}
+                      aria-haspopup="dialog"
+                      aria-controls="polish-extra-popover"
                       aria-label="带本次额外要求润色"
                       title="带本次额外要求润色"
                     >
                       <ChevronDown size={14} />
                     </button>
                     {polishMenuOpen && (
-                      <div className="polish-popover" role="dialog" aria-label="本次额外要求">
+                      <div
+                        ref={polishPopoverRef}
+                        id="polish-extra-popover"
+                        className="polish-popover"
+                        role="dialog"
+                        aria-label="本次额外要求"
+                      >
                         <span className="polish-popover-label">本次额外要求（可选）</span>
                         <textarea
                           className="polish-popover-input"
@@ -586,18 +611,31 @@ export function Workbench(props: Props) {
                     {exportConfigured && (
                       <>
                         <button
+                          ref={exportMenuButtonRef}
                           className="export-split-toggle"
                           type="button"
-                          onClick={() => setExportMenuOpen((current) => !current)}
+                          onClick={() => {
+                            setPolishMenuOpen(false);
+                            setCopyAsMenuOpen(false);
+                            setExportMenuOpen((current) => !current);
+                          }}
                           disabled={exportBlocked}
                           aria-expanded={exportMenuOpen}
+                          aria-haspopup="menu"
+                          aria-controls="report-export-menu"
                           aria-label="选择导出格式"
                           title="选择导出格式"
                         >
                           <ChevronDown size={14} />
                         </button>
                         {exportMenuOpen && (
-                          <div className="export-popover" role="menu" aria-label="导出格式">
+                          <div
+                            ref={exportPopoverRef}
+                            id="report-export-menu"
+                            className="export-popover"
+                            role="menu"
+                            aria-label="导出格式"
+                          >
                             <button type="button" className="export-option" role="menuitem" onClick={() => handleExport("markdown")}>
                               <FileText size={15} />
                               <span>
@@ -633,18 +671,31 @@ export function Workbench(props: Props) {
                   {props.previewText && (
                     <>
                       <button
+                        ref={copyMenuButtonRef}
                         className="copy-split-toggle"
                         type="button"
-                        onClick={() => setCopyAsMenuOpen((current) => !current)}
+                        onClick={() => {
+                          setPolishMenuOpen(false);
+                          setExportMenuOpen(false);
+                          setCopyAsMenuOpen((current) => !current);
+                        }}
                         disabled={!props.previewText || interactionBlocked}
                         aria-expanded={copyAsMenuOpen}
+                        aria-haspopup="menu"
+                        aria-controls="report-copy-menu"
                         aria-label="复制为其他格式"
                         title="复制为其他格式"
                       >
                         <ChevronDown size={14} />
                       </button>
                       {copyAsMenuOpen && (
-                        <div className="copy-as-popover" role="menu" aria-label="复制格式">
+                        <div
+                          ref={copyPopoverRef}
+                          id="report-copy-menu"
+                          className="copy-as-popover"
+                          role="menu"
+                          aria-label="复制格式"
+                        >
                           {REPORT_FORMAT_PRESETS.filter((p) => p.id !== "default").map((preset) => (
                             <button
                               key={preset.id}

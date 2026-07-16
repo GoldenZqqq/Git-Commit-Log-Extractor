@@ -67,6 +67,7 @@ type MockScenario = {
   diagnosticsResult?: Record<string, unknown>;
   batchResult?: Record<string, unknown>;
   enhanceResult?: Record<string, unknown>;
+  aiModels?: Array<{ id: string; ownedBy?: string }>;
   deferredCommands?: string[];
   updateMetadata?: Record<string, unknown> | null;
   outputDir?: string;
@@ -186,6 +187,7 @@ export async function launchApp(page: Page, scenario: MockScenario) {
     },
     batchResult: scenario.batchResult ?? null,
     enhanceResult: scenario.enhanceResult ?? null,
+    aiModels: scenario.aiModels ?? [],
     deferredCommands: scenario.deferredCommands ?? [],
     updateMetadata: scenario.updateMetadata ?? null,
     outputDir: scenario.outputDir ?? "C:/exports",
@@ -416,7 +418,7 @@ export async function launchApp(page: Page, scenario: MockScenario) {
             case "codex_oauth_status":
               return state.codexAuthStatus;
             case "list_ai_models":
-              return [];
+              return state.aiModels;
             case "get_git_identity":
               return state.gitIdentity;
             case "scan_repos":

@@ -2,6 +2,7 @@ import { Tag, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { MappingScope, RepoInfo } from "../model";
 import { readRepoMapping } from "../model";
+import { useModalDialog } from "../hooks/useOverlayFocus";
 import { Field } from "./Primitives";
 
 type Props = {
@@ -15,6 +16,7 @@ type Props = {
 export function RepoMappingDialog({ open, repo, projectNamesText, onClose, onConfirm }: Props) {
   const [scope, setScope] = useState<MappingScope>("all");
   const [displayName, setDisplayName] = useState("");
+  const dialogRef = useModalDialog({ open: open && Boolean(repo), onClose });
 
   useEffect(() => {
     if (open && repo) {
@@ -24,15 +26,6 @@ export function RepoMappingDialog({ open, repo, projectNamesText, onClose, onCon
     }
   }, [open, repo, projectNamesText]);
 
-  useEffect(() => {
-    if (!open) return;
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
-
   if (!open || !repo) return null;
 
   const branchScopeDisabled = !repo.branch;
@@ -40,10 +33,12 @@ export function RepoMappingDialog({ open, repo, projectNamesText, onClose, onCon
   return (
     <div className="dialog-backdrop compact-backdrop" role="presentation" onMouseDown={onClose}>
       <section
+        ref={dialogRef}
         className="range-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="repo-mapping-title"
+        tabIndex={-1}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="range-dialog-header">
@@ -63,8 +58,8 @@ export function RepoMappingDialog({ open, repo, projectNamesText, onClose, onCon
 
         <Field label="映射名称" hint="留空则清除该仓库的映射，报告中回退使用仓库名">
           <input
+            data-dialog-initial-focus
             value={displayName}
-            autoFocus
             onChange={(event) => setDisplayName(event.target.value)}
             placeholder="例如：在线学习平台"
             onKeyDown={(event) => {

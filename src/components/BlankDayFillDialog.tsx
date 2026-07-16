@@ -24,6 +24,7 @@ import {
   validateAiSettings,
   validateExtractSettings,
 } from "../model";
+import { useModalDialog } from "../hooks/useOverlayFocus";
 import { Field } from "./Primitives";
 
 type Props = {
@@ -72,6 +73,7 @@ export function BlankDayFillDialog({
   const [error, setError] = useState("");
   const [draftText, setDraftText] = useState("");
   const [stage, setStage] = useState<Stage>("config");
+  const dialogRef = useModalDialog({ open, onClose, closeEnabled: !generating });
 
   const repoTags = useMemo(
     () => collectBlankDayRepoTags(sourceCommits, projectNames),
@@ -223,10 +225,12 @@ export function BlankDayFillDialog({
   return (
     <div className="dialog-backdrop compact-backdrop" role="presentation" onMouseDown={() => !generating && onClose()}>
       <section
+        ref={dialogRef}
         className="range-dialog blank-day-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="blank-day-dialog-title"
+        tabIndex={-1}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="range-dialog-header">
@@ -254,7 +258,12 @@ export function BlankDayFillDialog({
           <>
             <div className="range-fields">
               <Field label="目标日">
-                <input type="date" value={targetDate} onChange={(event) => setTargetDate(event.target.value)} />
+                <input
+                  data-dialog-initial-focus
+                  type="date"
+                  value={targetDate}
+                  onChange={(event) => setTargetDate(event.target.value)}
+                />
               </Field>
               <Field label="生成条数">
                 <select

@@ -53,6 +53,7 @@ import {
   type UpdateSummary,
 } from "../model";
 import { useDiagnosticsPanel } from "../hooks/useDiagnosticsPanel";
+import { useModalDialog, usePopover } from "../hooks/useOverlayFocus";
 import { Field, PathInput, RootDirField, Toggle } from "./Primitives";
 import { ReportFormatSettings } from "./ReportFormatSettings";
 import { UpdateSection } from "./UpdateSection";
@@ -139,7 +140,20 @@ export function SettingsDialog({
   const [savedPulse, setSavedPulse] = useState(false);
   const lastSettingsRef = useRef(settings);
   const modelPickerRef = useRef<HTMLDivElement | null>(null);
+  const modelInputRef = useRef<HTMLInputElement | null>(null);
   const [promptEditTarget, setPromptEditTarget] = useState<"daily" | "monthly">("daily");
+  const settingsDialogRef = useModalDialog({ open, onClose });
+  const confirmDialogRef = useModalDialog({
+    open: open && pendingDeleteIndex !== null,
+    onClose: () => setPendingDeleteIndex(null),
+  });
+  const modelOptionsRef = usePopover({
+    open: open && modelMenuOpen,
+    onClose: () => setModelMenuOpen(false),
+    anchorRef: modelPickerRef,
+    restoreFocusRef: modelInputRef,
+    itemSelector: "[role='option']:not([aria-disabled='true'])",
+  });
   const diagnostics = useDiagnosticsPanel({
     open,
     active: activeTab === "diagnostics",
@@ -182,15 +196,6 @@ export function SettingsDialog({
     if (open && settings.aiProvider === "codex-oauth") void refreshCodexStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, settings.aiProvider]);
-  useEffect(() => {
-    if (!modelMenuOpen) return;
-    function closeOnOutsideClick(event: MouseEvent) {
-      if (modelPickerRef.current?.contains(event.target as Node)) return;
-      setModelMenuOpen(false);
-    }
-    document.addEventListener("mousedown", closeOnOutsideClick);
-    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
-  }, [modelMenuOpen]);
   if (!open) return null;
 
   const mappingRows = parseMappingText(settings.projectNamesText);
@@ -495,11 +500,19 @@ export function SettingsDialog({
   return (
     <>
     <div className="dialog-backdrop" role="presentation" onMouseDown={onClose}>
-      <section className="settings-dialog" role="dialog" aria-modal="true" aria-label="应用设置" onMouseDown={(event) => event.stopPropagation()}>
+      <section
+        ref={settingsDialogRef}
+        className="settings-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-dialog-title"
+        tabIndex={-1}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
         <header className="dialog-header">
           <div>
             <p className="kicker">Preferences</p>
-            <h2>设置</h2>
+            <h2 id="settings-dialog-title">设置</h2>
           </div>
           <button type="button" className="icon-button" onClick={onClose} aria-label="关闭设置">
             <X size={18} />
@@ -790,14 +803,22 @@ export function SettingsDialog({
                   <div className="model-picker" ref={modelPickerRef}>
                     <div className={`model-combobox ${modelMenuOpen ? "open" : ""}`}>
                       <input
+                        ref={modelInputRef}
                         value={settings.aiModel}
                         onChange={(event) => updateAiModel(event.target.value)}
-                        onFocus={() => setModelMenuOpen(true)}
+                        onClick={() => setModelMenuOpen(true)}
+                        onKeyDown={(event) => {
+                          if (!modelMenuOpen && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+                            event.preventDefault();
+                            setModelMenuOpen(true);
+                          }
+                        }}
                         placeholder="例如：gpt-4.1-mini"
                         role="combobox"
                         aria-controls="ai-model-options"
                         aria-expanded={modelMenuOpen}
                         aria-haspopup="listbox"
+                        aria-autocomplete="list"
                         autoComplete="off"
                         spellCheck={false}
                       />
@@ -807,11 +828,19 @@ export function SettingsDialog({
                         onClick={() => setModelMenuOpen((current) => !current)}
                         aria-label={modelMenuOpen ? "收起模型列表" : "展开模型列表"}
                         aria-expanded={modelMenuOpen}
+                        aria-controls="ai-model-options"
+                        aria-haspopup="listbox"
                       >
                         <ChevronDown size={16} />
                       </button>
                       {modelMenuOpen && (
-                        <div className="model-options" id="ai-model-options" role="listbox">
+                        <div
+                          ref={modelOptionsRef}
+                          className="model-options"
+                          id="ai-model-options"
+                          role="listbox"
+                          aria-label="可用模型"
+                        >
                           {aiModelOptions.length > 0 ? (
                             aiModelOptions.map((model) => (
                               <button
@@ -827,7 +856,7 @@ export function SettingsDialog({
                               </button>
                             ))
                           ) : (
-                            <div className="model-options-empty" role="status">
+                            <div className="model-options-empty" role="option" aria-disabled="true">
                               先点击右侧获取模型，或直接输入模型名
                             </div>
                           )}
@@ -1095,10 +1124,12 @@ export function SettingsDialog({
         onMouseDown={() => setPendingDeleteIndex(null)}
       >
         <section
+          ref={confirmDialogRef}
           className="range-dialog confirm-dialog"
           role="alertdialog"
           aria-modal="true"
           aria-labelledby="mapping-delete-title"
+          tabIndex={-1}
           onMouseDown={(event) => event.stopPropagation()}
         >
           <header className="range-dialog-header">
@@ -1112,7 +1143,12 @@ export function SettingsDialog({
           </header>
           <p className="confirm-dialog-text">删除后该项目映射将立即移除，此操作不可撤销。</p>
           <footer className="range-dialog-actions">
-            <button type="button" className="mapping-import" onClick={() => setPendingDeleteIndex(null)}>
+            <button
+              data-dialog-initial-focus
+              type="button"
+              className="mapping-import"
+              onClick={() => setPendingDeleteIndex(null)}
+            >
               取消
             </button>
             <button type="button" className="danger-button" onClick={confirmRemoveMapping}>

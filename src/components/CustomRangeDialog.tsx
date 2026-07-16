@@ -1,6 +1,7 @@
 import { CalendarDays, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { DateRange } from "../model";
+import { useModalDialog } from "../hooks/useOverlayFocus";
 import { Field } from "./Primitives";
 
 type Props = {
@@ -13,6 +14,7 @@ type Props = {
 
 export function CustomRangeDialog({ open, initialRange, generationBlocked, onClose, onConfirm }: Props) {
   const [range, setRange] = useState<DateRange>(initialRange);
+  const dialogRef = useModalDialog({ open, onClose });
 
   useEffect(() => {
     if (open) setRange(initialRange);
@@ -25,10 +27,12 @@ export function CustomRangeDialog({ open, initialRange, generationBlocked, onClo
   return (
     <div className="dialog-backdrop compact-backdrop" role="presentation" onMouseDown={onClose}>
       <section
+        ref={dialogRef}
         className="range-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="custom-range-title"
+        tabIndex={-1}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="range-dialog-header">
@@ -44,6 +48,7 @@ export function CustomRangeDialog({ open, initialRange, generationBlocked, onClo
         <div className="range-fields">
           <Field label="开始日期">
             <input
+              data-dialog-initial-focus
               type="date"
               value={range.startDate}
               onChange={(event) => setRange((current) => ({ ...current, startDate: event.target.value }))}

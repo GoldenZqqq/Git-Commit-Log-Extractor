@@ -122,7 +122,7 @@ test("shows backup recovery and clears both runtime and file history", async ({ 
   await openHistory(page);
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "清空", exact: true }).click();
-  await expect(page.getByText("生成报告后会在这里保留最近记录，可重新打开、复制或按同一周期重新生成。")).toBeVisible();
+  await expect(page.getByText("暂无历史报告，生成后可在此打开、复制或重新生成。")).toBeVisible();
   await expect.poll(async () => (await storedHistory(page)).length).toBe(0);
 });
 

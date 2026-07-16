@@ -35,6 +35,8 @@ Frontend changes should preserve a reliable local desktop workflow: scan reposit
 - Run `npm run build` for TypeScript/build verification after frontend changes.
 - Run targeted Playwright tests when changing onboarding, workbench generation controls, report history, settings, or export UX.
 - For release-impacting changes, follow `CONTRIBUTING.md`: `npm run build`, `npm run test:e2e`, `cd src-tauri && cargo check && cargo test`.
+- Dialog and menu changes require Playwright focus assertions for entry, Tab/Escape, keyboard navigation, and trigger restoration. Scan the changed overlay with `@axe-core/playwright` and fail on `serious` or `critical` violations.
+- Axe scans must target the changed overlay when unrelated legacy surfaces are outside task scope. Do not disable the `color-contrast` rule to force a pass; fix contrast tokens or component colors found inside the target.
 
 ---
 

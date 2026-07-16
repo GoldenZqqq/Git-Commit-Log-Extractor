@@ -17,6 +17,7 @@ import {
   DEFAULT_BATCH_FILE_NAME_TEMPLATE,
   parseProjectNames,
 } from "../model";
+import { useModalDialog } from "../hooks/useOverlayFocus";
 import { Field } from "./Primitives";
 
 type Props = {
@@ -80,6 +81,11 @@ export function BatchDialog({ open: isOpen, settings, indexedRepos, onNotify, on
   const [result, setResult] = useState<BatchReportResult | null>(null);
   const [error, setError] = useState("");
   const [openError, setOpenError] = useState("");
+  const dialogRef = useModalDialog({
+    open: isOpen,
+    onClose: handleClose,
+    closeEnabled: stage !== "running",
+  });
 
   useEffect(() => {
     if (isOpen) {
@@ -196,10 +202,12 @@ export function BatchDialog({ open: isOpen, settings, indexedRepos, onNotify, on
   return (
     <div className="dialog-backdrop compact-backdrop" role="presentation" onMouseDown={handleClose}>
       <section
+        ref={dialogRef}
         className="range-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="batch-dialog-title"
+        tabIndex={-1}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="range-dialog-header">
@@ -223,6 +231,7 @@ export function BatchDialog({ open: isOpen, settings, indexedRepos, onNotify, on
             <div className="range-fields">
               <Field label="开始日期">
                 <input
+                  data-dialog-initial-focus
                   type="date"
                   value={rangeStart}
                   onChange={(e) => setRangeStart(e.target.value)}

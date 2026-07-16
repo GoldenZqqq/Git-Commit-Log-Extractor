@@ -276,7 +276,7 @@ test("keeps export setup visible when output is not configured", async ({ page }
 
   await page.getByRole("button", { name: "设置导出" }).click();
 
-  await expect(page.getByRole("dialog", { name: "应用设置" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "设置" })).toBeVisible();
   await expect(page.getByRole("status").getByText("请先开启输出到文件并选择输出目录")).toBeVisible();
   await expect(page.getByText("基础配置")).toBeVisible();
   await expect(page.getByText("输出到文件", { exact: true })).toBeVisible();
