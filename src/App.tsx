@@ -11,6 +11,7 @@ import { SettingsDialog } from "./components/SettingsDialog";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { Workbench } from "./components/Workbench";
 import { useAppRuntime } from "./hooks/useAppRuntime";
+import { useReportHistoryStorage } from "./hooks/useReportHistoryStorage";
 import { useWorkspaceHealth } from "./hooks/useWorkspaceHealth";
 import {
   taskIsActive,
@@ -38,7 +39,6 @@ import {
   buildExtractOptions,
   buildPeriodReportOptions,
   buildReportEnhanceOptions,
-  clearReportHistory,
   clearRepoIndexCache,
   isBlankDayHistoryEntry,
   countCommitProjects,
@@ -51,17 +51,13 @@ import {
   getWeekLabel,
   getWeekRange,
   isAiKeyReference,
-  loadReportHistory,
   loadRepoIndexCache,
   normalizeReportHistoryLimit,
   loadSettingsState,
   parseProjectNames,
   persistRepoIndexCache,
-  rememberReportHistoryEntry,
-  saveReportHistory,
   saveRepoIndexCache,
   settingsForPersistence,
-  updateReportHistoryEntry,
   upsertRepoMapping,
   validateAiConnectionSettings,
   validateExtractSettings,
@@ -108,7 +104,15 @@ function App() {
   const [monthlyReport, setMonthlyReport] = useState("");
   const [monthlyMonth, setMonthlyMonth] = useState(getPreviousMonthInput);
   const [monthlyLabel, setMonthlyLabel] = useState("");
-  const [reportHistory, setReportHistory] = useState<ReportHistoryEntry[]>(() => loadReportHistory(loadedSettings.settings.reportHistoryLimit));
+  const [warnings, setWarnings] = useState<string[]>([]);
+  const reportHistoryStorage = useReportHistoryStorage(
+    loadedSettings.settings.reportHistoryLimit,
+    (message) => {
+      setWarnings((current) => current.includes(message) ? current : [message, ...current]);
+      setStatus(message, { tone: "warning", notify: true, duration: 0 });
+    },
+  );
+  const reportHistory = reportHistoryStorage.entries;
   const [supplementalDrafts, setSupplementalDrafts] = useState<Record<string, string>>({});
   const [activeHistoryId, setActiveHistoryId] = useState("");
   const [activePreview, setActivePreview] = useState<PreviewMode>("summary");
@@ -121,7 +125,6 @@ function App() {
         : "就绪",
   );
   const [appMessage, setAppMessage] = useState<AppMessage | null>(null);
-  const [warnings, setWarnings] = useState<string[]>([]);
   const workspaceHealth = useWorkspaceHealth({
     rootDirs: settings.rootDirs,
     indexedRepos: repos,
@@ -429,13 +432,13 @@ function App() {
   }
 
   function rememberHistory(entry: ReportHistoryEntry) {
-    setReportHistory((current) => rememberReportHistoryEntry(current, entry, settings.reportHistoryLimit));
+    reportHistoryStorage.remember(entry);
     setActiveHistoryId(entry.id);
   }
 
   function updateActiveHistory(patch: Partial<Pick<ReportHistoryEntry, "outputFile" | "reportText" | "commitCount" | "generatedAt">>) {
     if (!activeHistoryId) return;
-    setReportHistory((current) => updateReportHistoryEntry(current, activeHistoryId, patch, settings.reportHistoryLimit));
+    reportHistoryStorage.update(activeHistoryId, patch);
   }
 
   function buildHistoryEntry(
@@ -817,10 +820,10 @@ function App() {
     }
   }
 
-  function clearHistoryRecords() {
+  async function clearHistoryRecords() {
     if (!window.confirm("清空最近报告记录？已导出的 Markdown 文件不会被删除。")) return;
-    clearReportHistory();
-    setReportHistory([]);
+    const cleared = await reportHistoryStorage.clear();
+    if (!cleared) return;
     setActiveHistoryId("");
     setStatus("最近报告记录已清空");
   }
@@ -862,7 +865,7 @@ function App() {
     if (key === "reportHistoryLimit") {
       const limit = normalizeReportHistoryLimit(value);
       setSettings((current) => ({ ...current, reportHistoryLimit: limit }));
-      setReportHistory((current) => saveReportHistory(current, limit));
+      reportHistoryStorage.resize(limit);
       return;
     }
     if (key === "aiApiKey") {

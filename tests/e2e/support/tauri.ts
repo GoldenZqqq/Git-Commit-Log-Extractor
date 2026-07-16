@@ -30,6 +30,13 @@ type MockScenario = {
   settings?: Record<string, unknown>;
   repoCache?: { rootDirs: string[]; repos: RepoInfo[]; scannedAt: string };
   reportHistory?: ReportHistoryEntry[];
+  legacyReportHistoryRaw?: string;
+  storedReportHistory?: ReportHistoryEntry[];
+  reportHistoryLoadError?: string;
+  reportHistoryLoadWarning?: string;
+  reportHistoryRecoveredFromBackup?: boolean;
+  reportHistorySaveError?: string;
+  reportHistoryClearError?: string;
   dialogResponses?: unknown[];
   appVersion?: string;
   gitIdentity?: { userName: string; userEmail: string };
@@ -140,6 +147,13 @@ export async function launchApp(page: Page, scenario: MockScenario) {
     settings: scenario.settings,
     repoCache: scenario.repoCache,
     reportHistory: scenario.reportHistory,
+    legacyReportHistoryRaw: scenario.legacyReportHistoryRaw,
+    storedReportHistory: scenario.storedReportHistory,
+    reportHistoryLoadError: scenario.reportHistoryLoadError,
+    reportHistoryLoadWarning: scenario.reportHistoryLoadWarning,
+    reportHistoryRecoveredFromBackup: scenario.reportHistoryRecoveredFromBackup ?? false,
+    reportHistorySaveError: scenario.reportHistorySaveError,
+    reportHistoryClearError: scenario.reportHistoryClearError,
     dialogResponses: [...(scenario.dialogResponses ?? [])],
     appVersion: scenario.appVersion ?? "0.3.7-test",
     gitIdentity: scenario.gitIdentity ?? {
@@ -180,6 +194,8 @@ export async function launchApp(page: Page, scenario: MockScenario) {
         ...state,
         dialogResponses,
         extractResults,
+        reportHistoryStore: [...(state.storedReportHistory ?? [])],
+        reportHistoryStoreExists: state.storedReportHistory !== undefined,
         calls: [],
         clipboard: "",
         releaseCommand(cmd) {
@@ -229,7 +245,9 @@ export async function launchApp(page: Page, scenario: MockScenario) {
       if (state.repoCache) {
         window.localStorage.setItem(repoIndexCacheKey, JSON.stringify(state.repoCache));
       }
-      if (state.reportHistory) {
+      if (state.legacyReportHistoryRaw !== undefined) {
+        window.localStorage.setItem(reportHistoryKey, state.legacyReportHistoryRaw);
+      } else if (state.reportHistory) {
         window.localStorage.setItem(reportHistoryKey, JSON.stringify(state.reportHistory));
       }
 
@@ -266,6 +284,16 @@ export async function launchApp(page: Page, scenario: MockScenario) {
       function saveReportFile(args) {
         const extension = args.format === "markdown" ? "md" : args.format;
         return `${state.outputDir ?? "C:/exports"}/${args.baseName}.${extension}`;
+      }
+
+      function normalizeHistory(entries, limit) {
+        const maxEntries = [30, 60, 120, 200].includes(limit) ? limit : 120;
+        const ids = new Set();
+        return (entries ?? []).filter((entry) => {
+          if (!entry?.id || ids.has(entry.id)) return false;
+          ids.add(entry.id);
+          return true;
+        }).slice(0, maxEntries);
       }
 
       function waitForCommandRelease(cmd) {
@@ -349,6 +377,30 @@ export async function launchApp(page: Page, scenario: MockScenario) {
               };
             case "inspect_workspace_health":
               return state.workspaceHealthResult;
+            case "load_report_history": {
+              if (state.reportHistoryLoadError) throw new Error(state.reportHistoryLoadError);
+              const hasLegacy = Array.isArray(args.legacyEntries);
+              if (!mockState.reportHistoryStoreExists && hasLegacy) {
+                mockState.reportHistoryStore = normalizeHistory(args.legacyEntries, args.limit);
+                mockState.reportHistoryStoreExists = true;
+              }
+              return {
+                entries: [...mockState.reportHistoryStore],
+                migrationComplete: hasLegacy && mockState.reportHistoryStoreExists,
+                recoveredFromBackup: state.reportHistoryRecoveredFromBackup,
+                warning: state.reportHistoryLoadWarning ?? null,
+              };
+            }
+            case "save_report_history":
+              if (state.reportHistorySaveError) throw new Error(state.reportHistorySaveError);
+              mockState.reportHistoryStore = normalizeHistory(args.entries, args.limit);
+              mockState.reportHistoryStoreExists = true;
+              return [...mockState.reportHistoryStore];
+            case "clear_report_history":
+              if (state.reportHistoryClearError) throw new Error(state.reportHistoryClearError);
+              mockState.reportHistoryStore = [];
+              mockState.reportHistoryStoreExists = true;
+              return null;
             case "extract_commits":
               return nextExtractResult();
             case "generate_period_report":

@@ -13,7 +13,8 @@ The app uses React local state, `useMemo`, `useRef`, localStorage helpers, and T
 ## State Categories
 
 - Persisted settings live in localStorage through `loadSettingsState` and `settingsForPersistence`; plain settings must not store raw API keys.
-- Repository index and report history are localStorage-backed convenience state, not source-controlled or remote state.
+- Repository index is localStorage-backed convenience state, not source-controlled or remote state.
+- Report history runs from React memory and persists through `useReportHistoryStorage` into the Rust application-data file; `gitpulse-report-history` is migration-only input.
 - Report text, selected report mode, warnings, progress, and dialog state live in `App.tsx`.
 - Derived values such as project name maps, date ranges, preview text, and AI readiness should use `useMemo` or small helper functions.
 - Secrets and ChatGPT login state belong in OS-backed secure storage via Rust commands, not localStorage.
@@ -38,6 +39,15 @@ GitPulse is local-first. Treat local Git repositories, local files, system crede
 - Deriving report command options in components instead of using `src/model.ts` builders.
 - Treating empty author input as an invalid author; empty author scope means all authors.
 - Forgetting to clear active history selection when changing report mode or period.
+- Saving an optimistic report-history snapshot before the startup file load finishes; queued mutations must replay against the loaded authoritative snapshot.
+
+## Report History Storage Ownership
+
+- `App.tsx` and its consumers read one in-memory `reportHistory` array from `useReportHistoryStorage`.
+- The hook serializes save/clear commands and keeps a separate storage-candidate ref so slower older writes cannot overwrite newer state.
+- A mutation made while startup loading is pending is optimistic in the UI, then replayed against the Rust result before persistence; never save the pre-load empty fallback as authoritative.
+- Save failure keeps current memory and preview. Clear failure restores the prior memory. Both add a Chinese warning to the toast and event log.
+- The complete file, migration, backup, command, and test contract lives in [Report History Storage](../tauri-rust/report-history-storage.md).
 
 ## App-Level Async Task Activity
 

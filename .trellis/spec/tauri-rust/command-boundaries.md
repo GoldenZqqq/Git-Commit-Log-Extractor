@@ -9,6 +9,7 @@
 - `src-tauri/src/git_ops.rs`: Git command execution, repository discovery, author filtering, branch attribution, and scan progress.
 - `src-tauri/src/commit_pipeline.rs`: local report orchestration, commit collection, progress aggregation, AI fallback, and save decisions.
 - `src-tauri/src/report.rs`: report text rendering and document/file output.
+- `src-tauri/src/report_history.rs`: versioned report-history file storage, migration, backup recovery, and clear rollback.
 - `src-tauri/src/network.rs`: shared outbound HTTP client construction, app-level proxy support, proxy candidate scan, and proxy connection tests.
 - `src-tauri/src/ai.rs` and `codex_oauth.rs`: optional polishing/model integration.
 - `src-tauri/src/secure_store.rs`: OS-backed credential storage for secrets and login state.
@@ -20,6 +21,7 @@
 - Long-running Git/report tasks should use progress callbacks bridged to Tauri events.
 - A single invalid repository root should not break a whole scan when skipping is reasonable.
 - AI polishing failure should become a warning and preserve the local report draft/template.
+- Report-history commands follow [Report History Storage](./report-history-storage.md); `lib.rs` only resolves `app_data_dir`, dispatches blocking work, and registers commands.
 
 ## Payload Rules
 

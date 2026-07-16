@@ -60,8 +60,9 @@ test("adds non-Git supplemental facts to every report mode and history", async (
   ]);
   await expect(page.getByText("用户补充事项（非 Git）")).toBeVisible();
 
-  const savedHistory = await page.evaluate(() => JSON.parse(window.localStorage.getItem("gitpulse-report-history") ?? "[]"));
-  expect(savedHistory[0].supplementalItems).toEqual(extractCalls[0].args.options.supplementalItems);
+  await expect.poll(async () => (await storedHistory(page))[0]?.supplementalItems).toEqual(
+    extractCalls[0].args.options.supplementalItems,
+  );
 
   await page.getByLabel("选择日报日期").fill("2026-07-01");
   await expect(page.getByLabel("补充事项（非 Git）")).toHaveValue("");
@@ -141,6 +142,10 @@ async function generateWithSupplement(page: Parameters<typeof expectWorkbench>[0
 
 async function commandCalls(page: Parameters<typeof expectWorkbench>[0], command: string) {
   return page.evaluate((cmd) => window.__mockTauri.calls.filter((call) => call.cmd === cmd), command);
+}
+
+async function storedHistory(page: Parameters<typeof expectWorkbench>[0]) {
+  return page.evaluate(() => window.__mockTauri.reportHistoryStore);
 }
 
 function createCommit(hash: string, message: string) {

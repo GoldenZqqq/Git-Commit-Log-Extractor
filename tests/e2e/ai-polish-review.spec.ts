@@ -70,7 +70,7 @@ test("reviews AI changes before accepting and only then updates history and expo
   await expect(review).toHaveCount(0);
   await expect(page.getByText("支付模块已正式上线，故障率降低 30%")).toBeVisible();
   await expect.poll(() => commandCount(page, "save_report_file")).toBe(1);
-  expect((await storedHistory(page))[0].reportText).toBe(polishedReport);
+  await expect.poll(async () => (await storedHistory(page))[0]?.reportText).toBe(polishedReport);
   expect((await storedHistory(page))[0].repoCount).toBe(4);
   await expect(page.getByRole("button", { name: "AI润色" })).toBeFocused();
 });
@@ -158,5 +158,5 @@ async function commandCount(page: Page, command: string) {
 }
 
 async function storedHistory(page: Page) {
-  return page.evaluate(() => JSON.parse(window.localStorage.getItem("gitpulse-report-history") ?? "[]"));
+  return page.evaluate(() => window.__mockTauri.reportHistoryStore);
 }

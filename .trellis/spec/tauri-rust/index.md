@@ -11,6 +11,7 @@ Rust owns local Git scanning, commit extraction, report rendering/export, option
 | Guide | Description | Status |
 |-------|-------------|--------|
 | [Command Boundaries](./command-boundaries.md) | Tauri command and module ownership | Filled |
+| [Report History Storage](./report-history-storage.md) | Versioned local history, migration, recovery, and IPC contract | Filled |
 | [Quality Guidelines](./quality-guidelines.md) | Rust verification and safety rules | Filled |
 
 ## Pre-Development Checklist
@@ -19,6 +20,7 @@ Rust owns local Git scanning, commit extraction, report rendering/export, option
 - [ ] Check `src-tauri/src/models.rs` for request/response shape changes and mirror them in `src/model.ts`.
 - [ ] Preserve local-first behavior and AI failure fallback.
 - [ ] Keep user-facing Rust errors in Chinese.
+- [ ] For report-history work, follow `report-history-storage.md`; do not write report bodies back to WebView localStorage.
 
 ## Quality Check
 

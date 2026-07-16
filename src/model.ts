@@ -213,6 +213,13 @@ export type ReportHistoryEntry = {
   supplementalItems?: string[];
 };
 
+export type LegacyReportHistoryState = {
+  entries: ReportHistoryEntry[];
+  present: boolean;
+  valid: boolean;
+  warning: string;
+};
+
 export type ReportPolishReview = {
   mode: PreviewMode;
   range: DateRange;
@@ -356,7 +363,7 @@ export type LoadedSettingsState = {
 
 export const STORAGE_KEY = "gitpulse-settings";
 const REPO_INDEX_CACHE_KEY = "gitpulse-repo-index-cache";
-const REPORT_HISTORY_KEY = "gitpulse-report-history";
+export const REPORT_HISTORY_KEY = "gitpulse-report-history";
 const LEGACY_STORAGE_KEY = "git-report-studio-settings";
 const ENV_VAR_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const EVIDENCE_PRESERVATION_INSTRUCTION =
@@ -612,37 +619,43 @@ export function normalizeReportHistoryLimit(value: unknown): ReportHistoryLimit 
   return DEFAULT_REPORT_HISTORY_LIMIT;
 }
 
-export function loadReportHistory(limit: ReportHistoryLimit = DEFAULT_REPORT_HISTORY_LIMIT): ReportHistoryEntry[] {
+export function readLegacyReportHistory(
+  limit: ReportHistoryLimit = DEFAULT_REPORT_HISTORY_LIMIT,
+): LegacyReportHistoryState {
   const saved = localStorage.getItem(REPORT_HISTORY_KEY);
-  if (!saved) return [];
+  if (saved === null) return { entries: [], present: false, valid: true, warning: "" };
 
   let rawHistory: unknown;
   try {
     rawHistory = JSON.parse(saved);
   } catch {
-    localStorage.removeItem(REPORT_HISTORY_KEY);
-    return [];
+    return invalidLegacyHistory("旧报告历史不是有效 JSON，已保留原数据供手动恢复");
   }
 
-  if (!Array.isArray(rawHistory)) return [];
-  return rawHistory.filter(isReportHistoryEntry).slice(0, normalizeReportHistoryLimit(limit));
+  if (!Array.isArray(rawHistory) || !rawHistory.every(isReportHistoryEntry)) {
+    return invalidLegacyHistory("旧报告历史格式异常，已保留原数据供手动恢复");
+  }
+  return {
+    entries: normalizeReportHistoryEntries(rawHistory, limit),
+    present: true,
+    valid: true,
+    warning: "",
+  };
 }
 
-export function saveReportHistory(
+export function normalizeReportHistoryEntries(
   entries: ReportHistoryEntry[],
   limit: ReportHistoryLimit = DEFAULT_REPORT_HISTORY_LIMIT,
 ): ReportHistoryEntry[] {
-  let nextEntries = entries.filter(isReportHistoryEntry).slice(0, normalizeReportHistoryLimit(limit));
-  while (nextEntries.length > 0) {
-    try {
-      localStorage.setItem(REPORT_HISTORY_KEY, JSON.stringify(nextEntries));
-      return nextEntries;
-    } catch {
-      nextEntries = nextEntries.slice(0, Math.max(0, Math.floor(nextEntries.length / 2)));
-    }
-  }
-  localStorage.removeItem(REPORT_HISTORY_KEY);
-  return [];
+  const ids = new Set<string>();
+  return entries
+    .filter(isReportHistoryEntry)
+    .filter((entry) => {
+      if (ids.has(entry.id)) return false;
+      ids.add(entry.id);
+      return true;
+    })
+    .slice(0, normalizeReportHistoryLimit(limit));
 }
 
 export function rememberReportHistoryEntry(
@@ -650,7 +663,7 @@ export function rememberReportHistoryEntry(
   entry: ReportHistoryEntry,
   limit: ReportHistoryLimit = DEFAULT_REPORT_HISTORY_LIMIT,
 ): ReportHistoryEntry[] {
-  return saveReportHistory([entry, ...entries.filter((item) => item.id !== entry.id)], limit);
+  return normalizeReportHistoryEntries([entry, ...entries.filter((item) => item.id !== entry.id)], limit);
 }
 
 export function updateReportHistoryEntry(
@@ -661,11 +674,15 @@ export function updateReportHistoryEntry(
 ): ReportHistoryEntry[] {
   if (!id) return entries;
   const nextEntries = entries.map((entry) => (entry.id === id ? { ...entry, ...patch } : entry));
-  return saveReportHistory(nextEntries, limit);
+  return normalizeReportHistoryEntries(nextEntries, limit);
 }
 
-export function clearReportHistory() {
+export function clearLegacyReportHistory() {
   localStorage.removeItem(REPORT_HISTORY_KEY);
+}
+
+function invalidLegacyHistory(warning: string): LegacyReportHistoryState {
+  return { entries: [], present: true, valid: false, warning };
 }
 
 export function isBlankDayHistoryEntry(entry: ReportHistoryEntry) {

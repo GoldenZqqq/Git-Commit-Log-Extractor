@@ -8,6 +8,7 @@ pub mod models;
 mod network;
 mod pdf;
 pub mod report;
+mod report_history;
 mod secure_store;
 mod workspace_health;
 mod zip_store;
@@ -24,7 +25,7 @@ use crate::models::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::async_runtime;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_opener::OpenerExt;
 
 #[derive(Clone, Default)]
@@ -79,6 +80,44 @@ async fn inspect_workspace_health(
     async_runtime::spawn_blocking(move || workspace_health::inspect(options))
         .await
         .map_err(|err| format!("检查工作区健康状态失败：{err}"))
+}
+
+#[tauri::command]
+async fn load_report_history(
+    app: AppHandle,
+    legacy_entries: Option<Vec<report_history::ReportHistoryEntry>>,
+    limit: usize,
+) -> Result<report_history::ReportHistoryLoadResult, String> {
+    let directory = report_history_directory(&app)?;
+    async_runtime::spawn_blocking(move || report_history::load(&directory, legacy_entries, limit))
+        .await
+        .map_err(|error| format!("加载报告历史任务中断：{error}"))?
+}
+
+#[tauri::command]
+async fn save_report_history(
+    app: AppHandle,
+    entries: Vec<report_history::ReportHistoryEntry>,
+    limit: usize,
+) -> Result<Vec<report_history::ReportHistoryEntry>, String> {
+    let directory = report_history_directory(&app)?;
+    async_runtime::spawn_blocking(move || report_history::save(&directory, entries, limit))
+        .await
+        .map_err(|error| format!("保存报告历史任务中断：{error}"))?
+}
+
+#[tauri::command]
+async fn clear_report_history(app: AppHandle) -> Result<(), String> {
+    let directory = report_history_directory(&app)?;
+    async_runtime::spawn_blocking(move || report_history::clear(&directory))
+        .await
+        .map_err(|error| format!("清空报告历史任务中断：{error}"))?
+}
+
+fn report_history_directory(app: &AppHandle) -> Result<std::path::PathBuf, String> {
+    app.path()
+        .app_data_dir()
+        .map_err(|error| format!("获取应用数据目录失败：{error}"))
 }
 
 #[tauri::command]
@@ -379,6 +418,9 @@ pub fn run() {
             scan_repos,
             cancel_repo_scan,
             inspect_workspace_health,
+            load_report_history,
+            save_report_history,
+            clear_report_history,
             get_git_identity,
             extract_commits,
             generate_monthly_report,
