@@ -370,7 +370,7 @@ export function Workbench(props: Props) {
         <div className="hero-copy">
           <div className="brand-logo hero-brand" role="img" aria-label="GitPulse" />
           <h2>工作报告工作台</h2>
-          <p className="hero-subcopy">本地 Git 数据源 · 日报可选单日 · 周报可选周次 · 月报可选月份 · 自定义可选周期</p>
+          <p className="hero-subcopy">扫描本地 Git，一键生成工作报告</p>
         </div>
         <div className="hero-aside">
           <div className="hero-actions">
@@ -492,7 +492,7 @@ export function Workbench(props: Props) {
                   <div className="blank-day-entry">
                     {blankDayTipOpen && (
                       <div className="blank-day-tip" role="status">
-                        <span>今天仓库静悄悄？用近几天的工作线索补一份日报草稿</span>
+                        <span>今天无提交？参考近期工作生成草稿</span>
                         <button
                           type="button"
                           className="blank-day-tip-close"
@@ -960,7 +960,7 @@ function ReportHistoryPanel({
         )}
       />
       {entries.length === 0 ? (
-        <p className="history-empty">生成报告后会在这里保留最近记录，可重新打开、复制或按同一周期重新生成。</p>
+        <p className="history-empty">暂无历史报告，生成后可在此打开、复制或重新生成。</p>
       ) : (
         <>
           <HistoryFilterBar
@@ -974,7 +974,7 @@ function ReportHistoryPanel({
             onReset={resetFilters}
           />
           {filteredEntries.length === 0 ? (
-            <p className="history-empty">没有匹配的历史报告，请调整筛选条件。</p>
+            <p className="history-empty">没有匹配记录，请调整筛选。</p>
           ) : (
             <HistoryList
               entries={filteredEntries}

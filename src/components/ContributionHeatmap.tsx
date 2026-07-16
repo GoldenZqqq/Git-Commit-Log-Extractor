@@ -107,7 +107,7 @@ export function ContributionHeatmap({ data, loading, fullWidth }: Props) {
   if (!data) {
     return (
       <div className="contribution-heatmap">
-        <p className="heatmap-empty">暂无热力图数据。请先在设置中添加工作区目录。</p>
+        <p className="heatmap-empty">暂无数据，请先添加工作区目录。</p>
       </div>
     );
   }

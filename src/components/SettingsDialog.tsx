@@ -527,11 +527,11 @@ export function SettingsDialog({
                     dirs={settings.rootDirs}
                     onAdd={onAddRootDirs}
                     onRemove={onRemoveRootDir}
-                    hint="可添加多个分散在不同位置的目录，全部一起扫描"
+                    hint="可添加多个目录并统一扫描"
                   />
                   <Field
                     label="Git 作者"
-                    hint="留空 = 不过滤作者（适合团队周报）；多人用逗号分隔，任一命中即纳入"
+                    hint="留空统计全部作者；多人用逗号分隔"
                   >
                     <input
                       value={settings.author}
@@ -541,7 +541,7 @@ export function SettingsDialog({
                   </Field>
                   <Toggle label="输出到文件" checked={settings.outputEnabled} onChange={(value) => updateSetting("outputEnabled", value)} />
                   {settings.outputEnabled && <PathInput label="输出目录" value={settings.outputDir} onBrowse={onChooseOutputDir} />}
-                  <p className="mapping-hint">日报默认使用今天；周报取本周；月报可在首页选择月份。其他日期范围请切换到「自定义」。</p>
+                  <p className="mapping-hint">日报用当天，周报用本周；其他周期在首页选择。</p>
                 </section>
 
                 <details className="settings-section advanced-settings-section">
@@ -558,7 +558,7 @@ export function SettingsDialog({
                   <div className="advanced-settings-content">
                     <Field
                       label="作者身份别名"
-                      hint="每行一组：展示姓名 -> Git name 或 email；多个别名用逗号分隔。提取时会自动合并匹配，报告中显示展示姓名。"
+                      hint="每行：展示姓名 -> Git name/email；多个别名用逗号分隔"
                     >
                       <textarea
                         className="refinement-input author-alias-input"
@@ -578,7 +578,7 @@ export function SettingsDialog({
                     </div>
                     <Field
                       label="日报条目前缀"
-                      hint="控制 {commitItems} 的每条输出。推荐使用映射项目名，例如：柏科注安工程师 - 接入题目纠错反馈模块。"
+                      hint="控制每条 {commitItems} 的前缀，例如：项目名 - 事项"
                     >
                       <select
                         value={settings.commitItemPrefixMode}
@@ -592,7 +592,7 @@ export function SettingsDialog({
                     </Field>
                     <Field
                       label="证据链接前缀"
-                      hint="可选。每行一条：前缀 -> 链接模板；支持 {id}、{key}、{prefix}，用于 #123、PR #123、JIRA-123 等编号。"
+                      hint="每行：前缀 -> 链接模板；支持 {id}、{key}、{prefix}"
                     >
                       <textarea
                         className="refinement-input evidence-link-input"
@@ -603,7 +603,7 @@ export function SettingsDialog({
                     </Field>
                     <Field
                       label="脱敏替换规则"
-                      hint="可选。每行一条：敏感词 -> 替换文本；只写敏感词时默认替换为 ***。启用报告脱敏后生效。"
+                      hint="每行：敏感词 -> 替换文本；省略替换文本时使用 ***"
                     >
                       <textarea
                         className="refinement-input redaction-rules-input"
@@ -624,7 +624,7 @@ export function SettingsDialog({
                 <SectionTitle icon={<Bot size={16} />} title="AI 润色" />
                 <Field
                   label="应用出站代理"
-                  hint="仅代理 GitPulse 访问外部 API 的请求，不修改系统代理，也不影响本地 Git 扫描。"
+                  hint="仅用于外部 API，不修改系统代理或本地 Git"
                 >
                   <div className="proxy-panel">
                     <Toggle label="启用代理" checked={settings.proxyMode === "custom"} onChange={updateProxyMode} />
@@ -711,7 +711,7 @@ export function SettingsDialog({
                   </select>
                 </Field>
                 {settings.aiProvider === "codex-oauth" ? (
-                  <Field label="ChatGPT 账号" hint="使用 ChatGPT Plus/Pro 订阅额度润色，无需 API Key。属非官方接入，可能随时失效。">
+                  <Field label="ChatGPT 账号" hint="使用 Plus/Pro 额度，无需 API Key；非官方接入，可能失效">
                     <div className="codex-auth">
                       {codexAuth.authenticated ? (
                         <div className="codex-auth-row">
@@ -773,7 +773,7 @@ export function SettingsDialog({
                     </Field>
                   </>
                 )}
-                <Field label="模型" hint="可手动输入；也可以根据当前 Base URL 与 API Key 获取模型列表后选择。">
+                <Field label="模型" hint="可手动输入，或从当前服务获取">
                   <div className="model-picker" ref={modelPickerRef}>
                     <div className={`model-combobox ${modelMenuOpen ? "open" : ""}`}>
                       <input
@@ -841,7 +841,7 @@ export function SettingsDialog({
                     </p>
                   )}
                 </Field>
-                <Field label="生成温度" hint="越低越稳健保守，越高越灵活多样；默认 0.2">
+                <Field label="生成温度" hint="低值更稳定，高值更多样；默认 0.2">
                   <div className="temperature-control">
                     <input
                       type="range"
@@ -854,7 +854,7 @@ export function SettingsDialog({
                     <span className="temperature-value">{settings.aiTemperature.toFixed(1)}</span>
                   </div>
                 </Field>
-                <Field label="润色指令" hint="常驻的快速微调，追加在系统提示词之上；留空则不追加。临时性的本次要求可在首页润色按钮处填写。">
+                <Field label="润色指令" hint="常驻润色要求；临时要求请在首页填写">
                   <textarea
                     className="refinement-input"
                     value={settings.refinementInstruction}
@@ -864,7 +864,7 @@ export function SettingsDialog({
                 </Field>
                 <Field
                   label="系统提示词模板（高级）"
-                  hint="决定报告的整体结构与角色（如月报的分段方式）。留空则回退内置默认。"
+                  hint="控制报告结构；留空使用内置模板"
                 >
                   <div className="prompt-template-editor">
                     <div className="mapping-scope-control" role="radiogroup" aria-label="选择编辑的报告类型">
@@ -1013,7 +1013,7 @@ export function SettingsDialog({
                       ))}
                     </select>
                   </Field>
-                  <p className="mapping-hint">仅存本机。超出后自动去掉更早的记录，不影响 Git 仓库。</p>
+                  <p className="mapping-hint">仅存本机，超出上限自动删除最早记录。</p>
                   <button
                     type="button"
                     className="mapping-import"

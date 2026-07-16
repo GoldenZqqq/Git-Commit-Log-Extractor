@@ -233,7 +233,7 @@ export function BlankDayFillDialog({
           <div>
             <p className="kicker">Blank Day Fill</p>
             <h2 id="blank-day-dialog-title">空白日补写</h2>
-            <p className="blank-day-subtitle">基于历史提交线索生成延续草稿，生成后请核对再使用</p>
+            <p className="blank-day-subtitle">参考历史提交生成草稿，请核对后使用</p>
           </div>
           <button className="icon-button" type="button" onClick={onClose} disabled={generating} aria-label="关闭空白日补写">
             <X size={18} />

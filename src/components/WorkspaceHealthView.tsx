@@ -74,7 +74,7 @@ function HealthHeader(props: Props & { showSettings: boolean }) {
     <header className="workspace-health-header">
       <div>
         <h3><ShieldCheck size={17} /> 工作区健康</h3>
-        <p>仅检查本地目录、Git 标记与当前分支，不读取提交内容，也不会调用 AI。</p>
+        <p>检查目录、Git 标记和当前分支；不读取提交，不调用 AI。</p>
       </div>
       <div className="workspace-health-actions">
         <button type="button" onClick={props.onRefresh} disabled={props.loading}>
@@ -152,7 +152,7 @@ function RepoHealthTable({ repos, onToggleRepo, onRemoveRepo }: {
         <span>{repos.length} 项</span>
       </div>
       {repos.length === 0 ? (
-        <p className="workspace-health-no-repos">当前没有缓存仓库，重新扫描后会在此显示逐项状态。</p>
+        <p className="workspace-health-no-repos">暂无缓存仓库，请重新扫描。</p>
       ) : (
         <div className="workspace-health-table-wrap">
           <table className="workspace-health-table">
@@ -221,7 +221,7 @@ function HealthEmpty({ onOpenSettings }: { onOpenSettings: () => void }) {
   return (
     <div className="workspace-health-state" role="status">
       <FolderCog size={24} /><strong>尚未配置工作区</strong>
-      <p>添加至少一个仓库根目录并重新扫描后，这里会显示索引新鲜度与逐项健康状态。</p>
+      <p>请先添加仓库根目录并扫描。</p>
       <button type="button" onClick={onOpenSettings}><Settings2 size={14} /> 打开设置</button>
     </div>
   );

@@ -1313,7 +1313,11 @@ async function copyText(text: string, errorMessage: string) {
 function shouldNotifyStatus(message: string) {
   const trimmed = message.trim();
   if (!trimmed || trimmed === "就绪") return false;
-  if (trimmed.startsWith("正在扫描仓库：") || trimmed.startsWith("正在提取提交：")) return false;
+  if (
+    trimmed.startsWith("正在扫描仓库：")
+    || trimmed.startsWith("正在提取提交：")
+    || trimmed.startsWith("提取中：")
+  ) return false;
   return true;
 }
 
@@ -1321,7 +1325,7 @@ function inferMessageTone(message: string): AppMessageTone {
   if (message.includes("失败") || message.includes("错误") || message.includes("无效") || message.includes("无法")) return "error";
   if (message.includes("请选择") || message.includes("请输入") || message.includes("请先") || message.includes("不能为空")) return "warning";
   if (message.includes("取消") || message.includes("未写入") || message.includes("未读取") || message.includes("待配置")) return "warning";
-  if (message.startsWith("正在")) return "loading";
+  if (message.startsWith("正在") || message.startsWith("提取中：")) return "loading";
   if (message.includes("已") || message.includes("完成") || message.includes("生成")) return "success";
   return "info";
 }
@@ -1354,8 +1358,7 @@ function formatReportExportLabel(format: ReportExportFormat) {
 function formatExtractProgress(progress: CommitExtractProgress) {
   const total = progress.totalRepos;
   if (total === 0) return "没有启用的仓库可提取";
-  const current = progress.currentRepo ? ` · 刚完成 ${progress.currentRepo}` : "";
-  return `正在提取提交：${progress.completedRepos}/${total} 仓库 · ${progress.concurrency} 并发 · ${progress.commitCount} 条提交${current}`;
+  return `提取中：${progress.completedRepos}/${total} 仓库 · ${progress.commitCount} 条提交`;
 }
 
 export default App;

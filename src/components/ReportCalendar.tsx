@@ -94,7 +94,7 @@ export function ReportCalendar({
             <CalendarDays size={16} />
             报告日历
           </h4>
-          <p>查看本地已生成的日报、周报、月报与补写草稿</p>
+          <p>按日期查看本地报告</p>
         </div>
         <div className="report-calendar-nav">
           <button type="button" onClick={() => shiftMonth(-1)} aria-label="上个月">
@@ -119,7 +119,7 @@ export function ReportCalendar({
       </div>
 
       {!hasAny ? (
-        <p className="report-calendar-empty">暂无报告记录。生成日报或周报后，会显示在这里。</p>
+        <p className="report-calendar-empty">暂无报告，生成后将在此显示。</p>
       ) : (
         <>
           <div className="report-calendar-weekdays">

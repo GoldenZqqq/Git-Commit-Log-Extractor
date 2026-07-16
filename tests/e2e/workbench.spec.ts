@@ -340,7 +340,7 @@ test("guides users when workspace has no indexed repositories", async ({ page })
   const emptyState = page.getByLabel("仓库索引为空");
   await expect(emptyState).toBeVisible();
   await expect(emptyState.getByText("先添加仓库根目录")).toBeVisible();
-  await expect(emptyState.getByText("选择存放代码项目的文件夹后，GitPulse 会扫描其中的本地 Git 仓库。")).toBeVisible();
+  await expect(emptyState.getByText("添加代码目录后即可扫描 Git 仓库。")).toBeVisible();
   await expect(emptyState.getByText("多个工作区可分次添加。")).toBeVisible();
 
   await emptyState.getByRole("button", { name: "添加目录" }).click();
@@ -662,7 +662,7 @@ test("opens and clears report history", async ({ page }) => {
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "清空" }).click();
 
-  await expect(page.getByText("生成报告后会在这里保留最近记录，可重新打开、复制或按同一周期重新生成。")).toBeVisible();
+  await expect(page.getByText("暂无历史报告，生成后可在此打开、复制或重新生成。")).toBeVisible();
 });
 
 test("filters report history by type date status and search", async ({ page }) => {

@@ -243,7 +243,7 @@ function RepositoryFilterEmpty(props: {
     <div className="repo-filter-empty" role="status">
       <Search size={20} />
       <strong>{title}</strong>
-      <p>{props.query ? "换个关键词，或清除搜索查看当前状态筛选中的全部仓库。" : "切换状态筛选后即可继续管理仓库范围。"}</p>
+      <p>{props.query ? "换个关键词或清除搜索。" : "切换状态筛选以查看其他仓库。"}</p>
       <div>
         {props.query && <button type="button" onClick={() => props.onQueryChange("")}>清除搜索</button>}
         {props.status !== "all" && <button type="button" onClick={() => props.onStatusChange("all")}>查看全部</button>}
@@ -268,7 +268,7 @@ function RepoEmptyCopy({ hasRootDirs }: { hasRootDirs: boolean }) {
   return (
     <div className="repo-empty-copy">
       <strong>{hasRootDirs ? "还没有扫描到 Git 仓库" : "先添加仓库根目录"}</strong>
-      <p>{hasRootDirs ? "已配置目录，但当前索引为空。通常是目录层级不对、目录下没有 .git，或扫描还没有重新执行。" : "选择存放代码项目的文件夹后，GitPulse 会扫描其中的本地 Git 仓库。"}</p>
+      <p>{hasRootDirs ? "索引为空，请确认目录层级或重新扫描。" : "添加代码目录后即可扫描 Git 仓库。"}</p>
     </div>
   );
 }
