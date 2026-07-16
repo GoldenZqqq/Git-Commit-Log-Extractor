@@ -38,6 +38,8 @@ pub struct ReportHistoryEntry {
     pub report_text: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub supplemental_items: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub projects: Option<Vec<crate::project_retrospective::ReportHistoryProject>>,
 }
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -311,6 +313,17 @@ fn is_valid_entry(entry: &ReportHistoryEntry) -> bool {
         )
         && !entry.title.trim().is_empty()
         && !entry.generated_at.trim().is_empty()
+        && entry.projects.as_ref().is_none_or(|projects| {
+            projects.iter().all(|project| {
+                !project.name.trim().is_empty()
+                    && project.evidence_ids.len()
+                        <= crate::project_retrospective::MAX_PROJECT_EVIDENCE_IDS
+                    && project
+                        .evidence_ids
+                        .iter()
+                        .all(|evidence_id| !evidence_id.trim().is_empty())
+            })
+        })
 }
 
 fn normalize_limit(limit: usize) -> usize {
@@ -476,6 +489,23 @@ mod tests {
         cleanup(&root);
     }
 
+    #[test]
+    fn round_trip_preserves_optional_structured_projects() {
+        let root = temp_root("structured-projects");
+        let mut entry = sample_entry(8);
+        entry.projects = Some(vec![crate::project_retrospective::ReportHistoryProject {
+            name: "研发平台".to_string(),
+            commit_count: 2,
+            evidence_ids: vec!["abc123d".to_string(), "def456a".to_string()],
+        }]);
+
+        save(&root, vec![entry.clone()], 120).unwrap();
+        let loaded = load(&root, None, 120).unwrap();
+
+        assert_eq!(vec![entry], loaded.entries);
+        cleanup(&root);
+    }
+
     fn sample_entry(index: usize) -> ReportHistoryEntry {
         ReportHistoryEntry {
             id: format!("history-{index}"),
@@ -494,6 +524,7 @@ mod tests {
             output_file: String::new(),
             report_text: format!("report {index}"),
             supplemental_items: None,
+            projects: None,
         }
     }
 

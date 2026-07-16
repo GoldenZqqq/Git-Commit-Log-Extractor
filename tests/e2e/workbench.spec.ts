@@ -558,6 +558,9 @@ test("passes redaction options when generating a traceable weekly report", async
         reportKind: "weekly",
         projectCount: 1,
         commitCount: 1,
+        projects: [
+          { name: "仓库1(分支1)", commitCount: 1, evidenceIds: ["commit-1"] },
+        ],
       },
     },
     outputDir: "C:/exports",
@@ -583,6 +586,11 @@ test("passes redaction options when generating a traceable weekly report", async
       { find: "SECRET_TOKEN", replacement: "***" },
     ],
   });
+  const stored = await page.evaluate(() => window.__mockTauri.reportHistoryStore[0]);
+  expect(stored.projects).toEqual([
+    { name: "仓库1(分支1)", commitCount: 1, evidenceIds: ["commit-1"] },
+  ]);
+  expect(JSON.stringify(stored.projects)).not.toContain("gitpulse");
 });
 
 test("generates and exports a monthly report", async ({ page }) => {

@@ -85,12 +85,19 @@ export type CommitExtractProgress = {
   done: boolean;
 };
 
+export type ReportHistoryProject = {
+  name: string;
+  commitCount: number;
+  evidenceIds: string[];
+};
+
 export type ExtractResult = {
   repos: RepoInfo[];
   summaryText: string;
   detailedText: string;
   warnings: string[];
   commits: CommitRecord[];
+  projects: ReportHistoryProject[];
 };
 
 export type MonthlyReportResult = {
@@ -115,6 +122,7 @@ export type PeriodReportResult = {
   reportKind: PeriodReportKind;
   projectCount: number;
   commitCount: number;
+  projects: ReportHistoryProject[];
 };
 
 export type ReportEnhanceResult = {
@@ -211,6 +219,7 @@ export type ReportHistoryEntry = {
   outputFile: string;
   reportText: string;
   supplementalItems?: string[];
+  projects?: ReportHistoryProject[];
 };
 
 export type LegacyReportHistoryState = {
@@ -231,6 +240,7 @@ export type ReportPolishReview = {
   commitCount: number;
   projectCount: number;
   supplementalItems: string[];
+  projects?: ReportHistoryProject[];
 };
 
 export type UpdateSummary = {
@@ -1577,6 +1587,25 @@ function isReportHistoryEntry(value: unknown): value is ReportHistoryEntry {
     && typeof entry.outputFile === "string"
     && typeof entry.reportText === "string"
     && isSupplementalItemsValue(entry.supplementalItems)
+    && isReportHistoryProjectsValue(entry.projects)
+  );
+}
+
+function isReportHistoryProjectsValue(value: unknown): value is ReportHistoryProject[] | undefined {
+  if (value === undefined) return true;
+  return Array.isArray(value) && value.every(isReportHistoryProject);
+}
+
+function isReportHistoryProject(value: unknown): value is ReportHistoryProject {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const project = value as Partial<ReportHistoryProject>;
+  return (
+    isNonEmptyString(project.name)
+    && Number.isInteger(project.commitCount)
+    && (project.commitCount ?? -1) >= 0
+    && Array.isArray(project.evidenceIds)
+    && project.evidenceIds.length <= 20
+    && project.evidenceIds.every(isNonEmptyString)
   );
 }
 

@@ -203,6 +203,7 @@ pub struct ExtractOptions {
 pub struct ExtractResult {
     pub repos: Vec<RepoInfo>,
     pub commits: Vec<CommitRecord>,
+    pub projects: Vec<crate::project_retrospective::ReportHistoryProject>,
     pub summary_text: String,
     pub detailed_text: String,
     pub warnings: Vec<String>,
@@ -485,6 +486,7 @@ pub struct PeriodReportResult {
     pub report_kind: String,
     pub project_count: usize,
     pub commit_count: usize,
+    pub projects: Vec<crate::project_retrospective::ReportHistoryProject>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

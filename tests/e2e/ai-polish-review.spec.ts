@@ -29,6 +29,9 @@ const history = [createHistoryEntry({
   reportText: originalReport,
   repoCount: 4,
   projectCount: 2,
+  projects: [
+    { name: "支付平台", commitCount: 2, evidenceIds: ["abc1201", "def2302"] },
+  ],
 })];
 const settings = createSettings({
   rootDirs: ["C:/workspace"],
@@ -72,6 +75,7 @@ test("reviews AI changes before accepting and only then updates history and expo
   await expect.poll(() => commandCount(page, "save_report_file")).toBe(1);
   await expect.poll(async () => (await storedHistory(page))[0]?.reportText).toBe(polishedReport);
   expect((await storedHistory(page))[0].repoCount).toBe(4);
+  expect((await storedHistory(page))[0].projects).toEqual(history[0].projects);
   await expect(page.getByRole("button", { name: "AI润色" })).toBeFocused();
 });
 

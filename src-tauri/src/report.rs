@@ -5,6 +5,7 @@ use crate::{
         RepoInfo, ReportFormatTemplates, ReportRedactionOptions, ReportRedactionRule, SubPeriod,
     },
     pdf,
+    project_retrospective::{self, ReportHistoryProject},
 };
 use chrono::{Datelike, Duration, Local, NaiveDate};
 use regex::Regex;
@@ -105,6 +106,7 @@ pub fn build_extract_result(
     format: ExtractReportFormat,
 ) -> ExtractResult {
     if !redaction.enabled {
+        let projects = build_report_history_projects(&commits, project_names, redaction);
         let summary_text = render_extract_report(
             &commits,
             project_names,
@@ -123,6 +125,7 @@ pub fn build_extract_result(
             detailed_text,
             repos,
             commits,
+            projects,
             warnings,
         };
     }
@@ -150,13 +153,28 @@ pub fn build_extract_result(
     } else {
         String::new()
     };
+    let projects = project_retrospective::summarize_projects(prepared.commits.as_ref(), |commit| {
+        monthly_project_name(prepared.project_names.as_ref(), commit)
+    });
     ExtractResult {
         summary_text,
         detailed_text,
         repos,
         commits: prepared.commits.into_owned(),
+        projects,
         warnings,
     }
+}
+
+pub fn build_report_history_projects(
+    commits: &[CommitRecord],
+    project_names: &HashMap<String, String>,
+    redaction: &ReportRedactionOptions,
+) -> Vec<ReportHistoryProject> {
+    let prepared = prepare_report_input(commits, project_names, &[], "", redaction);
+    project_retrospective::summarize_projects(prepared.commits.as_ref(), |commit| {
+        monthly_project_name(prepared.project_names.as_ref(), commit)
+    })
 }
 
 pub fn render_summary_text(
@@ -514,9 +532,10 @@ pub fn build_period_result(
     warnings: Vec<String>,
     dates: (String, String, String),
     report_kind: String,
-    project_count: usize,
+    projects: Vec<ReportHistoryProject>,
     commit_count: usize,
 ) -> PeriodReportResult {
+    let project_count = projects.len();
     PeriodReportResult {
         report_text,
         output_file,
@@ -527,6 +546,7 @@ pub fn build_period_result(
         report_kind,
         project_count,
         commit_count,
+        projects,
     }
 }
 
@@ -1469,10 +1489,7 @@ fn short_date(date: &str) -> String {
 }
 
 fn short_hash(hash: &str) -> String {
-    if hash.starts_with("commit-") {
-        return hash.to_string();
-    }
-    hash.chars().take(7).collect()
+    project_retrospective::short_evidence_id(hash)
 }
 
 fn compact_message(message: &str) -> String {
@@ -2222,6 +2239,54 @@ mod tests {
         assert!(!report.contains("https://jira.internal"));
         assert!(!report.contains("内部平台"));
         assert!(!report.contains("内部项目"));
+    }
+
+    #[test]
+    fn report_history_projects_reuse_mapping_and_redact_before_persistence() {
+        let mut commits = vec![
+            commit("private-api", "main", "feat: exact mapping"),
+            commit("private-api", "feature/report", "feat: wildcard mapping"),
+        ];
+        commits[0].hash = "abc123def".to_string();
+        commits[1].hash = "def456abc".to_string();
+        let project_names = HashMap::from([
+            ("private-api(main)".to_string(), "核心平台-".to_string()),
+            ("private-api(*)".to_string(), "内部平台_".to_string()),
+        ]);
+
+        let projects = build_report_history_projects(
+            &commits,
+            &project_names,
+            &ReportRedactionOptions::default(),
+        );
+        assert_eq!(vec!["内部平台", "核心平台"], project_names_from(&projects));
+        assert_eq!(vec!["def456a"], projects[0].evidence_ids);
+        assert_eq!(vec!["abc123d"], projects[1].evidence_ids);
+
+        let redacted = build_report_history_projects(
+            &commits,
+            &project_names,
+            &ReportRedactionOptions {
+                enabled: true,
+                rules: Vec::new(),
+            },
+        );
+        assert_eq!(
+            vec!["仓库1(分支1)", "仓库1(分支2)"],
+            project_names_from(&redacted)
+        );
+        assert_eq!(vec!["commit-1"], redacted[0].evidence_ids);
+        assert_eq!(vec!["commit-2"], redacted[1].evidence_ids);
+        assert!(!format!("{redacted:?}").contains("private-api"));
+    }
+
+    fn project_names_from(
+        projects: &[crate::project_retrospective::ReportHistoryProject],
+    ) -> Vec<&str> {
+        projects
+            .iter()
+            .map(|project| project.name.as_str())
+            .collect()
     }
 
     #[test]

@@ -55,7 +55,7 @@
 
 .insights-content {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   gap: 14px;
   min-height: 0;
   overflow-y: auto;

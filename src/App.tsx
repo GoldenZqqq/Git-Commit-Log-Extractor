@@ -30,6 +30,7 @@ import {
   type ReportExportFormat,
   type PreviewMode,
   type ReportHistoryEntry,
+  type ReportHistoryProject,
   type ReportPolishReview,
   type RepoInfo,
   type RepoScanProgress,
@@ -41,7 +42,6 @@ import {
   buildReportEnhanceOptions,
   clearRepoIndexCache,
   isBlankDayHistoryEntry,
-  countCommitProjects,
   formatMonthLabel,
   getMonthRange,
   getPreviousMonthInput,
@@ -87,6 +87,19 @@ type RunTaskInput = {
   task: () => Promise<void>;
   validate?: () => void;
   allowDuringPolishReview?: boolean;
+};
+
+type HistoryEntryInput = {
+  mode: PreviewMode;
+  range: DateRange;
+  periodLabel: string;
+  reportText: string;
+  commitCount: number;
+  projectCount: number;
+  aiEnhanced: boolean;
+  outputFile?: string;
+  supplementalItems?: string[];
+  projects?: ReportHistoryProject[];
 };
 
 function App() {
@@ -441,31 +454,22 @@ function App() {
     reportHistoryStorage.update(activeHistoryId, patch);
   }
 
-  function buildHistoryEntry(
-    mode: PreviewMode,
-    range: DateRange,
-    periodLabel: string,
-    reportText: string,
-    commitTotal: number,
-    projectTotal: number,
-    aiEnhanced: boolean,
-    outputFile = "",
-    supplementalItems: string[] = [],
-  ): ReportHistoryEntry {
+  function buildHistoryEntry(input: HistoryEntryInput): ReportHistoryEntry {
     return {
       id: createHistoryId(),
-      mode,
-      title: formatHistoryTitle(mode, periodLabel, range),
-      range,
-      periodLabel,
+      mode: input.mode,
+      title: formatHistoryTitle(input.mode, input.periodLabel, input.range),
+      range: input.range,
+      periodLabel: input.periodLabel,
       generatedAt: new Date().toISOString(),
       repoCount: getEnabledRepoCount(),
-      projectCount: projectTotal,
-      commitCount: commitTotal,
-      aiEnhanced,
-      outputFile,
-      reportText,
-      supplementalItems,
+      projectCount: input.projectCount,
+      commitCount: input.commitCount,
+      aiEnhanced: input.aiEnhanced,
+      outputFile: input.outputFile ?? "",
+      reportText: input.reportText,
+      supplementalItems: input.supplementalItems ?? [],
+      projects: input.projects,
     };
   }
 
@@ -485,7 +489,7 @@ function App() {
           options: buildExtractOptions(settings, projectNames, range, false, "", repos, "daily", supplementalItems),
         });
         const reportText = result.detailedText || result.summaryText;
-        const projectTotal = countCommitProjects(result.commits, projectNames);
+        const projectTotal = result.projects.length;
         setDailyDate(dateValue);
         setSummaryText(reportText);
         setWarnings(result.warnings);
@@ -494,7 +498,17 @@ function App() {
         setProjectCount(projectTotal);
         setBlankDayDraftActive(false);
         setActivePreview("summary");
-        rememberHistory(buildHistoryEntry("summary", range, dateValue, reportText, result.commits.length, projectTotal, false, "", supplementalItems));
+        rememberHistory(buildHistoryEntry({
+          mode: "summary",
+          range,
+          periodLabel: dateValue,
+          reportText,
+          commitCount: result.commits.length,
+          projectCount: projectTotal,
+          aiEnhanced: false,
+          supplementalItems,
+          projects: result.projects,
+        }));
         setStatus(`${dateValue} 日报已生成`);
       },
       validate: () => {
@@ -516,7 +530,7 @@ function App() {
         });
         const reportText = result.detailedText || result.summaryText;
         const periodLabel = `${range.startDate} ~ ${range.endDate}`;
-        const projectTotal = countCommitProjects(result.commits, projectNames);
+        const projectTotal = result.projects.length;
         setCustomRange(range);
         setCustomReport(reportText);
         setWarnings(result.warnings);
@@ -525,7 +539,17 @@ function App() {
         setProjectCount(projectTotal);
         setBlankDayDraftActive(false);
         setActivePreview("custom");
-        rememberHistory(buildHistoryEntry("custom", range, periodLabel, reportText, result.commits.length, projectTotal, false, "", supplementalItems));
+        rememberHistory(buildHistoryEntry({
+          mode: "custom",
+          range,
+          periodLabel,
+          reportText,
+          commitCount: result.commits.length,
+          projectCount: projectTotal,
+          aiEnhanced: false,
+          supplementalItems,
+          projects: result.projects,
+        }));
         setStatus("自定义报告已生成");
       },
       validate: () => {
@@ -555,7 +579,18 @@ function App() {
         setProjectCount(result.projectCount);
         setBlankDayDraftActive(false);
         setActivePreview("weekly");
-        rememberHistory(buildHistoryEntry("weekly", range, result.periodLabel, result.reportText, result.commitCount, result.projectCount, false, result.outputFile, supplementalItems));
+        rememberHistory(buildHistoryEntry({
+          mode: "weekly",
+          range,
+          periodLabel: result.periodLabel,
+          reportText: result.reportText,
+          commitCount: result.commitCount,
+          projectCount: result.projectCount,
+          aiEnhanced: false,
+          outputFile: result.outputFile,
+          supplementalItems,
+          projects: result.projects,
+        }));
         setStatus(result.outputFile ? `${result.periodLabel} 周报已生成` : `${result.periodLabel} 周报已生成，未写入文件`);
       },
       validate: () => {
@@ -586,7 +621,18 @@ function App() {
         setProjectCount(result.projectCount);
         setBlankDayDraftActive(false);
         setActivePreview("monthly");
-        rememberHistory(buildHistoryEntry("monthly", range, result.periodLabel, result.reportText, result.commitCount, result.projectCount, false, result.outputFile, supplementalItems));
+        rememberHistory(buildHistoryEntry({
+          mode: "monthly",
+          range,
+          periodLabel: result.periodLabel,
+          reportText: result.reportText,
+          commitCount: result.commitCount,
+          projectCount: result.projectCount,
+          aiEnhanced: false,
+          outputFile: result.outputFile,
+          supplementalItems,
+          projects: result.projects,
+        }));
         setStatus(result.outputFile ? `${result.periodLabel} 月报已生成` : `${result.periodLabel} 月报已生成，未写入文件`);
       },
       validate: () => {
@@ -627,8 +673,8 @@ function App() {
     const range = activePreviewRange(activePreview, dailyRange, weeklyRange, monthlyRange, customRange);
     const periodLabel = activePreviewPeriodLabel(activePreview, dailyDate, weeklyWeek, monthlyLabel || monthlyMonth, customRange);
     const baseReport = previewText;
-    const sourceRepoCount = reportHistory.find((entry) => entry.id === activeHistoryId)?.repoCount
-      ?? getEnabledRepoCount();
+    const sourceHistory = reportHistory.find((entry) => entry.id === activeHistoryId);
+    const sourceRepoCount = sourceHistory?.repoCount ?? getEnabledRepoCount();
     setExtractProgress(null);
     await runTask({
       kind: "polish",
@@ -654,6 +700,7 @@ function App() {
           commitCount,
           projectCount,
           supplementalItems,
+          projects: sourceHistory?.projects,
         });
         setStatus("AI 润色完成，请对照确认");
       },
@@ -678,17 +725,18 @@ function App() {
         setActivePreview(review.mode);
         setWarnings(review.warnings);
         setLastOutputFile(outputFile);
-        const historyEntry = buildHistoryEntry(
-          review.mode,
-          review.range,
-          review.periodLabel,
-          review.polishedText,
-          review.commitCount,
-          review.projectCount,
-          true,
+        const historyEntry = buildHistoryEntry({
+          mode: review.mode,
+          range: review.range,
+          periodLabel: review.periodLabel,
+          reportText: review.polishedText,
+          commitCount: review.commitCount,
+          projectCount: review.projectCount,
+          aiEnhanced: true,
           outputFile,
-          review.supplementalItems,
-        );
+          supplementalItems: review.supplementalItems,
+          projects: review.projects,
+        });
         rememberHistory({ ...historyEntry, repoCount: review.repoCount });
         setPolishReview(null);
         setStatus("已接受 AI 润色结果");

@@ -135,6 +135,7 @@ type ReportPolishReview = {
   commitCount: number;
   projectCount: number;
   supplementalItems: string[];
+  projects?: ReportHistoryProject[];
 };
 
 buildReportDiff(originalText, polishedText): ReportDiffResult;
@@ -144,7 +145,7 @@ detectPolishFactRisks(originalText, lines): PolishFactRisk[];
 ### Contracts
 
 - A successful `enhance_report` call creates `ReportPolishReview`; it must not update preview text, report history, or an output file.
-- Capture the source mode, range, counts, and supplemental facts when the review is created. Scan/settings changes may remain available, so acceptance must not recompute source metadata from current state.
+- Capture the source mode, range, counts, supplemental facts, and optional project attribution when the review is created. Scan/settings changes may remain available, so acceptance must not recompute source metadata from current state.
 - Accepting may write the configured output file, then applies the polished text and creates the AI history entry. If saving fails, keep the review open for retry.
 - Rejecting or pressing `Escape` only clears the review and returns focus to the AI polish button; it must not write history or files.
 - While a review is pending, block generation, another polish, export, report type/period changes, and history opening. Keep scan, copy, settings, and review scrolling available.

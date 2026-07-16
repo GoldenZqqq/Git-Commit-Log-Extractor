@@ -7,6 +7,7 @@ pub mod git_ops;
 pub mod models;
 mod network;
 mod pdf;
+mod project_retrospective;
 pub mod report;
 mod report_history;
 mod secure_store;

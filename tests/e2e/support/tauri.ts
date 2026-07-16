@@ -24,6 +24,13 @@ type ReportHistoryEntry = {
   outputFile: string;
   reportText: string;
   supplementalItems?: string[];
+  projects?: ReportHistoryProject[];
+};
+
+type ReportHistoryProject = {
+  name: string;
+  commitCount: number;
+  evidenceIds: string[];
 };
 
 type MockScenario = {
@@ -50,6 +57,7 @@ type MockScenario = {
     detailedText?: string;
     warnings?: string[];
     commits: unknown[];
+    projects?: ReportHistoryProject[];
   }>;
   periodResults?: {
     weekly?: Record<string, unknown>;
@@ -139,6 +147,7 @@ export function createHistoryEntry(
     outputFile: overrides.outputFile ?? "",
     reportText: overrides.reportText,
     supplementalItems: overrides.supplementalItems,
+    projects: overrides.projects,
   };
 }
 
@@ -256,14 +265,40 @@ export async function launchApp(page: Page, scenario: MockScenario) {
       }
 
       function nextExtractResult() {
-        if (extractResults.length > 0) return extractResults.shift();
-        return {
+        const result = extractResults.length > 0 ? extractResults.shift() : {
           repos: state.scanRepos ?? [],
           summaryText: "",
           detailedText: "",
           warnings: [],
           commits: [],
         };
+        const commits = result?.commits ?? [];
+        return {
+          repos: result?.repos ?? state.scanRepos ?? [],
+          summaryText: result?.summaryText ?? "",
+          detailedText: result?.detailedText ?? "",
+          warnings: result?.warnings ?? [],
+          commits,
+          projects: result?.projects ?? projectsFromCommits(commits),
+        };
+      }
+
+      function projectsFromCommits(commits) {
+        const groups = new Map();
+        for (const commit of commits) {
+          if (!commit?.projectName || !commit?.branchName) continue;
+          const name = `${commit.projectName}(${commit.branchName})`;
+          const project = groups.get(name) ?? { name, commitCount: 0, evidenceIds: [] };
+          project.commitCount += 1;
+          const evidenceId = String(commit.hash ?? "").startsWith("commit-")
+            ? String(commit.hash)
+            : String(commit.hash ?? "").slice(0, 7);
+          if (evidenceId && !project.evidenceIds.includes(evidenceId) && project.evidenceIds.length < 20) {
+            project.evidenceIds.push(evidenceId);
+          }
+          groups.set(name, project);
+        }
+        return [...groups.values()].sort((left, right) => left.name.localeCompare(right.name));
       }
 
       function resolvePeriodResult(kind) {
@@ -277,6 +312,7 @@ export async function launchApp(page: Page, scenario: MockScenario) {
           reportKind: kind,
           projectCount: 1,
           commitCount: 0,
+          projects: [],
         };
         return { ...fallback, ...(state.periodResults?.[kind] ?? {}) };
       }

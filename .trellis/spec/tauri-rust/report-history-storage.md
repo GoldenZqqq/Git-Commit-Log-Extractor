@@ -56,6 +56,7 @@ useReportHistoryStorage(limit, onWarning): {
   - `report-history.json.clear-rollback`: old primary during a clear transaction.
   - `report-history.corrupt-<timestamp>.json`: isolated invalid data.
 - Version 1 is `{ "version": 1, "entries": [...] }`. Unsupported versions are invalid, not silently reinterpreted.
+- `ReportHistoryEntry.projects?: ReportHistoryProject[]` is a backward-compatible optional field inside version 1; adding it does not bump the envelope version.
 - Supported limits are 30, 60, 120, and 200; any other value normalizes to 120. First-seen ID wins and ordering stays newest-first.
 - Normal save writes and syncs the temp file, rotates primary to backup, then renames temp to primary. A failed final rename restores the backup when possible.
 - Clear prepares two empty envelopes, moves the old primary to rollback, replaces backup and primary, then deletes rollback. Any returned error must leave the old primary recoverable.
@@ -94,6 +95,7 @@ useReportHistoryStorage(limit, onWarning): {
 - Playwright asserts valid legacy migration and key deletion, existing-file authority, invalid legacy preservation, load/save/clear warnings, save-failure memory fallback, and clear-failure UI rollback.
 - Defer `load_report_history`, generate a report before release, then assert the file store contains both old and new entries.
 - Existing AI polish, supplemental facts, report opening/filtering, and history clear flows must read the mock file store and remain green.
+- Structured project attribution must survive file round-trip; old entries without `projects` must continue loading unchanged.
 - Run `npm run build`, full `npm run test:e2e`, `cargo fmt -- --check`, `cargo check`, and full `cargo test`.
 
 ## 7. Wrong vs Correct

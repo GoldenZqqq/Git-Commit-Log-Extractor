@@ -3,6 +3,7 @@ import { ContributionHeatmap, type HeatmapResult } from "./ContributionHeatmap";
 import { WorkRhythmPanel, type WorkRhythmResult } from "./WorkRhythmPanel";
 import { TrendPanel, type TrendResult } from "./TrendPanel";
 import { ReportCalendar } from "./ReportCalendar";
+import { ProjectRetrospective } from "./ProjectRetrospective";
 import type { ReportHistoryEntry } from "../model";
 import "./InsightsView.css";
 
@@ -85,6 +86,8 @@ export function InsightsView({
               onOpenBlankDayFill={onOpenBlankDayFill}
             />
           </div>
+
+          <ProjectRetrospective entries={reportHistory} onOpenHistory={onOpenHistory} />
 
           <div className="insights-bottom-grid">
             <div className="insights-rhythm-section">

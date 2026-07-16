@@ -159,14 +159,15 @@ where
     report_text =
         apply_ai_to_period_report(report_text, &options, &dates, &report_author, &mut warnings);
     let output_file = save_period_if_enabled(&options, &report_text)?;
-    let project_count = count_projects(&commits, &options.project_names);
+    let projects =
+        report::build_report_history_projects(&commits, &options.project_names, &options.redaction);
     Ok(report::build_period_result(
         report_text,
         output_file,
         warnings,
         dates,
         options.report_kind,
-        project_count,
+        projects,
         commits.len(),
     ))
 }

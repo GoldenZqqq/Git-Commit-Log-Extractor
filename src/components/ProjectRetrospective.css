@@ -1,0 +1,255 @@
+.project-retrospective {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  min-width: 0;
+  padding: 13px 0;
+  border-block: 1px solid var(--line);
+}
+
+.project-retrospective-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.project-retrospective-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  color: var(--ink);
+}
+
+.project-retrospective-title > svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--primary-dark);
+}
+
+.project-retrospective-title h4,
+.project-retrospective-title p {
+  margin: 0;
+}
+
+.project-retrospective-title h4 {
+  font-size: 13px;
+  font-weight: 820;
+  text-wrap: balance;
+}
+
+.project-retrospective-title p {
+  margin-top: 3px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.project-retrospective-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.project-retrospective-controls label {
+  display: grid;
+  gap: 4px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.project-retrospective-controls select {
+  width: 164px;
+  min-height: 31px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 0 30px 0 9px;
+  color: var(--ink);
+  background-color: var(--paper);
+  font-size: 12px;
+}
+
+.project-retrospective-controls label:last-child select {
+  width: 118px;
+}
+
+.project-retrospective-controls select:focus-visible,
+.project-retrospective-open:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.project-retrospective-controls select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.project-retrospective-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  background: var(--paper-soft);
+  font-size: 11px;
+}
+
+.project-retrospective-summary strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.project-retrospective-notice {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.project-retrospective-timeline {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.project-retrospective-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 2px;
+  border-top: 1px solid var(--line);
+}
+
+.project-retrospective-row:first-child {
+  border-top: 0;
+}
+
+.project-retrospective-row-main {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.project-retrospective-row-heading,
+.project-retrospective-statuses,
+.project-retrospective-evidence {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.project-retrospective-row-heading strong {
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.project-retrospective-row-heading time {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.project-retrospective-kind,
+.project-retrospective-statuses span,
+.project-retrospective-evidence code {
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.project-retrospective-kind {
+  color: var(--primary-dark);
+  background: var(--primary-soft);
+  font-weight: 760;
+}
+
+.project-retrospective-statuses span {
+  color: var(--ink-soft);
+  background: var(--paper-soft);
+}
+
+.project-retrospective-evidence code {
+  max-width: 100%;
+  color: var(--canvas-text);
+  background: var(--mist);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.project-retrospective-evidence > span {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.project-retrospective-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 64px;
+  min-height: 30px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 0 9px;
+  color: var(--primary-dark);
+  background: var(--paper);
+  font-size: 11px;
+  font-weight: 760;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.project-retrospective-open:hover {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.project-retrospective-empty {
+  display: flex;
+  align-items: center;
+  min-height: 56px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+@media (max-width: 760px) {
+  .project-retrospective-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .project-retrospective-controls {
+    flex-wrap: wrap;
+  }
+
+  .project-retrospective-controls label {
+    flex: 1 1 150px;
+  }
+
+  .project-retrospective-controls select,
+  .project-retrospective-controls label:last-child select {
+    width: 100%;
+  }
+
+  .project-retrospective-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .project-retrospective-open {
+    justify-self: start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .project-retrospective-open {
+    transition: none;
+  }
+}

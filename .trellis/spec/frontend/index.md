@@ -20,6 +20,7 @@ The frontend owns state, layout, validation prompts, preview interactions, and T
 | [State Management](./state-management.md) | Local state, persisted state, derived state | Filled |
 | [Quality Guidelines](./quality-guidelines.md) | Code standards, verification, forbidden patterns | Filled |
 | [Type Safety](./type-safety.md) | Type patterns and validation | Filled |
+| [Project Retrospective Attribution](../tauri-rust/project-retrospective.md) | Cross-layer project history and insights projection contract | Filled |
 
 ---
 
