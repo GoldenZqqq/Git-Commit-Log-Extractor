@@ -3,7 +3,7 @@
   "name": "privacy-safe-support-bundle",
   "title": "增加隐私安全的支持诊断包",
   "description": "生成脱敏诊断包并提供低摩擦 GitHub Issue 反馈入口",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,

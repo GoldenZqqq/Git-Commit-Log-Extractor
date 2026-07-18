@@ -60,6 +60,14 @@ _Avoid_: final report, auto timesheet
 A month-grid module in Insights that visualizes when local reports were generated (daily, weekly, monthly, custom, and blank-day continuity drafts). It is about report delivery, not Git commit activity. Retention count is user-configurable in settings; clearing history is explicit and local-only.
 _Avoid_: attendance calendar, timesheet, punch clock
 
+**Support Bundle**:
+A user-reviewed local ZIP export containing a redacted diagnostic snapshot and bounded current-session application events. Preparing or exporting it never uploads data; attaching it to a support request is a separate user action.
+_Avoid_: log dump, telemetry upload, automatic crash report
+
+**Safe Issue Summary**:
+A short redacted aggregate suitable for copying or pre-filling a GitHub Issue. It excludes event details, local paths and attachments even when a Support Bundle exists.
+_Avoid_: diagnostic attachment, full log, uploaded report
+
 ## Flagged Ambiguities
 
 **Blank day / empty day**:
@@ -73,6 +81,9 @@ In product language, prefer **Repository** for a local Git source and **Project 
 
 **Generate**:
 Use "generate a report draft" for local commit-to-report creation. Use "AI polishing" for optional rewriting so we do not imply that AI owns the source of truth.
+
+**Logs / diagnostics**:
+Use **Support Bundle** for the reviewed local export and **current-session application events** for its bounded event list. Do not imply that GitPulse persistently records user activity or uploads diagnostics in the background.
 
 ## Example Dialogue
 
