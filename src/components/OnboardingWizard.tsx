@@ -17,7 +17,7 @@ import type { AppSettings, RepoInfo } from "../model";
 type Props = {
   settings: AppSettings;
   repos: RepoInfo[];
-  isBusy: boolean;
+  isScanning: boolean;
   updateSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
   onAddRootDirs: () => void;
   onRemoveRootDir: (dir: string) => void;
@@ -30,7 +30,7 @@ const STEPS = [
   { title: "统计作者", desc: "可选单人、多人或全部" },
 ] as const;
 
-export function OnboardingWizard({ settings, repos, isBusy, updateSetting, onAddRootDirs, onRemoveRootDir, onComplete }: Props) {
+export function OnboardingWizard({ settings, repos, isScanning, updateSetting, onAddRootDirs, onRemoveRootDir, onComplete }: Props) {
   const [step, setStep] = useState(0);
 
   const rootReady = settings.rootDirs.length > 0;
@@ -65,7 +65,7 @@ export function OnboardingWizard({ settings, repos, isBusy, updateSetting, onAdd
               </li>
             ))}
           </ol>
-          <p className="onboarding-rail-note">所有数据仅保存在本机，可随时在设置中修改。</p>
+          <p className="onboarding-rail-note">数据仅存本机，可在设置中修改。</p>
         </aside>
 
         <div className="onboarding-pane" key={step}>
@@ -74,7 +74,7 @@ export function OnboardingWizard({ settings, repos, isBusy, updateSetting, onAdd
               icon={<Sparkles size={22} />}
               kicker="Welcome"
               title="三步开始生成工作报告"
-              subtitle="GitPulse 扫描本机 Git 仓库，按作者与日期提取提交，一键产出日报与绩效月报。"
+              subtitle="扫描本地 Git，按作者与日期生成工作报告。"
             >
               <ul className="onboarding-points">
                 <li><FolderGit2 size={16} />自动发现根目录下的全部 Git 仓库</li>
@@ -89,7 +89,7 @@ export function OnboardingWizard({ settings, repos, isBusy, updateSetting, onAdd
               icon={<FolderGit2 size={22} />}
               kicker="Step 1"
               title="选择仓库根目录"
-              subtitle="选择存放代码项目的文件夹，可添加多个分散在不同位置的目录，GitPulse 会扫描其中所有 Git 仓库。"
+              subtitle="选择代码目录，GitPulse 将扫描其中的 Git 仓库。"
             >
               {settings.rootDirs.length > 0 && (
                 <ul className="root-dir-list onboarding-dir-list">
@@ -112,25 +112,25 @@ export function OnboardingWizard({ settings, repos, isBusy, updateSetting, onAdd
                   {settings.rootDirs.length > 0 ? "继续添加目录" : "点击选择文件夹，例如 D:\\workspace"}
                 </span>
               </button>
-              {rootReady && isBusy && (
+              {rootReady && isScanning && (
                 <p className="onboarding-feedback">
                   <Loader2 className="spin" size={14} />
                   正在扫描仓库……
                 </p>
               )}
-              {rootReady && !isBusy && hasRepos && (
+              {rootReady && !isScanning && hasRepos && (
                 <p className="onboarding-feedback ok">
                   <Check size={14} />
                   已发现 {repos.length} 个 Git 仓库
                 </p>
               )}
-              {rootReady && !isBusy && !hasRepos && (
+              {rootReady && !isScanning && !hasRepos && (
                 <div className="onboarding-empty-workspace" role="status" aria-live="polite">
                   <div className="onboarding-empty-title">
                     <AlertCircle size={15} />
                     <strong>暂未发现 Git 仓库</strong>
                   </div>
-                  <p>请确认选择的是代码工作区，或包含多个项目的上层目录。</p>
+                  <p>请选择代码工作区或项目上层目录。</p>
                   <ul>
                     <li>目录本身或子目录需要包含 `.git`。</li>
                     <li>如果仓库在更深层目录，可继续添加那个上层目录。</li>
@@ -146,7 +146,7 @@ export function OnboardingWizard({ settings, repos, isBusy, updateSetting, onAdd
               icon={<UserRound size={22} />}
               kicker="Step 2"
               title="确认统计作者"
-              subtitle="默认读取本机 Git 作者；也可以留空统计全部作者，或用逗号分隔多个作者。"
+              subtitle="默认使用本机 Git 作者；留空统计全部作者。"
             >
               <label className="onboarding-author">
                 <span>Git 作者</span>

@@ -1,6 +1,7 @@
 import { CalendarDays, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getMonthRange, isValidMonthInput } from "../model";
+import { useModalDialog } from "../hooks/useOverlayFocus";
 import { Field } from "./Primitives";
 
 type Props = {
@@ -13,6 +14,7 @@ type Props = {
 
 export function MonthReportDialog({ open, initialMonth, isBusy, onClose, onConfirm }: Props) {
   const [month, setMonth] = useState(initialMonth);
+  const dialogRef = useModalDialog({ open, onClose });
 
   useEffect(() => {
     if (open) setMonth(initialMonth);
@@ -26,10 +28,12 @@ export function MonthReportDialog({ open, initialMonth, isBusy, onClose, onConfi
   return (
     <div className="dialog-backdrop compact-backdrop" role="presentation" onMouseDown={onClose}>
       <section
+        ref={dialogRef}
         className="range-dialog month-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="month-report-title"
+        tabIndex={-1}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="range-dialog-header">
@@ -45,6 +49,7 @@ export function MonthReportDialog({ open, initialMonth, isBusy, onClose, onConfi
         <div className="range-fields month-fields">
           <Field label="月份">
             <input
+              data-dialog-initial-focus
               type="month"
               value={month}
               onChange={(event) => setMonth(event.target.value)}

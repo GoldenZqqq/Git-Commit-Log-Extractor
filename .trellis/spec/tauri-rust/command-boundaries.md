@@ -9,6 +9,7 @@
 - `src-tauri/src/git_ops.rs`: Git command execution, repository discovery, author filtering, branch attribution, and scan progress.
 - `src-tauri/src/commit_pipeline.rs`: local report orchestration, commit collection, progress aggregation, AI fallback, and save decisions.
 - `src-tauri/src/report.rs`: report text rendering and document/file output.
+- `src-tauri/src/report_history.rs`: versioned report-history file storage, migration, backup recovery, and clear rollback.
 - `src-tauri/src/network.rs`: shared outbound HTTP client construction, app-level proxy support, proxy candidate scan, and proxy connection tests.
 - `src-tauri/src/ai.rs` and `codex_oauth.rs`: optional polishing/model integration.
 - `src-tauri/src/secure_store.rs`: OS-backed credential storage for secrets and login state.
@@ -20,12 +21,109 @@
 - Long-running Git/report tasks should use progress callbacks bridged to Tauri events.
 - A single invalid repository root should not break a whole scan when skipping is reasonable.
 - AI polishing failure should become a warning and preserve the local report draft/template.
+- Report-history commands follow [Report History Storage](./report-history-storage.md); `lib.rs` only resolves `app_data_dir`, dispatches blocking work, and registers commands.
 
 ## Payload Rules
 
 - Rust structs exposed to the frontend use `#[serde(rename_all = "camelCase")]`.
 - When adding a field, update Rust model defaults/serde behavior and frontend builders in `src/model.ts`.
 - Keep option names tied to product language: report period, author scope, project name mapping, evidence detail, export format.
+
+## Scenario: Cycle-Safe Repository Scan Results
+
+### 1. Scope / Trigger
+
+- Trigger: any Tauri or Rust path recursively discovers Git repositories from one or more user-selected roots.
+- Applies to `scan_repos`, `git_ops::find_git_repos_with_progress`, and the frontend `RepoScanResult` mirror.
+- The scanner may follow directory links, so loop prevention and partial-failure reporting are part of the command contract, not optional UI polish.
+
+### 2. Signatures
+
+```rust
+pub struct RepoScanResult {
+    pub repos: Vec<RepoInfo>,
+    pub warnings: Vec<String>,
+}
+
+pub fn find_git_repos_with_progress<F>(
+    root_dirs: &[String],
+    cancel_requested: &AtomicBool,
+    on_progress: F,
+) -> Result<RepoScanResult, String>
+where
+    F: FnMut(RepoScanProgress);
+
+async fn scan_repos(
+    app: AppHandle,
+    state: State<'_, RepoScanState>,
+    root_dirs: Vec<String>,
+) -> Result<RepoScanResult, String>;
+```
+
+TypeScript mirrors the camelCase response exactly:
+
+```ts
+type RepoScanResult = { repos: RepoInfo[]; warnings: string[] };
+```
+
+### 3. Contracts
+
+- One `RepoScanner` instance owns all roots in a scan and shares a canonical `HashSet<PathBuf>` across them.
+- A directory is canonicalized before progress counting, repository detection, or recursion. The same physical directory is visited at most once even through overlapping roots, symlinks, or Windows junctions.
+- Resolvable directory links are followed; file links are ignored; broken link targets become warnings.
+- Repository paths use canonical display paths, remain stably sorted, and are deduplicated before returning.
+- `RepoScanProgress` fields and the cancellation event remain compatible. The final progress event uses the returned repository count.
+- Warning output contains at most 49 unique details plus one omission summary. The collector must not retain an unbounded set after the detail cap.
+- React saves `result.repos` to the existing cache and shows `result.warnings`; warning data is not persisted in the repository cache by this contract.
+
+### 4. Validation & Error Matrix
+
+- Git executable missing/unusable -> return a hard Chinese `Err`; do not emit a successful result.
+- Cancellation flag set -> return `仓库扫描已取消`; `lib.rs` emits the existing cancelled progress event.
+- Root/child canonicalize failure -> append `规范化目录失败` warning and continue.
+- `read_dir` failure (including a file passed as a root) -> append `读取目录失败` warning and continue other roots.
+- Directory entry or file-type read failure -> append the matching operation warning and continue.
+- Broken symlink/junction target metadata -> append `读取链接目标失败` warning and continue.
+- Canonical identity already visited -> skip silently; this is normal deduplication, not a warning.
+- More than 49 unique path failures -> keep the first 49 details and add one `另有 N 个路径问题未逐条显示` summary.
+
+### 5. Good/Base/Bad Cases
+
+- Good: root A contains a repository and a link back to A; scanning returns the repository once, finishes with two or fewer visited directories, and reports no error.
+- Base: ordinary roots without links preserve the previous repository list, ordering, progress, and cache behavior.
+- Good partial failure: one missing root and one valid root return the valid repository plus a Chinese warning.
+- Bad: deduplicating repositories only after recursion; a directory loop may run until path-length or stack failure before the result is deduplicated.
+- Bad: storing every warning string in a `seen` set after the visible warning cap; the UI is bounded while memory remains unbounded.
+
+### 6. Tests Required
+
+- Rust tests for invalid roots, deterministic `read_dir` failure, broken directory links, warning dedupe/cap, overlapping roots, progress, and cancellation.
+- Unix symlink-cycle test and Windows conditional directory-symlink cycle test; the Windows test may return early only when the OS refuses link creation.
+- Playwright must assert a scan can update valid repositories while displaying returned warning detail and warning status.
+- Run `npm run build`, `npm run test:e2e`, `cargo check`, `cargo test`, and `cargo fmt -- --check` after changing this contract.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+if path.is_dir() {
+    visit_dir(&path)?; // Follows aliases before any physical-directory dedupe.
+}
+```
+
+#### Correct
+
+```rust
+let Some(canonical_dir) = self.canonicalize_dir(dir) else {
+    return Ok(());
+};
+if !self.visited_dirs.insert(canonical_dir.clone()) {
+    return Ok(());
+}
+self.scanned_dirs += 1;
+self.emit_current_progress(root_dir, &canonical_dir);
+```
 
 ## Scenario: App-Level Outbound Proxy
 
@@ -315,3 +413,243 @@ report::save_report_document(&options.output_dir, &file_name, &content, format)?
 - `splitGranularity = custom` creates one custom report period covering the full selected date range and reuses the existing custom report template.
 - Rust regression coverage must include group derivation, empty group rejection, grouped real-file output, custom-range splitting, and output totals.
 - Playwright must cover group selection, group-specific default templates, custom granularity, and the exact camelCase IPC payload.
+
+## Scenario: Period-Scoped Non-Git Supplemental Facts
+
+### 1. Scope / Trigger
+
+- Trigger: a daily, weekly, monthly, or custom report must include user-provided work facts that do not have a Git commit.
+- These facts belong to one report mode and date range. They are report content, not commit evidence, workspace settings, or batch-report defaults.
+
+### 2. Signatures
+
+- Frontend builders accept a final `supplementalItems: string[] = []` argument:
+  - `buildExtractOptions(...)`
+  - `buildMonthlyOptions(...)`
+  - `buildPeriodReportOptions(...)`
+- History: `ReportHistoryEntry.supplementalItems?: string[]`.
+- Rust request models expose `#[serde(default)] supplemental_items: Vec<String>` on `ExtractOptions`, `MonthlyReportOptions`, and `PeriodReportOptions`.
+- Rendering boundary: `report::append_supplemental_items(report_text, items, redaction) -> Result<String, String>`.
+
+### 3. Contracts
+
+- IPC uses camelCase `supplementalItems`; at most 20 non-empty items are accepted and each item may contain at most 200 Unicode characters.
+- The frontend draft key is `PreviewMode + startDate + endDate`; changing mode or period must not copy facts into another report.
+- Rust appends a standard `## 用户补充事项（非 Git）` section after template rendering and before optional AI enhancement. This ordering keeps local output and AI-failure fallback truthful.
+- Supplemental facts must not change commit count, project count, line statistics, evidence links, or repository grouping.
+- When report redaction is enabled, custom literal replacement rules also apply to the appended section.
+- Batch reports do not accept supplemental facts because one batch spans several independently attributable periods.
+- Missing history fields and missing IPC fields normalize to an empty list for backward compatibility.
+
+### 4. Validation & Error Matrix
+
+- Missing field or empty list -> preserve the previous report output byte-for-byte.
+- Blank lines/items -> trim and ignore them.
+- More than 20 normalized items -> `补充事项最多填写 20 项`.
+- Item longer than 200 Unicode characters -> `第 N 条补充事项不能超过 200 个字符`.
+- Old history without `supplementalItems` -> load the record and restore an empty draft.
+- Persisted `supplementalItems` containing non-string values -> reject it through the report-history type guard instead of casting raw JSON.
+
+### 5. Good/Base/Bad Cases
+
+- Good: a weekly report appends meeting and rollout-verification facts, sends the resulting report to AI with a fact-preservation instruction, and saves the original item array in history.
+- Base: no supplemental facts keeps existing templates, statistics, and exports unchanged.
+- Bad: add supplemental text to commit arrays or evidence sections; this inflates statistics and falsely presents user statements as Git evidence.
+- Bad: reuse one global draft across report modes or periods; facts then leak into the wrong report.
+
+### 6. Tests Required
+
+- Rust unit tests assert normalized rendering, redaction, item-count rejection, and character-limit rejection.
+- A period pipeline smoke test asserts the appended section while `commit_count` remains derived only from Git commits.
+- Playwright asserts all four report-mode payloads, preview/history round-trip, period isolation, AI fact instruction, invalid-input blocking, and draft clearing.
+- Run `npm run build`, `npm run test:e2e`, `cd src-tauri && cargo check`, and `cd src-tauri && cargo test`.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+commits.push(CommitRecord::from_user_note(item));
+```
+
+#### Correct
+
+```rust
+report_text = report::append_supplemental_items(
+    &report_text,
+    &options.supplemental_items,
+    &options.redaction,
+)?;
+report_text = apply_ai_to_period_report(
+    report_text,
+    &options,
+    &dates,
+    &report_author,
+    &mut warnings,
+);
+```
+
+## Scenario: On-Demand Workspace Health Inspection
+
+### 1. Scope / Trigger
+
+- Trigger: the workbench needs a transient health read model for configured roots and cached repositories.
+- The inspection is local and read-only: it may read path metadata, `.git` markers, and the current branch, but must not read commit history, mutate repositories, persist results, or call AI.
+
+### 2. Signatures
+
+```rust
+pub struct WorkspaceHealthOptions {
+    pub root_dirs: Vec<String>,
+    pub indexed_repos: Vec<RepoInfo>,
+    pub disabled_repos: Vec<String>,
+}
+
+pub struct WorkspaceHealthResult {
+    pub roots: Vec<WorkspaceRootHealth>,
+    pub repos: Vec<WorkspaceRepoHealth>,
+}
+
+async fn inspect_workspace_health(
+    options: WorkspaceHealthOptions,
+) -> Result<WorkspaceHealthResult, String>;
+
+pub(crate) fn repo_path_is_valid(repo: &RepoInfo) -> bool;
+```
+
+The command wrapper calls `workspace_health::inspect(options)` through `async_runtime::spawn_blocking`. TypeScript invokes `inspect_workspace_health` with `{ options: { rootDirs, indexedRepos, disabledRepos } }`.
+
+### 3. Contracts
+
+- IPC fields use camelCase; status enum values use snake_case.
+- Root status is `healthy | missing | inaccessible | not_directory`.
+- Repository status is `healthy | missing | inaccessible | not_git | branch_unknown | branch_changed`.
+- A `.git` directory or file is valid so ordinary repositories and Git worktrees share the same path contract.
+- `currentBranch` is empty when the branch cannot be read; `cachedBranch` always mirrors the indexed `RepoInfo.branch`.
+- `disabled` is derived from the current `disabledRepos` input. The command never changes settings.
+- `scannedAt` is excluded from this command. Repository cache time remains a frontend-owned scan timestamp, while health results remain in memory only.
+- Settings diagnostics must reuse `repo_path_is_valid` instead of defining a second `.git` validity rule.
+
+### 4. Validation & Error Matrix
+
+- Root metadata is a directory -> `healthy`.
+- Root metadata returns `NotFound` -> `missing`; another I/O error -> `inaccessible`; an existing non-directory -> `not_directory`.
+- Repository directory returns `NotFound` -> `missing`; another directory metadata error -> `inaccessible`; an existing non-directory -> `not_git`.
+- `.git` marker returns `NotFound` -> `not_git`; another marker metadata error -> `inaccessible`.
+- Current branch is empty or `unknown` -> `branch_unknown`; differs from cached branch -> `branch_changed`; otherwise -> `healthy`.
+- Per-item filesystem/Git failures become item statuses and details, not a whole-command failure.
+- Blocking task join failure -> command returns `检查工作区健康状态失败：<cause>`.
+
+### 5. Good/Base/Bad Cases
+
+- Good: one missing root and two valid repositories return all three rows, allowing the UI to repair only the affected index entry.
+- Base: empty inputs return empty root/repository arrays without reading Git or AI state.
+- Good: a worktree with `.git` as a file remains valid.
+- Bad: call recursive repository discovery or Git log extraction from the health command; inspection must stay bounded to configured inputs.
+- Bad: return only aggregate counts; repair actions require stable per-path rows.
+
+### 6. Tests Required
+
+- Rust tests cover healthy/missing/non-directory/inaccessible roots and healthy/missing/non-Git/branch-unknown/branch-changed repositories.
+- Assert disabled-state projection and `.git` file/directory compatibility through the shared validity helper.
+- Playwright asserts the exact camelCase payload and snake_case response statuses.
+- Run `npm run build`, `npm run test:e2e`, `cargo fmt -- --check`, `cargo check`, and `cargo test` after changing this contract.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+#[tauri::command]
+fn inspect_workspace_health(options: WorkspaceHealthOptions) -> WorkspaceHealthResult {
+    scan_and_read_all_commits(options.root_dirs)
+}
+```
+
+#### Correct
+
+```rust
+#[tauri::command]
+async fn inspect_workspace_health(
+    options: WorkspaceHealthOptions,
+) -> Result<WorkspaceHealthResult, String> {
+    async_runtime::spawn_blocking(move || workspace_health::inspect(options))
+        .await
+        .map_err(|err| format!("检查工作区健康状态失败：{err}"))
+}
+```
+
+## Scenario: Concrete Blank-Day Continuation Prompt
+
+### 1. Scope / Trigger
+
+- Trigger: changing `blank_day_system_prompt`, `blank_day_user_prompt`, or `DEFAULT_BLANK_DAY_USER_PROMPT` for the “空白日补写” workflow.
+- The feature predicts plausible next work from selected historical Git evidence. It remains an editable draft and must not claim the target day contains real commits.
+
+### 2. Signatures
+
+```rust
+fn blank_day_system_prompt() -> &'static str;
+
+fn blank_day_user_prompt(
+    base_evidence: &str,
+    target_date: &str,
+    source_start_date: &str,
+    source_end_date: &str,
+    author: &str,
+    item_count: u32,
+    user_prompt: &str,
+) -> String;
+```
+
+```ts
+export const DEFAULT_BLANK_DAY_USER_PROMPT: string;
+```
+
+### 3. Contracts
+
+- Rust system prompt and the visible frontend default must share the same concrete-work policy. “恢复默认” and the initial textarea value use the frontend constant; an empty custom input still remains under the Rust system constraint.
+- Every generated item must identify a concrete anchor found in the supplied history: an existing feature, interface, data flow, page, script, test, exceptional path, or technical object.
+- Preferred continuations are code-level actions: extend an existing branch of behavior, repair a plausible defect/regression, add exceptional/boundary/compatibility handling, strengthen tests/verification, or connect interfaces/data flows already present in history.
+- “跟进 / 排查 / 推进 / 联调 / 整理” cannot be the whole item. If used, the item must also state the concrete object, problem pattern, and intended action.
+- A potential defect is phrased as a proposed protection/fix. The prompt must not assert that an unobserved fault occurred or was fixed.
+- Multiple items should use different history anchors or actions rather than paraphrasing one generic sentence.
+- Existing rules remain: exactly N short list items, preserve mapped/repository prefixes, do not invent new modules, release/acceptance/business results, percentages, or target-day commits.
+
+### 4. Validation & Error Matrix
+
+- Empty historical evidence -> pipeline returns `素材周期内没有可用的提交线索` before AI invocation.
+- Empty user prompt -> user instruction displays `无额外要求`; system and generated wrapper still enforce concrete anchors.
+- Custom user prompt requests generic progress language -> it may refine tone/content but cannot remove the Rust system safety and anchor requirements.
+- Historical line has a project prefix -> every output item preserves the same prefix style.
+- Requested item count outside 1..=8 -> pipeline clamps it to the supported range before prompt construction.
+- Potential defect lacks historical object -> reject it at prompt level; do not introduce a post-generation fabricated classifier in this contract.
+
+### 5. Good / Base / Bad Cases
+
+- Good: `报告历史加载空值兼容` -> `补充报告历史加载的空数组回退测试，覆盖文件为空时的恢复路径`.
+- Good: `设置页代理保存` -> `为代理密码保存失败补充错误提示和安全存储回滚处理`.
+- Base: retain a mapped prefix and propose one specific extension from that project's commit message.
+- Bad: `跟进相关功能`、`排查现有问题`、`持续推进联调`、`整理代码逻辑`.
+- Bad: claim `已修复线上崩溃` when no historical evidence says a crash occurred.
+
+### 6. Tests Required
+
+- Rust unit test asserts both prompt layers contain concrete anchor, feature extension, defect/regression, test strengthening, and generic-language rejection markers; retain item-count/evidence/prefix assertions.
+- Frontend smoke asserts the visible default contains the same markers and no longer contains the old “偏跟进/排查/推进/整理” preference.
+- Playwright opens the blank-day dialog, verifies the visible default, edits it, clicks “恢复默认”, and verifies the new text returns.
+- Run full `cargo test`, `npm run build`, frontend smoke, and full Playwright before a release/checkpoint push.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```text
+优先使用跟进、排查、推进、联调、整理等进行中表述。
+```
+
+#### Correct
+
+```text
+每条必须从历史线索提取具体锚点，并写明功能延伸、缺陷/回归修复、边界兼容或测试补强等代码级动作；不得只写过程性表态。
+```

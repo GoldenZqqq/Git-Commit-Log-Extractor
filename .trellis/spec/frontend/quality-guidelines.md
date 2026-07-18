@@ -35,6 +35,8 @@ Frontend changes should preserve a reliable local desktop workflow: scan reposit
 - Run `npm run build` for TypeScript/build verification after frontend changes.
 - Run targeted Playwright tests when changing onboarding, workbench generation controls, report history, settings, or export UX.
 - For release-impacting changes, follow `CONTRIBUTING.md`: `npm run build`, `npm run test:e2e`, `cd src-tauri && cargo check && cargo test`.
+- Dialog and menu changes require Playwright focus assertions for entry, Tab/Escape, keyboard navigation, and trigger restoration. Scan the changed overlay with `@axe-core/playwright` and fail on `serious` or `critical` violations.
+- Axe scans must target the changed overlay when unrelated legacy surfaces are outside task scope. Do not disable the `color-contrast` rule to force a pass; fix contrast tokens or component colors found inside the target.
 
 ---
 
@@ -58,3 +60,11 @@ On Windows, Tauri uses WebView2 (Chromium). Native form controls (`<input type="
 - Are status messages, validation errors, and labels clear in Chinese?
 - Does the UI remain usable in both light and dark themes?
 - Are secrets stored only through secure storage or safe environment-variable references?
+
+## Responsive Layout Contract
+
+- `body` supports down to 320 CSS pixels; never restore a desktop-wide `min-width` that makes the document horizontally scroll at the target viewport.
+- Keep the fixed-height two-column workbench at normal desktop widths. At or below the existing 1040px content breakpoint, switch the root to natural height and document vertical scrolling so the report, assist rail, and health/insights surfaces remain reachable.
+- At or below 720px, stack report controls and allow action groups/popovers to wrap within `calc(100vw - local padding)`. Do not use horizontal scrolling to reveal generation, settings, copy, or export actions.
+- Shared dialogs use `max-height: calc(100dvh - local padding)` and `overflow-y: auto`; narrow/small-height variants keep the header and close control sticky or outside the scrolling content.
+- Responsive Playwright coverage must include `320×900`, `640×450` (200% equivalent CSS viewport), and `1280×480`, checking document/card `scrollWidth`, key bounding boxes, dialog bounds, and screenshot artifacts.

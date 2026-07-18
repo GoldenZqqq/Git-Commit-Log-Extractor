@@ -23,23 +23,42 @@ type ReportHistoryEntry = {
   aiEnhanced: boolean;
   outputFile: string;
   reportText: string;
+  supplementalItems?: string[];
+  projects?: ReportHistoryProject[];
+};
+
+type ReportHistoryProject = {
+  name: string;
+  commitCount: number;
+  evidenceIds: string[];
 };
 
 type MockScenario = {
   settings?: Record<string, unknown>;
   repoCache?: { rootDirs: string[]; repos: RepoInfo[]; scannedAt: string };
   reportHistory?: ReportHistoryEntry[];
+  legacyReportHistoryRaw?: string;
+  storedReportHistory?: ReportHistoryEntry[];
+  reportHistoryLoadError?: string;
+  reportHistoryLoadWarning?: string;
+  reportHistoryRecoveredFromBackup?: boolean;
+  reportHistorySaveError?: string;
+  reportHistoryClearError?: string;
   dialogResponses?: unknown[];
   appVersion?: string;
   gitIdentity?: { userName: string; userEmail: string };
   secureApiKey?: string | null;
+  codexAuthStatus?: { authenticated: boolean; email?: string };
   scanRepos?: RepoInfo[];
+  scanWarnings?: string[];
+  workspaceHealthResult?: Record<string, unknown>;
   extractResults?: Array<{
     repos?: RepoInfo[];
     summaryText: string;
     detailedText?: string;
     warnings?: string[];
     commits: unknown[];
+    projects?: ReportHistoryProject[];
   }>;
   periodResults?: {
     weekly?: Record<string, unknown>;
@@ -47,8 +66,12 @@ type MockScenario = {
   };
   diagnosticsResult?: Record<string, unknown>;
   batchResult?: Record<string, unknown>;
+  enhanceResult?: Record<string, unknown>;
+  aiModels?: Array<{ id: string; ownedBy?: string }>;
+  deferredCommands?: string[];
   updateMetadata?: Record<string, unknown> | null;
   outputDir?: string;
+  textFiles?: Record<string, string>;
 };
 
 export function createSettings(overrides: Record<string, unknown> = {}) {
@@ -126,6 +149,8 @@ export function createHistoryEntry(
     aiEnhanced: overrides.aiEnhanced ?? false,
     outputFile: overrides.outputFile ?? "",
     reportText: overrides.reportText,
+    supplementalItems: overrides.supplementalItems,
+    projects: overrides.projects,
   };
 }
 
@@ -134,6 +159,13 @@ export async function launchApp(page: Page, scenario: MockScenario) {
     settings: scenario.settings,
     repoCache: scenario.repoCache,
     reportHistory: scenario.reportHistory,
+    legacyReportHistoryRaw: scenario.legacyReportHistoryRaw,
+    storedReportHistory: scenario.storedReportHistory,
+    reportHistoryLoadError: scenario.reportHistoryLoadError,
+    reportHistoryLoadWarning: scenario.reportHistoryLoadWarning,
+    reportHistoryRecoveredFromBackup: scenario.reportHistoryRecoveredFromBackup ?? false,
+    reportHistorySaveError: scenario.reportHistorySaveError,
+    reportHistoryClearError: scenario.reportHistoryClearError,
     dialogResponses: [...(scenario.dialogResponses ?? [])],
     appVersion: scenario.appVersion ?? "0.3.7-test",
     gitIdentity: scenario.gitIdentity ?? {
@@ -141,7 +173,10 @@ export async function launchApp(page: Page, scenario: MockScenario) {
       userEmail: "playwright@example.com",
     },
     secureApiKey: scenario.secureApiKey ?? null,
+    codexAuthStatus: scenario.codexAuthStatus ?? { authenticated: false },
     scanRepos: scenario.scanRepos ?? scenario.repoCache?.repos ?? [],
+    scanWarnings: scenario.scanWarnings ?? [],
+    workspaceHealthResult: scenario.workspaceHealthResult ?? { roots: [], repos: [] },
     extractResults: scenario.extractResults ?? [],
     periodResults: scenario.periodResults ?? {},
     diagnosticsResult: scenario.diagnosticsResult ?? {
@@ -151,8 +186,12 @@ export async function launchApp(page: Page, scenario: MockScenario) {
       errorCount: 0,
     },
     batchResult: scenario.batchResult ?? null,
+    enhanceResult: scenario.enhanceResult ?? null,
+    aiModels: scenario.aiModels ?? [],
+    deferredCommands: scenario.deferredCommands ?? [],
     updateMetadata: scenario.updateMetadata ?? null,
     outputDir: scenario.outputDir ?? "C:/exports",
+    textFiles: { ...(scenario.textFiles ?? {}) },
   };
 
   await page.addInitScript(
@@ -163,12 +202,27 @@ export async function launchApp(page: Page, scenario: MockScenario) {
 
       const dialogResponses = [...(state.dialogResponses ?? [])];
       const extractResults = [...(state.extractResults ?? [])];
+      const deferredCommands = new Set(state.deferredCommands ?? []);
+      const deferredResolvers = new Map();
+      const releasedCommands = new Set();
       const mockState = {
         ...state,
         dialogResponses,
         extractResults,
+        reportHistoryStore: [...(state.storedReportHistory ?? [])],
+        reportHistoryStoreExists: state.storedReportHistory !== undefined,
+        textFiles: { ...(state.textFiles ?? {}) },
         calls: [],
         clipboard: "",
+        releaseCommand(cmd) {
+          const resolvers = deferredResolvers.get(cmd);
+          const resolve = resolvers?.shift();
+          if (resolve) {
+            resolve();
+          } else {
+            releasedCommands.add(cmd);
+          }
+        },
       };
 
       const mediaQueryFallback = {
@@ -207,7 +261,9 @@ export async function launchApp(page: Page, scenario: MockScenario) {
       if (state.repoCache) {
         window.localStorage.setItem(repoIndexCacheKey, JSON.stringify(state.repoCache));
       }
-      if (state.reportHistory) {
+      if (state.legacyReportHistoryRaw !== undefined) {
+        window.localStorage.setItem(reportHistoryKey, state.legacyReportHistoryRaw);
+      } else if (state.reportHistory) {
         window.localStorage.setItem(reportHistoryKey, JSON.stringify(state.reportHistory));
       }
 
@@ -216,14 +272,40 @@ export async function launchApp(page: Page, scenario: MockScenario) {
       }
 
       function nextExtractResult() {
-        if (extractResults.length > 0) return extractResults.shift();
-        return {
+        const result = extractResults.length > 0 ? extractResults.shift() : {
           repos: state.scanRepos ?? [],
           summaryText: "",
           detailedText: "",
           warnings: [],
           commits: [],
         };
+        const commits = result?.commits ?? [];
+        return {
+          repos: result?.repos ?? state.scanRepos ?? [],
+          summaryText: result?.summaryText ?? "",
+          detailedText: result?.detailedText ?? "",
+          warnings: result?.warnings ?? [],
+          commits,
+          projects: result?.projects ?? projectsFromCommits(commits),
+        };
+      }
+
+      function projectsFromCommits(commits) {
+        const groups = new Map();
+        for (const commit of commits) {
+          if (!commit?.projectName || !commit?.branchName) continue;
+          const name = `${commit.projectName}(${commit.branchName})`;
+          const project = groups.get(name) ?? { name, commitCount: 0, evidenceIds: [] };
+          project.commitCount += 1;
+          const evidenceId = String(commit.hash ?? "").startsWith("commit-")
+            ? String(commit.hash)
+            : String(commit.hash ?? "").slice(0, 7);
+          if (evidenceId && !project.evidenceIds.includes(evidenceId) && project.evidenceIds.length < 20) {
+            project.evidenceIds.push(evidenceId);
+          }
+          groups.set(name, project);
+        }
+        return [...groups.values()].sort((left, right) => left.name.localeCompare(right.name));
       }
 
       function resolvePeriodResult(kind) {
@@ -237,6 +319,7 @@ export async function launchApp(page: Page, scenario: MockScenario) {
           reportKind: kind,
           projectCount: 1,
           commitCount: 0,
+          projects: [],
         };
         return { ...fallback, ...(state.periodResults?.[kind] ?? {}) };
       }
@@ -244,6 +327,25 @@ export async function launchApp(page: Page, scenario: MockScenario) {
       function saveReportFile(args) {
         const extension = args.format === "markdown" ? "md" : args.format;
         return `${state.outputDir ?? "C:/exports"}/${args.baseName}.${extension}`;
+      }
+
+      function normalizeHistory(entries, limit) {
+        const maxEntries = [30, 60, 120, 200].includes(limit) ? limit : 120;
+        const ids = new Set();
+        return (entries ?? []).filter((entry) => {
+          if (!entry?.id || ids.has(entry.id)) return false;
+          ids.add(entry.id);
+          return true;
+        }).slice(0, maxEntries);
+      }
+
+      function waitForCommandRelease(cmd) {
+        if (!deferredCommands.has(cmd) || releasedCommands.delete(cmd)) return Promise.resolve();
+        return new Promise((resolve) => {
+          const resolvers = deferredResolvers.get(cmd) ?? [];
+          resolvers.push(resolve);
+          deferredResolvers.set(cmd, resolvers);
+        });
       }
 
       function registerCallback(callback, once = false) {
@@ -279,6 +381,7 @@ export async function launchApp(page: Page, scenario: MockScenario) {
         },
         async invoke(cmd, args = {}) {
           mockState.calls.push({ cmd, args });
+          await waitForCommandRelease(cmd);
 
           switch (cmd) {
             case "plugin:app|version":
@@ -304,20 +407,59 @@ export async function launchApp(page: Page, scenario: MockScenario) {
             case "write_mapping_template_xlsx":
             case "codex_oauth_logout":
               return null;
+            case "read_text_file": {
+              const content = mockState.textFiles[args.path];
+              if (typeof content !== "string") throw new Error("读取配置方案失败：文件不存在");
+              return content;
+            }
+            case "write_text_file":
+              mockState.textFiles[args.path] = String(args.content ?? "");
+              return null;
             case "codex_oauth_status":
-              return { authenticated: false };
+              return state.codexAuthStatus;
             case "list_ai_models":
-              return [];
+              return state.aiModels;
             case "get_git_identity":
               return state.gitIdentity;
             case "scan_repos":
-              return state.scanRepos ?? [];
+              return {
+                repos: state.scanRepos ?? [],
+                warnings: state.scanWarnings ?? [],
+              };
+            case "inspect_workspace_health":
+              return state.workspaceHealthResult;
+            case "load_report_history": {
+              if (state.reportHistoryLoadError) throw new Error(state.reportHistoryLoadError);
+              const hasLegacy = Array.isArray(args.legacyEntries);
+              if (!mockState.reportHistoryStoreExists && hasLegacy) {
+                mockState.reportHistoryStore = normalizeHistory(args.legacyEntries, args.limit);
+                mockState.reportHistoryStoreExists = true;
+              }
+              return {
+                entries: [...mockState.reportHistoryStore],
+                migrationComplete: hasLegacy && mockState.reportHistoryStoreExists,
+                recoveredFromBackup: state.reportHistoryRecoveredFromBackup,
+                warning: state.reportHistoryLoadWarning ?? null,
+              };
+            }
+            case "save_report_history":
+              if (state.reportHistorySaveError) throw new Error(state.reportHistorySaveError);
+              mockState.reportHistoryStore = normalizeHistory(args.entries, args.limit);
+              mockState.reportHistoryStoreExists = true;
+              return [...mockState.reportHistoryStore];
+            case "clear_report_history":
+              if (state.reportHistoryClearError) throw new Error(state.reportHistoryClearError);
+              mockState.reportHistoryStore = [];
+              mockState.reportHistoryStoreExists = true;
+              return null;
             case "extract_commits":
               return nextExtractResult();
             case "generate_period_report":
               return resolvePeriodResult(args.options?.reportKind);
             case "batch_generate_reports":
               return state.batchResult;
+            case "enhance_report":
+              return state.enhanceResult ?? { reportText: args.options?.baseReport ?? "", warnings: [] };
             case "run_diagnostics":
               return state.diagnosticsResult;
             case "save_report_file":

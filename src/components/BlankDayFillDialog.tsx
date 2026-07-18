@@ -24,6 +24,7 @@ import {
   validateAiSettings,
   validateExtractSettings,
 } from "../model";
+import { useModalDialog } from "../hooks/useOverlayFocus";
 import { Field } from "./Primitives";
 
 type Props = {
@@ -72,8 +73,12 @@ export function BlankDayFillDialog({
   const [error, setError] = useState("");
   const [draftText, setDraftText] = useState("");
   const [stage, setStage] = useState<Stage>("config");
+  const dialogRef = useModalDialog({ open, onClose, closeEnabled: !generating });
 
-  const repoTags = useMemo(() => collectBlankDayRepoTags(sourceCommits), [sourceCommits]);
+  const repoTags = useMemo(
+    () => collectBlankDayRepoTags(sourceCommits, projectNames),
+    [sourceCommits, projectNames],
+  );
   const rangeInvalid = Boolean(sourceRange.startDate && sourceRange.endDate && sourceRange.startDate > sourceRange.endDate);
   const canGenerate =
     aiConfigured &&
@@ -116,7 +121,7 @@ export function BlankDayFillDialog({
         ]);
         if (cancelled) return;
         setSourceCommits(sourceResult.commits);
-        const tags = collectBlankDayRepoTags(sourceResult.commits);
+        const tags = collectBlankDayRepoTags(sourceResult.commits, projectNames);
         setSelectedRepoPaths(tags.map((tag) => tag.path));
         setTargetHasCommits(targetResult.commits.length > 0);
         if (sourceResult.commits.length === 0) {
@@ -168,7 +173,12 @@ export function BlankDayFillDialog({
       return;
     }
 
-    const evidence = buildBlankDayEvidenceText(sourceCommits, selectedRepoPaths);
+    const evidence = buildBlankDayEvidenceText(
+      sourceCommits,
+      selectedRepoPaths,
+      projectNames,
+      settings.commitItemPrefixMode,
+    );
     if (!evidence.trim()) {
       setError("当前勾选仓库在素材周期内没有提交线索。");
       return;
@@ -215,17 +225,19 @@ export function BlankDayFillDialog({
   return (
     <div className="dialog-backdrop compact-backdrop" role="presentation" onMouseDown={() => !generating && onClose()}>
       <section
+        ref={dialogRef}
         className="range-dialog blank-day-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="blank-day-dialog-title"
+        tabIndex={-1}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="range-dialog-header">
           <div>
             <p className="kicker">Blank Day Fill</p>
             <h2 id="blank-day-dialog-title">空白日补写</h2>
-            <p className="blank-day-subtitle">基于历史提交线索生成延续草稿，生成后请核对再使用</p>
+            <p className="blank-day-subtitle">参考历史提交生成草稿，请核对后使用</p>
           </div>
           <button className="icon-button" type="button" onClick={onClose} disabled={generating} aria-label="关闭空白日补写">
             <X size={18} />
@@ -246,7 +258,12 @@ export function BlankDayFillDialog({
           <>
             <div className="range-fields">
               <Field label="目标日">
-                <input type="date" value={targetDate} onChange={(event) => setTargetDate(event.target.value)} />
+                <input
+                  data-dialog-initial-focus
+                  type="date"
+                  value={targetDate}
+                  onChange={(event) => setTargetDate(event.target.value)}
+                />
               </Field>
               <Field label="生成条数">
                 <select

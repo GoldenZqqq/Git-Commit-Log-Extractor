@@ -1,7 +1,7 @@
 :root {
   --ink: #182334;
   --ink-soft: #526174;
-  --muted: #8190a3;
+  --muted: #5f6f85;
   --line: #dce6f0;
   --line-strong: #c8d8e8;
   --paper: #ffffff;
@@ -46,7 +46,7 @@
 
 body {
   margin: 0;
-  min-width: 980px;
+  min-width: 320px;
   height: 100vh;
   overflow: hidden;
   background:

@@ -10,7 +10,15 @@ import { RepoMappingDialog } from "./components/RepoMappingDialog";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { Workbench } from "./components/Workbench";
+import type { ConfigProfileSettings } from "./configProfile";
 import { useAppRuntime } from "./hooks/useAppRuntime";
+import { useReportHistoryStorage } from "./hooks/useReportHistoryStorage";
+import { useWorkspaceHealth } from "./hooks/useWorkspaceHealth";
+import {
+  taskIsActive,
+  type AppTaskKind,
+  useTaskActivity,
+} from "./hooks/useTaskActivity";
 import {
   type AppSettings,
   type CommitExtractProgress,
@@ -23,17 +31,18 @@ import {
   type ReportExportFormat,
   type PreviewMode,
   type ReportHistoryEntry,
+  type ReportHistoryProject,
+  type ReportPolishReview,
   type RepoInfo,
   type RepoScanProgress,
+  type RepoScanResult,
   type MappingScope,
   STORAGE_KEY,
   buildExtractOptions,
   buildPeriodReportOptions,
   buildReportEnhanceOptions,
-  clearReportHistory,
   clearRepoIndexCache,
   isBlankDayHistoryEntry,
-  countCommitProjects,
   formatMonthLabel,
   getMonthRange,
   getPreviousMonthInput,
@@ -43,16 +52,13 @@ import {
   getWeekLabel,
   getWeekRange,
   isAiKeyReference,
-  loadReportHistory,
   loadRepoIndexCache,
   normalizeReportHistoryLimit,
   loadSettingsState,
   parseProjectNames,
-  rememberReportHistoryEntry,
-  saveReportHistory,
+  persistRepoIndexCache,
   saveRepoIndexCache,
   settingsForPersistence,
-  updateReportHistoryEntry,
   upsertRepoMapping,
   validateAiConnectionSettings,
   validateExtractSettings,
@@ -61,6 +67,13 @@ import {
   validateRequiredSettings,
   validateWorkspaceSettings,
 } from "./model";
+import {
+  buildSupplementalDraftKey,
+  formatSupplementalItemsText,
+  parseSupplementalItems,
+  supplementalItemsFromHistory,
+  validateSupplementalItems,
+} from "./supplementalItems";
 import "./styles/tokens.css";
 import "./styles/layout.css";
 import "./styles/components.css";
@@ -69,10 +82,33 @@ import "./styles/dialogs.css";
 import "./styles/onboarding.css";
 import "./styles/theme.css";
 
+type RunTaskInput = {
+  kind: AppTaskKind;
+  label: string;
+  task: () => Promise<void>;
+  validate?: () => void;
+  allowDuringPolishReview?: boolean;
+};
+
+type HistoryEntryInput = {
+  mode: PreviewMode;
+  range: DateRange;
+  periodLabel: string;
+  reportText: string;
+  commitCount: number;
+  projectCount: number;
+  aiEnhanced: boolean;
+  outputFile?: string;
+  supplementalItems?: string[];
+  projects?: ReportHistoryProject[];
+};
+
 function App() {
   const [loadedSettings] = useState<LoadedSettingsState>(loadSettingsState);
   const [settings, setSettings] = useState<AppSettings>(loadedSettings.settings);
-  const [repos, setRepos] = useState<RepoInfo[]>(() => loadRepoIndexCache(loadedSettings.settings.rootDirs)?.repos ?? []);
+  const [initialRepoCache] = useState(() => loadRepoIndexCache(loadedSettings.settings.rootDirs));
+  const [repos, setRepos] = useState<RepoInfo[]>(() => initialRepoCache?.repos ?? []);
+  const [repoScannedAt, setRepoScannedAt] = useState(() => initialRepoCache?.scannedAt ?? "");
   const [summaryText, setSummaryText] = useState("");
   const [dailyDate, setDailyDate] = useState(getToday);
   const [customReport, setCustomReport] = useState("");
@@ -82,9 +118,19 @@ function App() {
   const [monthlyReport, setMonthlyReport] = useState("");
   const [monthlyMonth, setMonthlyMonth] = useState(getPreviousMonthInput);
   const [monthlyLabel, setMonthlyLabel] = useState("");
-  const [reportHistory, setReportHistory] = useState<ReportHistoryEntry[]>(() => loadReportHistory(loadedSettings.settings.reportHistoryLimit));
+  const [warnings, setWarnings] = useState<string[]>([]);
+  const reportHistoryStorage = useReportHistoryStorage(
+    loadedSettings.settings.reportHistoryLimit,
+    (message) => {
+      setWarnings((current) => current.includes(message) ? current : [message, ...current]);
+      setStatus(message, { tone: "warning", notify: true, duration: 0 });
+    },
+  );
+  const reportHistory = reportHistoryStorage.entries;
+  const [supplementalDrafts, setSupplementalDrafts] = useState<Record<string, string>>({});
   const [activeHistoryId, setActiveHistoryId] = useState("");
   const [activePreview, setActivePreview] = useState<PreviewMode>("summary");
+  const [polishReview, setPolishReview] = useState<ReportPolishReview | null>(null);
   const [status, setStatusText] = useState(
     loadedSettings.recoveredCorruptedSettings
       ? "本地设置损坏，已恢复默认配置"
@@ -93,9 +139,13 @@ function App() {
         : "就绪",
   );
   const [appMessage, setAppMessage] = useState<AppMessage | null>(null);
-  const [warnings, setWarnings] = useState<string[]>([]);
-  const [isBusy, setIsBusy] = useState(false);
-  const [isRepoScanning, setIsRepoScanning] = useState(false);
+  const workspaceHealth = useWorkspaceHealth({
+    rootDirs: settings.rootDirs,
+    indexedRepos: repos,
+    disabledRepos: settings.disabledRepos,
+  });
+  const { activeTasks, tryStartTask, finishTask } = useTaskActivity();
+  const isRepoScanning = taskIsActive(activeTasks, "scan");
   const [scanProgress, setScanProgress] = useState<RepoScanProgress | null>(null);
   const [extractProgress, setExtractProgress] = useState<CommitExtractProgress | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -125,6 +175,9 @@ function App() {
   const weeklyRange = useMemo(() => getWeekRange(weeklyWeek), [weeklyWeek]);
   const monthlyRange = useMemo(() => getMonthRange(monthlyMonth), [monthlyMonth]);
   const previewText = activePreview === "monthly" ? monthlyReport : activePreview === "weekly" ? weeklyReport : activePreview === "custom" ? customReport : summaryText;
+  const currentReportRange = activePreviewRange(activePreview, dailyRange, weeklyRange, monthlyRange, customRange);
+  const currentSupplementalDraftKey = buildSupplementalDraftKey(activePreview, currentReportRange);
+  const supplementalItemsText = supplementalDrafts[currentSupplementalDraftKey] ?? "";
   const aiConfigured =
     settings.aiProvider === "codex-oauth"
       ? Boolean(settings.aiModel.trim())
@@ -261,6 +314,7 @@ function App() {
   useEffect(() => {
     if (settings.rootDirs.length === 0) {
       setRepos([]);
+      setRepoScannedAt("");
       clearRepoIndexCache();
       return;
     }
@@ -268,11 +322,13 @@ function App() {
     const repoCache = loadRepoIndexCache(settings.rootDirs);
     if (repoCache) {
       setRepos(repoCache.repos);
+      setRepoScannedAt(repoCache.scannedAt);
       setStatus(`已载入 ${repoCache.repos.length} 个缓存仓库索引`);
       return;
     }
 
     setRepos([]);
+    setRepoScannedAt("");
     if (settings.onboardingDone) {
       setStatus("工作目录已更新，请点击重新扫描仓库索引");
       return;
@@ -314,32 +370,39 @@ function App() {
   }
 
   async function scanWorkspace() {
-    setIsRepoScanning(true);
-    setScanProgress({
-      rootDir: "",
-      currentPath: "",
-      scannedDirs: 0,
-      foundRepos: 0,
-      done: false,
-      cancelled: false,
-    });
-    try {
-      await runTask("正在扫描仓库", async () => {
-        const result = await invoke<RepoInfo[]>("scan_repos", { rootDirs: settings.rootDirs });
-        updateRepoIndex(result);
+    await runTask({
+      kind: "scan",
+      label: "正在扫描仓库",
+      task: async () => {
+        setScanProgress({
+          rootDir: "",
+          currentPath: "",
+          scannedDirs: 0,
+          foundRepos: 0,
+          done: false,
+          cancelled: false,
+        });
+        const result = await invoke<RepoScanResult>("scan_repos", { rootDirs: settings.rootDirs });
+        updateRepoIndex(result.repos);
+        setWarnings(result.warnings);
         setScanProgress((current) => ({
           rootDir: current?.rootDir ?? "",
           currentPath: current?.currentPath ?? "",
           scannedDirs: current?.scannedDirs ?? 0,
-          foundRepos: result.length,
+          foundRepos: result.repos.length,
           done: true,
           cancelled: false,
         }));
-        setStatus(`已发现 ${result.length} 个仓库`);
-      }, () => validateWorkspaceSettings(settings));
-    } finally {
-      setIsRepoScanning(false);
-    }
+        setStatus(
+          result.warnings.length > 0
+            ? `已发现 ${result.repos.length} 个仓库，部分路径已跳过`
+            : `已发现 ${result.repos.length} 个仓库`,
+          result.warnings.length > 0 ? { tone: "warning", notify: true, duration: 4200 } : undefined,
+        );
+        workspaceHealth.refreshIfLoaded(result.repos);
+      },
+      validate: () => validateWorkspaceSettings(settings),
+    });
   }
 
   async function cancelRepoScan() {
@@ -372,39 +435,42 @@ function App() {
     setActiveHistoryId("");
   }
 
+  function changeSupplementalItems(value: string) {
+    setSupplementalDrafts((current) => ({ ...current, [currentSupplementalDraftKey]: value }));
+  }
+
+  function supplementalItemsFor(mode: PreviewMode, range: DateRange, override?: string[]) {
+    if (override) return validateSupplementalItems(override);
+    const key = buildSupplementalDraftKey(mode, range);
+    return parseSupplementalItems(supplementalDrafts[key] ?? "");
+  }
+
   function rememberHistory(entry: ReportHistoryEntry) {
-    setReportHistory((current) => rememberReportHistoryEntry(current, entry, settings.reportHistoryLimit));
+    reportHistoryStorage.remember(entry);
     setActiveHistoryId(entry.id);
   }
 
   function updateActiveHistory(patch: Partial<Pick<ReportHistoryEntry, "outputFile" | "reportText" | "commitCount" | "generatedAt">>) {
     if (!activeHistoryId) return;
-    setReportHistory((current) => updateReportHistoryEntry(current, activeHistoryId, patch, settings.reportHistoryLimit));
+    reportHistoryStorage.update(activeHistoryId, patch);
   }
 
-  function buildHistoryEntry(
-    mode: PreviewMode,
-    range: DateRange,
-    periodLabel: string,
-    reportText: string,
-    commitTotal: number,
-    projectTotal: number,
-    aiEnhanced: boolean,
-    outputFile = "",
-  ): ReportHistoryEntry {
+  function buildHistoryEntry(input: HistoryEntryInput): ReportHistoryEntry {
     return {
       id: createHistoryId(),
-      mode,
-      title: formatHistoryTitle(mode, periodLabel, range),
-      range,
-      periodLabel,
+      mode: input.mode,
+      title: formatHistoryTitle(input.mode, input.periodLabel, input.range),
+      range: input.range,
+      periodLabel: input.periodLabel,
       generatedAt: new Date().toISOString(),
       repoCount: getEnabledRepoCount(),
-      projectCount: projectTotal,
-      commitCount: commitTotal,
-      aiEnhanced,
-      outputFile,
-      reportText,
+      projectCount: input.projectCount,
+      commitCount: input.commitCount,
+      aiEnhanced: input.aiEnhanced,
+      outputFile: input.outputFile ?? "",
+      reportText: input.reportText,
+      supplementalItems: input.supplementalItems ?? [],
+      projects: input.projects,
     };
   }
 
@@ -412,91 +478,169 @@ function App() {
     return repos.filter((repo) => !settings.disabledRepos.includes(repo.path)).length;
   }
 
-  async function extractCommits(dateValue = dailyDate) {
+  async function extractCommits(dateValue = dailyDate, supplementalOverride?: string[]) {
     const range = getSingleDayRange(dateValue);
     setExtractProgress(null);
-    await runTask("正在提取提交记录", async () => {
-      const result = await invoke<ExtractResult>("extract_commits", {
-        options: buildExtractOptions(settings, projectNames, range, false, "", repos),
-      });
-      const reportText = result.detailedText || result.summaryText;
-      const projectTotal = countCommitProjects(result.commits, projectNames);
-      setDailyDate(dateValue);
-      setSummaryText(reportText);
-      setWarnings(result.warnings);
-      setLastOutputFile("");
-      setCommitCount(result.commits.length);
-      setProjectCount(projectTotal);
-      setBlankDayDraftActive(false);
-      setActivePreview("summary");
-      rememberHistory(buildHistoryEntry("summary", range, dateValue, reportText, result.commits.length, projectTotal, false));
-      setStatus(`${dateValue} 日报已生成`);
-    }, () => validateExtractSettings(settings, range));
+    await runTask({
+      kind: "generate",
+      label: "提取提交",
+      task: async () => {
+        const supplementalItems = supplementalItemsFor("summary", range, supplementalOverride);
+        const result = await invoke<ExtractResult>("extract_commits", {
+          options: buildExtractOptions(settings, projectNames, range, false, "", repos, "daily", supplementalItems),
+        });
+        const reportText = result.detailedText || result.summaryText;
+        const projectTotal = result.projects.length;
+        setDailyDate(dateValue);
+        setSummaryText(reportText);
+        setWarnings(result.warnings);
+        setLastOutputFile("");
+        setCommitCount(result.commits.length);
+        setProjectCount(projectTotal);
+        setBlankDayDraftActive(false);
+        setActivePreview("summary");
+        rememberHistory(buildHistoryEntry({
+          mode: "summary",
+          range,
+          periodLabel: dateValue,
+          reportText,
+          commitCount: result.commits.length,
+          projectCount: projectTotal,
+          aiEnhanced: false,
+          supplementalItems,
+          projects: result.projects,
+        }));
+        setStatus(`${dateValue} 日报已生成`);
+      },
+      validate: () => {
+        validateExtractSettings(settings, range);
+        supplementalItemsFor("summary", range, supplementalOverride);
+      },
+    });
   }
 
-  async function generateCustomReport(range: DateRange) {
+  async function generateCustomReport(range: DateRange, supplementalOverride?: string[]) {
     setExtractProgress(null);
-    await runTask("正在生成自定义报告", async () => {
-      const result = await invoke<ExtractResult>("extract_commits", {
-        options: buildExtractOptions(settings, projectNames, range, false, "", repos, "custom"),
-      });
-      const reportText = result.detailedText || result.summaryText;
-      const periodLabel = `${range.startDate} ~ ${range.endDate}`;
-      const projectTotal = countCommitProjects(result.commits, projectNames);
-      setCustomRange(range);
-      setCustomReport(reportText);
-      setWarnings(result.warnings);
-      setLastOutputFile("");
-      setCommitCount(result.commits.length);
-      setProjectCount(projectTotal);
-      setBlankDayDraftActive(false);
-      setActivePreview("custom");
-      rememberHistory(buildHistoryEntry("custom", range, periodLabel, reportText, result.commits.length, projectTotal, false));
-      setStatus("自定义报告已生成");
-    }, () => validateExtractSettings(settings, range));
+    await runTask({
+      kind: "generate",
+      label: "正在生成自定义报告",
+      task: async () => {
+        const supplementalItems = supplementalItemsFor("custom", range, supplementalOverride);
+        const result = await invoke<ExtractResult>("extract_commits", {
+          options: buildExtractOptions(settings, projectNames, range, false, "", repos, "custom", supplementalItems),
+        });
+        const reportText = result.detailedText || result.summaryText;
+        const periodLabel = `${range.startDate} ~ ${range.endDate}`;
+        const projectTotal = result.projects.length;
+        setCustomRange(range);
+        setCustomReport(reportText);
+        setWarnings(result.warnings);
+        setLastOutputFile("");
+        setCommitCount(result.commits.length);
+        setProjectCount(projectTotal);
+        setBlankDayDraftActive(false);
+        setActivePreview("custom");
+        rememberHistory(buildHistoryEntry({
+          mode: "custom",
+          range,
+          periodLabel,
+          reportText,
+          commitCount: result.commits.length,
+          projectCount: projectTotal,
+          aiEnhanced: false,
+          supplementalItems,
+          projects: result.projects,
+        }));
+        setStatus("自定义报告已生成");
+      },
+      validate: () => {
+        validateExtractSettings(settings, range);
+        supplementalItemsFor("custom", range, supplementalOverride);
+      },
+    });
   }
 
-  async function generateWeeklyReport(weekValue = weeklyWeek) {
+  async function generateWeeklyReport(weekValue = weeklyWeek, supplementalOverride?: string[]) {
     const range = getWeekRange(weekValue);
     const label = weekValue;
     setExtractProgress(null);
-    await runTask("正在生成周报", async () => {
-      const result = await invoke<PeriodReportResult>("generate_period_report", {
-        options: buildPeriodReportOptions(settings, projectNames, "weekly", range, label, false, "", repos),
-      });
-      setWeeklyWeek(result.periodLabel);
-      setWeeklyReport(result.reportText);
-      setWarnings(result.warnings);
-      setLastOutputFile(result.outputFile);
-      setCommitCount(result.commitCount);
-      setProjectCount(result.projectCount);
-      setBlankDayDraftActive(false);
-      setActivePreview("weekly");
-      rememberHistory(buildHistoryEntry("weekly", range, result.periodLabel, result.reportText, result.commitCount, result.projectCount, false, result.outputFile));
-      setStatus(result.outputFile ? `${result.periodLabel} 周报已生成` : `${result.periodLabel} 周报已生成，未写入文件`);
-    }, () => validatePeriodReportSettings(settings, range));
+    await runTask({
+      kind: "generate",
+      label: "正在生成周报",
+      task: async () => {
+        const supplementalItems = supplementalItemsFor("weekly", range, supplementalOverride);
+        const result = await invoke<PeriodReportResult>("generate_period_report", {
+          options: buildPeriodReportOptions(settings, projectNames, "weekly", range, label, false, "", repos, supplementalItems),
+        });
+        setWeeklyWeek(result.periodLabel);
+        setWeeklyReport(result.reportText);
+        setWarnings(result.warnings);
+        setLastOutputFile(result.outputFile);
+        setCommitCount(result.commitCount);
+        setProjectCount(result.projectCount);
+        setBlankDayDraftActive(false);
+        setActivePreview("weekly");
+        rememberHistory(buildHistoryEntry({
+          mode: "weekly",
+          range,
+          periodLabel: result.periodLabel,
+          reportText: result.reportText,
+          commitCount: result.commitCount,
+          projectCount: result.projectCount,
+          aiEnhanced: false,
+          outputFile: result.outputFile,
+          supplementalItems,
+          projects: result.projects,
+        }));
+        setStatus(result.outputFile ? `${result.periodLabel} 周报已生成` : `${result.periodLabel} 周报已生成，未写入文件`);
+      },
+      validate: () => {
+        validatePeriodReportSettings(settings, range);
+        supplementalItemsFor("weekly", range, supplementalOverride);
+      },
+    });
   }
 
-  async function generateMonthlyReport(monthValue = monthlyMonth) {
+  async function generateMonthlyReport(monthValue = monthlyMonth, supplementalOverride?: string[]) {
     setExtractProgress(null);
-    await runTask("正在生成月报", async () => {
-      const range = getMonthRange(monthValue);
-      const label = formatMonthLabel(monthValue);
-      const result = await invoke<PeriodReportResult>("generate_period_report", {
-        options: buildPeriodReportOptions(settings, projectNames, "monthly", range, label, false, "", repos),
-      });
-      setMonthlyMonth(result.periodLabel);
-      setMonthlyReport(result.reportText);
-      setMonthlyLabel(result.periodLabel);
-      setWarnings(result.warnings);
-      setLastOutputFile(result.outputFile);
-      setCommitCount(result.commitCount);
-      setProjectCount(result.projectCount);
-      setBlankDayDraftActive(false);
-      setActivePreview("monthly");
-      rememberHistory(buildHistoryEntry("monthly", range, result.periodLabel, result.reportText, result.commitCount, result.projectCount, false, result.outputFile));
-      setStatus(result.outputFile ? `${result.periodLabel} 月报已生成` : `${result.periodLabel} 月报已生成，未写入文件`);
-    }, () => validatePeriodReportSettings(settings, getMonthRange(monthValue)));
+    await runTask({
+      kind: "generate",
+      label: "正在生成月报",
+      task: async () => {
+        const range = getMonthRange(monthValue);
+        const label = formatMonthLabel(monthValue);
+        const supplementalItems = supplementalItemsFor("monthly", range, supplementalOverride);
+        const result = await invoke<PeriodReportResult>("generate_period_report", {
+          options: buildPeriodReportOptions(settings, projectNames, "monthly", range, label, false, "", repos, supplementalItems),
+        });
+        setMonthlyMonth(result.periodLabel);
+        setMonthlyReport(result.reportText);
+        setMonthlyLabel(result.periodLabel);
+        setWarnings(result.warnings);
+        setLastOutputFile(result.outputFile);
+        setCommitCount(result.commitCount);
+        setProjectCount(result.projectCount);
+        setBlankDayDraftActive(false);
+        setActivePreview("monthly");
+        rememberHistory(buildHistoryEntry({
+          mode: "monthly",
+          range,
+          periodLabel: result.periodLabel,
+          reportText: result.reportText,
+          commitCount: result.commitCount,
+          projectCount: result.projectCount,
+          aiEnhanced: false,
+          outputFile: result.outputFile,
+          supplementalItems,
+          projects: result.projects,
+        }));
+        setStatus(result.outputFile ? `${result.periodLabel} 月报已生成` : `${result.periodLabel} 月报已生成，未写入文件`);
+      },
+      validate: () => {
+        validatePeriodReportSettings(settings, getMonthRange(monthValue));
+        supplementalItemsFor("monthly", getMonthRange(monthValue), supplementalOverride);
+      },
+    });
   }
 
   function setActivePreviewText(mode: PreviewMode, text: string) {
@@ -523,45 +667,105 @@ function App() {
   }
 
   async function polishReport(extraInstruction = "") {
+    if (polishReview) {
+      setStatus("请先接受或放弃当前 AI 润色结果", { tone: "warning", notify: true });
+      return;
+    }
     const range = activePreviewRange(activePreview, dailyRange, weeklyRange, monthlyRange, customRange);
     const periodLabel = activePreviewPeriodLabel(activePreview, dailyDate, weeklyWeek, monthlyLabel || monthlyMonth, customRange);
     const baseReport = previewText;
+    const sourceHistory = reportHistory.find((entry) => entry.id === activeHistoryId);
+    const sourceRepoCount = sourceHistory?.repoCount ?? getEnabledRepoCount();
     setExtractProgress(null);
-    await runTask("AI 正在润色当前报告", async () => {
-      const result = await invoke<ReportEnhanceResult>("enhance_report", {
-        options: buildReportEnhanceOptions(settings, activePreview, range, baseReport, extraInstruction),
-      });
-      const aiEnhanced = !hasAiWarning(result.warnings);
-      const outputFile = await saveActivePreviewText(activePreview, range, periodLabel, result.reportText);
-      setActivePreviewText(activePreview, result.reportText);
-      setWarnings(result.warnings);
-      setLastOutputFile(outputFile);
-      rememberHistory(buildHistoryEntry(
-        activePreview,
-        range,
-        periodLabel,
-        result.reportText,
-        commitCount,
-        projectCount,
-        aiEnhanced,
-        outputFile,
-      ));
-      setStatus(hasAiWarning(result.warnings) ? "AI 润色失败，已保留当前报告" : "AI 润色已完成");
-    }, () => {
-      if (!baseReport.trim()) throw new Error("当前报告为空，请先生成报告再润色");
-      validateAiConnectionSettings(settings);
-      validateOutputSettings(settings);
+    await runTask({
+      kind: "polish",
+      label: "AI 正在润色当前报告",
+      task: async () => {
+        const supplementalItems = supplementalItemsFor(activePreview, range);
+        const result = await invoke<ReportEnhanceResult>("enhance_report", {
+          options: buildReportEnhanceOptions(settings, activePreview, range, baseReport, extraInstruction, supplementalItems),
+        });
+        setWarnings(result.warnings);
+        if (hasAiWarning(result.warnings)) {
+          setStatus("AI 润色失败，已保留当前报告");
+          return;
+        }
+        setPolishReview({
+          mode: activePreview,
+          range,
+          periodLabel,
+          originalText: baseReport,
+          polishedText: result.reportText,
+          warnings: result.warnings,
+          repoCount: sourceRepoCount,
+          commitCount,
+          projectCount,
+          supplementalItems,
+          projects: sourceHistory?.projects,
+        });
+        setStatus("AI 润色完成，请对照确认");
+      },
+      validate: () => {
+        if (!baseReport.trim()) throw new Error("当前报告为空，请先生成报告再润色");
+        validateAiConnectionSettings(settings);
+        validateOutputSettings(settings);
+        supplementalItemsFor(activePreview, range);
+      },
     });
+  }
+
+  async function acceptPolishReview() {
+    if (!polishReview) return;
+    const review = polishReview;
+    await runTask({
+      kind: "export",
+      label: "正在接受 AI 润色结果",
+      task: async () => {
+        const outputFile = await saveActivePreviewText(review.mode, review.range, review.periodLabel, review.polishedText);
+        setActivePreviewText(review.mode, review.polishedText);
+        setActivePreview(review.mode);
+        setWarnings(review.warnings);
+        setLastOutputFile(outputFile);
+        const historyEntry = buildHistoryEntry({
+          mode: review.mode,
+          range: review.range,
+          periodLabel: review.periodLabel,
+          reportText: review.polishedText,
+          commitCount: review.commitCount,
+          projectCount: review.projectCount,
+          aiEnhanced: true,
+          outputFile,
+          supplementalItems: review.supplementalItems,
+          projects: review.projects,
+        });
+        rememberHistory({ ...historyEntry, repoCount: review.repoCount });
+        setPolishReview(null);
+        setStatus("已接受 AI 润色结果");
+      },
+      validate: () => {
+        if (settings.outputEnabled) validateOutputSettings(settings);
+      },
+      allowDuringPolishReview: true,
+    });
+  }
+
+  function rejectPolishReview() {
+    if (!polishReview) return;
+    setPolishReview(null);
+    setStatus("已保留原稿");
   }
 
   async function copyPreview() {
     if (!previewText) return;
-    try {
-      await navigator.clipboard.writeText(previewText);
-      setStatus("内容已复制到剪贴板", { tone: "success", notify: true });
-    } catch {
-      setStatus("复制失败，请重试", { tone: "error", notify: true });
-    }
+    await runTask({
+      kind: "interaction",
+      label: "正在复制当前报告",
+      task: async () => {
+        await copyText(previewText, "复制失败，请重试");
+        setStatus("内容已复制到剪贴板", { tone: "success", notify: true });
+      },
+      validate: () => undefined,
+    });
   }
 
   async function saveReport(format: ReportExportFormat = "markdown") {
@@ -585,26 +789,41 @@ function App() {
       const range = activePreview === "custom" ? customRange : dailyRange;
       baseName = `git_commits_${range.startDate}_to_${range.endDate}`;
     }
-    await runTask("正在导出报告", async () => {
-      const outputFile = await invoke<string>("save_report_file", {
-        outputDir: settings.outputDir,
-        baseName,
-        format,
-        content: previewText,
-      });
-      setLastOutputFile(outputFile);
-      updateActiveHistory({ outputFile });
-      setStatus(`报告已导出为 ${formatReportExportLabel(format)}`);
-    }, () => validateOutputSettings(settings));
+    await runTask({
+      kind: "export",
+      label: "正在导出报告",
+      task: async () => {
+        const outputFile = await invoke<string>("save_report_file", {
+          outputDir: settings.outputDir,
+          baseName,
+          format,
+          content: previewText,
+        });
+        setLastOutputFile(outputFile);
+        updateActiveHistory({ outputFile });
+        setStatus(`报告已导出为 ${formatReportExportLabel(format)}`);
+      },
+      validate: () => validateOutputSettings(settings),
+    });
   }
 
   function openReportHistory(entry: ReportHistoryEntry) {
+    if (polishReview) {
+      setStatus("请先接受或放弃当前 AI 润色结果", { tone: "warning", notify: true });
+      return;
+    }
     setActiveHistoryId(entry.id);
     setWarnings([]);
     setLastOutputFile(entry.outputFile);
     setCommitCount(entry.commitCount);
     setProjectCount(entry.projectCount ?? entry.repoCount);
     setBlankDayDraftActive(isBlankDayHistoryEntry(entry));
+    const supplementalItems = supplementalItemsFromHistory(entry.supplementalItems);
+    const supplementalKey = buildSupplementalDraftKey(entry.mode, entry.range);
+    setSupplementalDrafts((current) => ({
+      ...current,
+      [supplementalKey]: formatSupplementalItemsText(supplementalItems),
+    }));
 
     if (entry.mode === "monthly") {
       setMonthlyMonth(entry.periodLabel);
@@ -626,45 +845,68 @@ function App() {
   }
 
   async function copyReportHistory(entry: ReportHistoryEntry) {
-    try {
-      await navigator.clipboard.writeText(entry.reportText);
-      setStatus(`已复制历史报告：${entry.title}`, { tone: "success", notify: true });
-    } catch {
-      setStatus("复制历史报告失败，请重试", { tone: "error", notify: true });
-    }
+    await runTask({
+      kind: "interaction",
+      label: "正在复制历史报告",
+      task: async () => {
+        await copyText(entry.reportText, "复制历史报告失败，请重试");
+        setStatus(`已复制历史报告：${entry.title}`, { tone: "success", notify: true });
+      },
+      validate: () => undefined,
+    });
   }
 
   async function regenerateReportHistory(entry: ReportHistoryEntry) {
+    const supplementalItems = supplementalItemsFromHistory(entry.supplementalItems);
     if (entry.mode === "monthly") {
-      await generateMonthlyReport(entry.periodLabel);
+      await generateMonthlyReport(entry.periodLabel, supplementalItems);
     } else if (entry.mode === "weekly") {
-      await generateWeeklyReport(entry.periodLabel);
+      await generateWeeklyReport(entry.periodLabel, supplementalItems);
     } else if (entry.mode === "custom") {
-      await generateCustomReport(entry.range);
+      await generateCustomReport(entry.range, supplementalItems);
     } else {
-      await extractCommits(entry.range.startDate);
+      await extractCommits(entry.range.startDate, supplementalItems);
     }
   }
 
-  function clearHistoryRecords() {
+  async function clearHistoryRecords() {
     if (!window.confirm("清空最近报告记录？已导出的 Markdown 文件不会被删除。")) return;
-    clearReportHistory();
-    setReportHistory([]);
+    const cleared = await reportHistoryStorage.clear();
+    if (!cleared) return;
     setActiveHistoryId("");
     setStatus("最近报告记录已清空");
   }
 
-  async function runTask(label: string, task: () => Promise<void>, validate = () => validateRequiredSettings(settings)) {
-    setIsBusy(true);
-    setStatus(label, { tone: "loading", notify: true, duration: 1600 });
-    setWarnings([]);
+  async function runTask({
+    kind,
+    label,
+    task,
+    validate = () => validateRequiredSettings(settings),
+    allowDuringPolishReview = false,
+  }: RunTaskInput) {
+    if (polishReview && !allowDuringPolishReview && (kind === "generate" || kind === "polish" || kind === "export")) {
+      setStatus("请先接受或放弃当前 AI 润色结果", { tone: "warning", notify: true });
+      return;
+    }
     try {
       validate();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error), { tone: "error", notify: true, duration: 4200 });
+      return;
+    }
+    const start = tryStartTask(kind, label);
+    if (!start.started) {
+      setStatus(`请等待“${start.conflictLabel}”完成后再继续`, { tone: "warning", notify: true, duration: 3200 });
+      return;
+    }
+    setStatus(label, { tone: "loading", notify: true, duration: 1600 });
+    if (kind !== "interaction") setWarnings([]);
+    try {
       await task();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error), { tone: "error", notify: true, duration: 4200 });
     } finally {
-      setIsBusy(false);
+      finishTask(kind);
     }
   }
 
@@ -672,7 +914,7 @@ function App() {
     if (key === "reportHistoryLimit") {
       const limit = normalizeReportHistoryLimit(value);
       setSettings((current) => ({ ...current, reportHistoryLimit: limit }));
-      setReportHistory((current) => saveReportHistory(current, limit));
+      reportHistoryStorage.resize(limit);
       return;
     }
     if (key === "aiApiKey") {
@@ -705,17 +947,54 @@ function App() {
     setSettings((current) => ({ ...current, [key]: value }));
   }
 
+  function applyConfigProfileSettings(profileSettings: ConfigProfileSettings) {
+    setSettings((current) => ({ ...current, ...profileSettings }));
+  }
+
   function toggleRepo(repoPath: string, enabled: boolean) {
     setSettings((current) => {
       const disabled = current.disabledRepos.filter((path) => path !== repoPath);
       if (!enabled) disabled.push(repoPath);
       return { ...current, disabledRepos: disabled };
     });
+    workspaceHealth.setRepoDisabled(repoPath, !enabled);
+  }
+
+  function setReposEnabled(repoPaths: string[], enabled: boolean) {
+    const uniquePaths = [...new Set(repoPaths.filter(Boolean))];
+    const disabledPaths = new Set(settings.disabledRepos);
+    const changedPaths = uniquePaths.filter((path) => enabled ? disabledPaths.has(path) : !disabledPaths.has(path));
+    if (changedPaths.length === 0) return;
+    setSettings((current) => {
+      const nextDisabled = new Set(current.disabledRepos);
+      for (const path of changedPaths) {
+        if (enabled) nextDisabled.delete(path);
+        else nextDisabled.add(path);
+      }
+      return { ...current, disabledRepos: [...nextDisabled] };
+    });
+    workspaceHealth.setReposDisabled(changedPaths, !enabled);
+    setStatus(`已${enabled ? "启用" : "禁用"}当前结果中的 ${changedPaths.length} 个仓库`, { tone: "success", notify: true });
   }
 
   function updateRepoIndex(nextRepos: RepoInfo[]) {
     setRepos(nextRepos);
-    saveRepoIndexCache(settings.rootDirs, nextRepos);
+    const cache = saveRepoIndexCache(settings.rootDirs, nextRepos);
+    setRepoScannedAt(cache.scannedAt);
+  }
+
+  function removeRepoFromIndex(repoPath: string) {
+    const repo = repos.find((item) => item.path === repoPath);
+    if (!repo || !window.confirm(`仅从 GitPulse 索引移除“${repo.name}”？本地仓库目录不会被删除。`)) return;
+    const nextRepos = repos.filter((item) => item.path !== repoPath);
+    setRepos(nextRepos);
+    persistRepoIndexCache({ rootDirs: settings.rootDirs, repos: nextRepos, scannedAt: repoScannedAt });
+    setSettings((current) => ({
+      ...current,
+      disabledRepos: current.disabledRepos.filter((path) => path !== repoPath),
+    }));
+    workspaceHealth.removeRepo(repoPath);
+    setStatus(`已从索引移除“${repo.name}”，本地目录未删除`, { tone: "success", notify: true });
   }
 
   function saveRepoMapping(scope: MappingScope, displayName: string) {
@@ -791,7 +1070,7 @@ function App() {
       <OnboardingWizard
         settings={settings}
         repos={repos}
-        isBusy={isBusy}
+        isScanning={isRepoScanning}
         updateSetting={updateSetting}
         onAddRootDirs={addRootDirs}
         onRemoveRootDir={removeRootDir}
@@ -880,8 +1159,8 @@ function handleBlankDayGenerated(payload: {
         activePreview={activePreview}
         status={status}
         warnings={warnings}
-        isBusy={isBusy}
-        isRepoScanning={isRepoScanning}
+        activeTasks={activeTasks}
+        polishReview={polishReview}
         scanProgress={scanProgress}
         extractProgress={extractProgress}
         lastOutputFile={lastOutputFile}
@@ -890,6 +1169,10 @@ function handleBlankDayGenerated(payload: {
         activeHistoryId={activeHistoryId}
         rootDirs={settings.rootDirs}
         repoCount={repos.length}
+        repoScannedAt={repoScannedAt}
+        workspaceHealth={workspaceHealth.result}
+        workspaceHealthLoading={workspaceHealth.loading}
+        workspaceHealthError={workspaceHealth.error}
         commitCount={commitCount}
         blankDayDraftActive={blankDayDraftActive}
         projectCount={projectCount}
@@ -903,6 +1186,8 @@ function handleBlankDayGenerated(payload: {
         onMonthlyMonthChange={changeMonthlyMonth}
         monthlyRange={monthlyRange}
         customRange={customRange}
+        supplementalItemsText={supplementalItemsText}
+        onSupplementalItemsChange={changeSupplementalItems}
         aiConfigured={aiConfigured}
         extractAllBranches={settings.extractAllBranches}
         showEvidenceDetails={settings.showEvidenceDetails}
@@ -914,6 +1199,8 @@ function handleBlankDayGenerated(payload: {
         onGenerateCustom={generateCustomReport}
         onGenerateMonthly={generateMonthlyReport}
         onPolish={polishReport}
+        onAcceptPolishReview={acceptPolishReview}
+        onRejectPolishReview={rejectPolishReview}
         onCopy={copyPreview}
         onExport={saveReport}
         onOpenHistory={openReportHistory}
@@ -923,9 +1210,12 @@ function handleBlankDayGenerated(payload: {
         canExport={settings.outputEnabled && Boolean(settings.outputDir.trim())}
         disabledRepos={settings.disabledRepos}
         onToggleRepo={toggleRepo}
+        onSetReposEnabled={setReposEnabled}
         onEditRepo={setEditingRepo}
         onRefreshRepos={scanWorkspace}
         onCancelRepoScan={cancelRepoScan}
+        onRefreshWorkspaceHealth={() => void workspaceHealth.refresh()}
+        onRemoveRepoFromIndex={removeRepoFromIndex}
         onAddRootDirs={addRootDirs}
         onPreviewChange={changePreview}
         onOpenSettings={() => setSettingsOpen(true)}
@@ -944,6 +1234,7 @@ function handleBlankDayGenerated(payload: {
         updateProgress={updateProgress}
         updateBusy={updateBusy}
         updateSetting={updateSetting}
+        onApplyConfigProfile={applyConfigProfileSettings}
         onAddRootDirs={addRootDirs}
         onRemoveRootDir={removeRootDir}
         onChooseOutputDir={chooseOutputDir}
@@ -1017,10 +1308,22 @@ function activePreviewBaseName(mode: PreviewMode, range: DateRange, periodLabel:
   return `git_commits_${range.startDate}_to_${range.endDate}`;
 }
 
+async function copyText(text: string, errorMessage: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    throw new Error(errorMessage);
+  }
+}
+
 function shouldNotifyStatus(message: string) {
   const trimmed = message.trim();
   if (!trimmed || trimmed === "就绪") return false;
-  if (trimmed.startsWith("正在扫描仓库：") || trimmed.startsWith("正在提取提交：")) return false;
+  if (
+    trimmed.startsWith("正在扫描仓库：")
+    || trimmed.startsWith("正在提取提交：")
+    || trimmed.startsWith("提取中：")
+  ) return false;
   return true;
 }
 
@@ -1028,7 +1331,7 @@ function inferMessageTone(message: string): AppMessageTone {
   if (message.includes("失败") || message.includes("错误") || message.includes("无效") || message.includes("无法")) return "error";
   if (message.includes("请选择") || message.includes("请输入") || message.includes("请先") || message.includes("不能为空")) return "warning";
   if (message.includes("取消") || message.includes("未写入") || message.includes("未读取") || message.includes("待配置")) return "warning";
-  if (message.startsWith("正在")) return "loading";
+  if (message.startsWith("正在") || message.startsWith("提取中：")) return "loading";
   if (message.includes("已") || message.includes("完成") || message.includes("生成")) return "success";
   return "info";
 }
@@ -1061,8 +1364,7 @@ function formatReportExportLabel(format: ReportExportFormat) {
 function formatExtractProgress(progress: CommitExtractProgress) {
   const total = progress.totalRepos;
   if (total === 0) return "没有启用的仓库可提取";
-  const current = progress.currentRepo ? ` · 刚完成 ${progress.currentRepo}` : "";
-  return `正在提取提交：${progress.completedRepos}/${total} 仓库 · ${progress.concurrency} 并发 · ${progress.commitCount} 条提交${current}`;
+  return `提取中 · ${progress.completedRepos}/${total} 仓库 · ${progress.commitCount} 提交`;
 }
 
 export default App;

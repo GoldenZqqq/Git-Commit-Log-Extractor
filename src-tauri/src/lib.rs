@@ -1,28 +1,33 @@
 mod ai;
 mod codex_oauth;
 pub mod commit_pipeline;
+mod config_profile_io;
 mod diagnostics;
 mod docx;
 pub mod git_ops;
 pub mod models;
 mod network;
 mod pdf;
+mod project_retrospective;
 pub mod report;
+mod report_history;
 mod secure_store;
+mod workspace_health;
 mod zip_store;
 
 use crate::models::{
-    AiConfig, AiModelInfo, BatchReportOptions, BatchReportResult, DiagnosticOptions,
-    DiagnosticResult, ExtractOptions, ExtractResult, GitIdentity, HeatmapOptions, HeatmapResult,
-    MappingEntry, MonthlyReportOptions, MonthlyReportResult, PeriodReportOptions,
-    PeriodReportResult, ProxyCandidate, ProxyConfig, ProxyTestResult, RepoInfo, RepoScanProgress,
-    BlankDayFillOptions, BlankDayFillResult, ReportEnhanceOptions, ReportEnhanceResult, TrendOptions, TrendResult, WorkRhythmOptions,
-    WorkRhythmResult,
+    AiConfig, AiModelInfo, BatchReportOptions, BatchReportResult, BlankDayFillOptions,
+    BlankDayFillResult, DiagnosticOptions, DiagnosticResult, ExtractOptions, ExtractResult,
+    GitIdentity, HeatmapOptions, HeatmapResult, MappingEntry, MonthlyReportOptions,
+    MonthlyReportResult, PeriodReportOptions, PeriodReportResult, ProxyCandidate, ProxyConfig,
+    ProxyTestResult, RepoScanProgress, RepoScanResult, ReportEnhanceOptions, ReportEnhanceResult,
+    TrendOptions, TrendResult, WorkRhythmOptions, WorkRhythmResult, WorkspaceHealthOptions,
+    WorkspaceHealthResult,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::async_runtime;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_opener::OpenerExt;
 
 #[derive(Clone, Default)]
@@ -35,7 +40,7 @@ async fn scan_repos(
     app: AppHandle,
     state: State<'_, RepoScanState>,
     root_dirs: Vec<String>,
-) -> Result<Vec<RepoInfo>, String> {
+) -> Result<RepoScanResult, String> {
     let cancel_requested = state.cancel_requested.clone();
     cancel_requested.store(false, Ordering::Relaxed);
     let progress_app = app.clone();
@@ -68,6 +73,53 @@ async fn scan_repos(
 #[tauri::command]
 fn cancel_repo_scan(state: State<'_, RepoScanState>) {
     state.cancel_requested.store(true, Ordering::Relaxed);
+}
+
+#[tauri::command]
+async fn inspect_workspace_health(
+    options: WorkspaceHealthOptions,
+) -> Result<WorkspaceHealthResult, String> {
+    async_runtime::spawn_blocking(move || workspace_health::inspect(options))
+        .await
+        .map_err(|err| format!("检查工作区健康状态失败：{err}"))
+}
+
+#[tauri::command]
+async fn load_report_history(
+    app: AppHandle,
+    legacy_entries: Option<Vec<report_history::ReportHistoryEntry>>,
+    limit: usize,
+) -> Result<report_history::ReportHistoryLoadResult, String> {
+    let directory = report_history_directory(&app)?;
+    async_runtime::spawn_blocking(move || report_history::load(&directory, legacy_entries, limit))
+        .await
+        .map_err(|error| format!("加载报告历史任务中断：{error}"))?
+}
+
+#[tauri::command]
+async fn save_report_history(
+    app: AppHandle,
+    entries: Vec<report_history::ReportHistoryEntry>,
+    limit: usize,
+) -> Result<Vec<report_history::ReportHistoryEntry>, String> {
+    let directory = report_history_directory(&app)?;
+    async_runtime::spawn_blocking(move || report_history::save(&directory, entries, limit))
+        .await
+        .map_err(|error| format!("保存报告历史任务中断：{error}"))?
+}
+
+#[tauri::command]
+async fn clear_report_history(app: AppHandle) -> Result<(), String> {
+    let directory = report_history_directory(&app)?;
+    async_runtime::spawn_blocking(move || report_history::clear(&directory))
+        .await
+        .map_err(|error| format!("清空报告历史任务中断：{error}"))?
+}
+
+fn report_history_directory(app: &AppHandle) -> Result<std::path::PathBuf, String> {
+    app.path()
+        .app_data_dir()
+        .map_err(|error| format!("获取应用数据目录失败：{error}"))
 }
 
 #[tauri::command]
@@ -285,6 +337,20 @@ fn save_text_file(
 }
 
 #[tauri::command]
+async fn read_text_file(path: String) -> Result<String, String> {
+    async_runtime::spawn_blocking(move || config_profile_io::read_text_file(&path))
+        .await
+        .map_err(|error| format!("读取配置方案任务中断：{error}"))?
+}
+
+#[tauri::command]
+async fn write_text_file(path: String, content: String) -> Result<(), String> {
+    async_runtime::spawn_blocking(move || config_profile_io::write_text_file(&path, &content))
+        .await
+        .map_err(|error| format!("保存配置方案任务中断：{error}"))?
+}
+
+#[tauri::command]
 fn save_report_file(
     output_dir: String,
     base_name: String,
@@ -367,6 +433,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             scan_repos,
             cancel_repo_scan,
+            inspect_workspace_health,
+            load_report_history,
+            save_report_history,
+            clear_report_history,
             get_git_identity,
             extract_commits,
             generate_monthly_report,
@@ -389,6 +459,8 @@ pub fn run() {
             scan_proxy_candidates,
             test_proxy_connection,
             save_text_file,
+            read_text_file,
+            write_text_file,
             save_report_file,
             read_mapping_xlsx,
             write_mapping_template_xlsx,

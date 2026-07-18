@@ -16,6 +16,31 @@ Hooks are used sparingly. Most app state lives in `App.tsx`; custom hooks are re
 - Keep side effects inside `useEffect` with cleanup functions for event listeners.
 - Keep Tauri runtime details inside hooks only when the hook owns a coherent runtime concern, as `useAppRuntime` owns theme, version, and updater state.
 
+## Overlay Focus Contract
+
+Custom dialogs and popovers use `src/hooks/useOverlayFocus.ts`; do not add component-local document listeners for the same behavior.
+
+```ts
+useModalDialog({ open, onClose, closeEnabled? }): RefObject<HTMLElement>;
+
+usePopover({
+  open,
+  onClose,
+  anchorRef,
+  restoreFocusRef?,
+  itemSelector?,
+  initialFocusSelector?,
+}): RefObject<HTMLDivElement>;
+```
+
+- Modal containers set `aria-modal="true"`, `tabIndex={-1}`, and the returned ref. The hook focuses `[data-dialog-initial-focus]` or the first usable control, traps Tab, closes the topmost modal on Escape, and restores the original trigger.
+- Pass `closeEnabled: false` while a running operation cannot be cancelled. This disables Escape without weakening the focus trap or the component's backdrop guard.
+- Nested alert dialogs are DOM-later than their parent. Only the last visible modal handles Tab/Escape, so one Escape never closes both layers.
+- Popover triggers expose `aria-haspopup`, `aria-expanded`, and `aria-controls`. Menus pass an `itemSelector` for ArrowUp/ArrowDown/Home/End; form-like popovers pass an `initialFocusSelector`.
+- Outside pointer clicks and Tab departures close without stealing focus from the new target. Escape and direct close actions return focus to `restoreFocusRef` or the anchor.
+
+> **Warning**: Do not open a listbox unconditionally from its input's `onFocus`. Escape closes the listbox and restores focus to that input; an `onFocus` opener immediately reopens it. Open from click or a direction-key handler instead.
+
 ---
 
 ## Data Fetching
@@ -39,3 +64,4 @@ Hooks are used sparingly. Most app state lives in `App.tsx`; custom hooks are re
 - Extracting a hook just to move ordinary component state out of sight.
 - Forgetting to remove Tauri/browser listeners on cleanup.
 - Letting hook state duplicate source-of-truth settings already owned by `App.tsx`.
+- Adding a new `role="dialog"`, `role="alertdialog"`, `role="menu"`, or `role="listbox"` without the shared overlay hook and keyboard regression coverage.

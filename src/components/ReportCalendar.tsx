@@ -10,7 +10,7 @@ import "./ReportCalendar.css";
 type Props = {
   entries: ReportHistoryEntry[];
   aiConfigured: boolean;
-  isBusy: boolean;
+  generationBlocked: boolean;
   onOpenHistory: (entry: ReportHistoryEntry) => void;
   onGenerateDaily: (date: string) => void;
   onOpenBlankDayFill: (date: string) => void;
@@ -35,7 +35,7 @@ const KIND_LABEL: Record<string, string> = {
 export function ReportCalendar({
   entries,
   aiConfigured,
-  isBusy,
+  generationBlocked,
   onOpenHistory,
   onGenerateDaily,
   onOpenBlankDayFill,
@@ -94,7 +94,7 @@ export function ReportCalendar({
             <CalendarDays size={16} />
             报告日历
           </h4>
-          <p>查看本地已生成的日报、周报、月报与补写草稿</p>
+          <p>按日期查看本地报告</p>
         </div>
         <div className="report-calendar-nav">
           <button type="button" onClick={() => shiftMonth(-1)} aria-label="上个月">
@@ -119,7 +119,7 @@ export function ReportCalendar({
       </div>
 
       {!hasAny ? (
-        <p className="report-calendar-empty">暂无报告记录。生成日报或周报后，会显示在这里。</p>
+        <p className="report-calendar-empty">暂无报告，生成后将在此显示。</p>
       ) : (
         <>
           <div className="report-calendar-weekdays">
@@ -189,7 +189,7 @@ export function ReportCalendar({
               <div className="report-calendar-empty-actions">
                 <button
                   type="button"
-                  disabled={isBusy}
+                  disabled={generationBlocked}
                   onClick={() => { onGenerateDaily(activeDate); setActiveDate(null); }}
                 >
                   <FileText size={14} />
@@ -197,7 +197,7 @@ export function ReportCalendar({
                 </button>
                 <button
                   type="button"
-                  disabled={isBusy || !aiConfigured}
+                  disabled={generationBlocked || !aiConfigured}
                   title={aiConfigured ? "基于近期 Git 线索补写" : "请先配置 AI"}
                   onClick={() => { onOpenBlankDayFill(activeDate); setActiveDate(null); }}
                 >

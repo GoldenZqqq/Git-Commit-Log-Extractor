@@ -75,7 +75,6 @@ pub fn enhance_daily_report(
     )
 }
 
-
 pub fn fill_blank_day_report(
     base_evidence: &str,
     target_date: &str,
@@ -102,12 +101,7 @@ pub fn fill_blank_day_report(
         count,
         user_prompt,
     );
-    enhance_report(
-        base_evidence,
-        blank_day_system_prompt(),
-        &prompt,
-        config,
-    )
+    enhance_report(base_evidence, blank_day_system_prompt(), &prompt, config)
 }
 
 /// 自定义系统提示词非空则采用它，否则回退内置默认。默认字符串保留为同源参照与兜底。
@@ -357,9 +351,8 @@ fn daily_system_prompt() -> &'static str {
     "你是一个严谨的工作日报写作助手。请基于 Git 提交记录润色为当天或指定周期的工作日报，不要虚构没有依据的业务结果、上线结论或百分比。最终输出保持为简洁纯文本或短列表，方便直接复制到工作汇报中。"
 }
 
-
 fn blank_day_system_prompt() -> &'static str {
-    "你是一个克制的日报延续草稿助手。请仅基于用户提供的历史 Git 提交线索，为目标日撰写可编辑的日报延续要点。禁止编造上线、验收、业务结果、百分比进度或从未出现过的模块；优先使用跟进、排查、推进、联调、整理等进行中表述。最终只输出短要点列表，不要长文复盘。"
+    "你是一个基于历史代码证据推断下一步工作的日报草稿助手。请仅根据用户提供的历史 Git 提交线索，为目标日撰写可编辑的延续要点。每条必须引用至少一个历史线索中的具体锚点，例如已有功能、接口、数据流、页面、脚本、测试、异常路径或技术对象，并给出最可能发生的代码级动作。优先选择功能延伸、缺陷或回归修复、异常与边界处理、兼容性完善、测试补强，或衔接历史中已出现的接口与数据流。可以提出潜在缺陷的修复动作，但不得断言已发现或已修复线索中没有给出的故障。不得只写跟进、排查、推进、联调、整理等空泛过程词；如确需使用，必须同时写清具体对象、问题模式和拟采取的动作。多条输出应覆盖不同历史锚点或不同具体动作，避免同义改写。禁止编造上线、验收、业务结果、百分比进度或从未出现过的模块，也不得把草稿伪装成目标日真实提交。若线索条目已带项目前缀（如「映射项目名 - 」或「仓库(分支) - 」），输出每条必须保留同风格前缀，与用户日常日报一致。最终只输出短要点列表，不要长文复盘。"
 }
 
 fn blank_day_user_prompt(
@@ -377,7 +370,7 @@ fn blank_day_user_prompt(
         user_prompt.trim()
     };
     format!(
-        "目标日：{}\n素材周期：{} 至 {}\n作者：{}\n需要输出条数：{}\n用户要求：{}\n\n请严格输出恰好 {} 条短要点列表（每行一条，使用 - 前缀）。每条一句话，基于下列历史提交线索做合理延续，不要写成目标日真实提交记录，不要添加无法核实的结论。\n\n历史提交线索：\n{}",
+        "目标日：{}\n素材周期：{} 至 {}\n作者：{}\n需要输出条数：{}\n用户要求：{}\n\n请严格输出恰好 {} 条短要点列表（每行一条，使用 - 前缀）。每条一句话，并从下列历史提交线索中提取明确的具体锚点，再写最可能发生的代码级延续。优先写功能延伸、缺陷或回归修复、异常/边界/兼容性处理、测试补强，或已有接口与数据流的衔接；不得只写「跟进、排查、推进、联调、整理」等过程性表态。若写潜在缺陷，应描述拟补充的保护或修复动作，不得声称故障已经发生。不同条目尽量对应不同历史线索或不同动作，避免同义改写。不要写成目标日真实提交记录，不要添加无法核实的结论。若线索中带有项目前缀（例如「柏科注安工程师 - 」），输出必须沿用该前缀风格，写成「- 项目名 - 具体延续事项」。\n\n历史提交线索：\n{}",
         target_date,
         source_start_date,
         source_end_date,
@@ -388,7 +381,6 @@ fn blank_day_user_prompt(
         base_evidence
     )
 }
-
 
 fn monthly_user_prompt(
     base_report: &str,
@@ -461,7 +453,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn blank_day_user_prompt_includes_item_count() {
+    fn blank_day_prompts_require_concrete_history_anchors() {
         let prompt = blank_day_user_prompt(
             "- repo: fix login",
             "2026-07-14",
@@ -474,6 +466,19 @@ mod tests {
         assert!(prompt.contains("需要输出条数：5"));
         assert!(prompt.contains("恰好 5 条"));
         assert!(prompt.contains("fix login"));
+        assert!(prompt.contains("项目前缀"));
+        assert!(prompt.contains("具体锚点"));
+        assert!(prompt.contains("功能延伸"));
+        assert!(prompt.contains("缺陷或回归"));
+        assert!(prompt.contains("测试补强"));
+        assert!(prompt.contains("不得只写"));
+        let system_prompt = blank_day_system_prompt();
+        assert!(system_prompt.contains("项目前缀"));
+        assert!(system_prompt.contains("具体锚点"));
+        assert!(system_prompt.contains("功能延伸"));
+        assert!(system_prompt.contains("缺陷或回归"));
+        assert!(system_prompt.contains("测试补强"));
+        assert!(!system_prompt.contains("优先使用跟进、排查、推进、联调、整理"));
     }
 
     #[test]

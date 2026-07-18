@@ -17,6 +17,7 @@ type Params = {
 };
 
 const UPDATE_CHECK_TIMEOUT_MS = 20000;
+const STARTUP_UPDATE_CHECK_DISABLED = import.meta.env.VITE_TAURI_SMOKE === "1";
 
 let startupUpdateCheckPromise: Promise<PendingAppUpdate | null> | null = null;
 let startupUpdateNoticeId = 0;
@@ -40,7 +41,9 @@ export function useAppRuntime({ themeMode }: Params) {
         if (cancelled) return;
         setAppVersion(version);
         setUpdateMessage(`当前版本 v${version}，可手动检查更新`);
-        void checkForStartupUpdates(version, () => cancelled);
+        if (!STARTUP_UPDATE_CHECK_DISABLED) {
+          void checkForStartupUpdates(version, () => cancelled);
+        }
       })
       .catch(() => {
         if (cancelled) return;

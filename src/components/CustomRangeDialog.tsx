@@ -1,18 +1,20 @@
 import { CalendarDays, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { DateRange } from "../model";
+import { useModalDialog } from "../hooks/useOverlayFocus";
 import { Field } from "./Primitives";
 
 type Props = {
   open: boolean;
   initialRange: DateRange;
-  isBusy: boolean;
+  generationBlocked: boolean;
   onClose: () => void;
   onConfirm: (range: DateRange) => void;
 };
 
-export function CustomRangeDialog({ open, initialRange, isBusy, onClose, onConfirm }: Props) {
+export function CustomRangeDialog({ open, initialRange, generationBlocked, onClose, onConfirm }: Props) {
   const [range, setRange] = useState<DateRange>(initialRange);
+  const dialogRef = useModalDialog({ open, onClose });
 
   useEffect(() => {
     if (open) setRange(initialRange);
@@ -25,10 +27,12 @@ export function CustomRangeDialog({ open, initialRange, isBusy, onClose, onConfi
   return (
     <div className="dialog-backdrop compact-backdrop" role="presentation" onMouseDown={onClose}>
       <section
+        ref={dialogRef}
         className="range-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="custom-range-title"
+        tabIndex={-1}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="range-dialog-header">
@@ -44,6 +48,7 @@ export function CustomRangeDialog({ open, initialRange, isBusy, onClose, onConfi
         <div className="range-fields">
           <Field label="开始日期">
             <input
+              data-dialog-initial-focus
               type="date"
               value={range.startDate}
               onChange={(event) => setRange((current) => ({ ...current, startDate: event.target.value }))}
@@ -67,7 +72,7 @@ export function CustomRangeDialog({ open, initialRange, isBusy, onClose, onConfi
           <button
             type="button"
             className="mapping-add"
-            disabled={rangeInvalid || isBusy}
+            disabled={rangeInvalid || generationBlocked}
             onClick={() => onConfirm(range)}
           >
             <CalendarDays size={16} />

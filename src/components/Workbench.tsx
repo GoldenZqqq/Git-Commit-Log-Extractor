@@ -6,17 +6,16 @@ import {
   Clipboard,
   FileDown,
   FileText,
-  FolderPlus,
   GitBranch,
   History,
   Layers,
   Loader2,
   Maximize2,
   Minimize2,
-  RefreshCw,
   RotateCcw,
   Search,
   Settings2,
+  ShieldCheck,
   Sparkles,
   TerminalSquare,
   Trash2,
@@ -24,28 +23,41 @@ import {
   UserRound,
   XCircle,
 } from "lucide-react";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   loadBlankDayTipDismissed,
-  resolveRepoDisplayName,
   saveBlankDayTipDismissed,
   type CommitExtractProgress,
   type DateRange,
   type PreviewMode,
   type ReportExportFormat,
   type ReportHistoryEntry,
+  type ReportPolishReview,
   type RepoInfo,
   type RepoScanProgress,
+  type WorkspaceHealthResult,
 } from "../model";
+import {
+  activeTaskLabel,
+  hasActiveTasks,
+  taskCanStart,
+  taskIsActive,
+  type ActiveTaskState,
+} from "../hooks/useTaskActivity";
+import { usePopover } from "../hooks/useOverlayFocus";
 import { convertMarkdownTo, REPORT_FORMAT_PRESETS, type IMFormatPresetId } from "../reportFormat";
 import { type HeatmapResult } from "./ContributionHeatmap";
 import { CustomRangeDialog } from "./CustomRangeDialog";
 import { InsightsView } from "./InsightsView";
 import { MarkdownPreview } from "./MarkdownPreview";
+import { ReportPolishReviewPanel } from "./ReportPolishReviewPanel";
 import { ReportQualityPanel } from "./ReportQualityPanel";
+import { RepositoryPanel } from "./RepositoryPanel";
+import { SupplementalItemsEditor } from "./SupplementalItemsEditor";
 import { type TrendResult } from "./TrendPanel";
 import { type WorkRhythmResult } from "./WorkRhythmPanel";
+import { WorkspaceHealthView } from "./WorkspaceHealthView";
 
 type Props = {
   repos: RepoInfo[];
@@ -53,8 +65,8 @@ type Props = {
   activePreview: PreviewMode;
   status: string;
   warnings: string[];
-  isBusy: boolean;
-  isRepoScanning: boolean;
+  activeTasks: ActiveTaskState;
+  polishReview: ReportPolishReview | null;
   scanProgress: RepoScanProgress | null;
   extractProgress: CommitExtractProgress | null;
   lastOutputFile: string;
@@ -62,6 +74,10 @@ type Props = {
   reportHistory: ReportHistoryEntry[];
   activeHistoryId: string;
   repoCount: number;
+  repoScannedAt: string;
+  workspaceHealth: WorkspaceHealthResult | null;
+  workspaceHealthLoading: boolean;
+  workspaceHealthError: string;
   commitCount: number;
   blankDayDraftActive?: boolean;
   projectCount: number;
@@ -75,6 +91,8 @@ type Props = {
   onMonthlyMonthChange: (month: string) => void;
   monthlyRange: DateRange;
   customRange: DateRange;
+  supplementalItemsText: string;
+  onSupplementalItemsChange: (value: string) => void;
   aiConfigured: boolean;
   extractAllBranches: boolean;
   showEvidenceDetails: boolean;
@@ -86,6 +104,8 @@ type Props = {
   onGenerateCustom: (range: DateRange) => void;
   onGenerateMonthly: (month: string) => void;
   onPolish: (extraInstruction?: string) => void;
+  onAcceptPolishReview: () => void;
+  onRejectPolishReview: () => void;
   onCopy: () => void;
   onExport: (format: ReportExportFormat) => void;
   onOpenHistory: (entry: ReportHistoryEntry) => void;
@@ -96,9 +116,12 @@ type Props = {
   disabledRepos: string[];
   projectNames: Record<string, string>;
   onToggleRepo: (path: string, enabled: boolean) => void;
+  onSetReposEnabled: (paths: string[], enabled: boolean) => void;
   onEditRepo: (repo: RepoInfo) => void;
   onRefreshRepos: () => void;
   onCancelRepoScan: () => void;
+  onRefreshWorkspaceHealth: () => void;
+  onRemoveRepoFromIndex: (path: string) => void;
   onPreviewChange: (preview: PreviewMode) => void;
   onOpenSettings: () => void;
   rootDirs: string[];
@@ -111,10 +134,22 @@ type Props = {
 
 type AssistPanel = "repos" | "history" | "quality";
 
-type WorkbenchView = "report" | "insights";
+type WorkbenchView = "report" | "insights" | "health";
 
 export function Workbench(props: Props) {
   const previewMeta = props.aiConfigured ? "AI 可润色" : "Markdown 渲染";
+  const isGenerating = taskIsActive(props.activeTasks, "generate");
+  const isPolishing = taskIsActive(props.activeTasks, "polish");
+  const isExporting = taskIsActive(props.activeTasks, "export");
+  const isInteracting = taskIsActive(props.activeTasks, "interaction");
+  const isRepoScanning = taskIsActive(props.activeTasks, "scan");
+  const reviewPending = Boolean(props.polishReview);
+  const generateBlocked = reviewPending || !taskCanStart(props.activeTasks, "generate");
+  const polishBlocked = reviewPending || !taskCanStart(props.activeTasks, "polish");
+  const exportBlocked = reviewPending || !taskCanStart(props.activeTasks, "export");
+  const interactionBlocked = !taskCanStart(props.activeTasks, "interaction");
+  const scanBlocked = !taskCanStart(props.activeTasks, "scan");
+  const activeTaskStatus = activeTaskLabel(props.activeTasks);
   const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
   const [blankDayTipOpen, setBlankDayTipOpen] = useState(() => !loadBlankDayTipDismissed());
   const [customDialogOpen, setCustomDialogOpen] = useState(false);
@@ -132,6 +167,40 @@ export function Workbench(props: Props) {
   const [trendData, setTrendData] = useState<TrendResult | null>(null);
   const [trendLoading, setTrendLoading] = useState(false);
   const [trendGranularity, setTrendGranularity] = useState<"weekly" | "monthly">("weekly");
+  const polishButtonRef = useRef<HTMLButtonElement>(null);
+  const polishMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const exportMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const copyMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const hadPolishReviewRef = useRef(false);
+  const polishPopoverRef = usePopover({
+    open: polishMenuOpen,
+    onClose: () => setPolishMenuOpen(false),
+    anchorRef: polishMenuButtonRef,
+    initialFocusSelector: "textarea",
+  });
+  const exportPopoverRef = usePopover({
+    open: exportMenuOpen,
+    onClose: () => setExportMenuOpen(false),
+    anchorRef: exportMenuButtonRef,
+    itemSelector: "[role='menuitem']",
+    initialFocusSelector: "[role='menuitem']",
+  });
+  const copyPopoverRef = usePopover({
+    open: copyAsMenuOpen,
+    onClose: () => setCopyAsMenuOpen(false),
+    anchorRef: copyMenuButtonRef,
+    itemSelector: "[role='menuitem']",
+    initialFocusSelector: "[role='menuitem']",
+  });
+
+  useEffect(() => {
+    if (props.polishReview) {
+      hadPolishReviewRef.current = true;
+    } else if (hadPolishReviewRef.current && !isExporting) {
+      hadPolishReviewRef.current = false;
+      polishButtonRef.current?.focus();
+    }
+  }, [isExporting, props.polishReview]);
 
   const loadHeatmapData = useCallback(() => {
     if (heatmapLoading) return;
@@ -200,6 +269,11 @@ export function Workbench(props: Props) {
   }
 
   useEffect(() => {
+    if (workbenchView !== "health" || props.workspaceHealth || props.workspaceHealthLoading || props.workspaceHealthError) return;
+    props.onRefreshWorkspaceHealth();
+  }, [workbenchView, props.workspaceHealth, props.workspaceHealthLoading, props.workspaceHealthError, props.onRefreshWorkspaceHealth]);
+
+  useEffect(() => {
     if (!isPreviewExpanded) return;
 
     function onKeyDown(event: KeyboardEvent) {
@@ -212,22 +286,10 @@ export function Workbench(props: Props) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isPreviewExpanded]);
 
-  useEffect(() => {
-    if (!polishMenuOpen && !exportMenuOpen && !copyAsMenuOpen) return;
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setPolishMenuOpen(false);
-        setExportMenuOpen(false);
-        setCopyAsMenuOpen(false);
-      }
-    }
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [polishMenuOpen, exportMenuOpen, copyAsMenuOpen]);
-
   function handlePreviewChange(preview: PreviewMode) {
+    setPolishMenuOpen(false);
+    setExportMenuOpen(false);
+    setCopyAsMenuOpen(false);
     props.onPreviewChange(preview);
   }
 
@@ -261,32 +323,37 @@ export function Workbench(props: Props) {
       : props.activePreview === "custom"
         ? "请选择时间段生成自定义报告。"
         : "暂无日报内容。";
-  const generateButtonLabel = props.activePreview === "monthly"
-    ? "生成月报"
-    : props.activePreview === "weekly"
-      ? "生成周报"
-      : props.activePreview === "custom"
-        ? "生成自定义报告"
-        : "生成日报";
-  const generateButtonIcon = props.activePreview === "monthly" ? <FileDown size={15} /> : props.activePreview === "weekly" || props.activePreview === "custom" ? <CalendarDays size={15} /> : <GitBranch size={15} />;
+  const generateButtonLabel = isGenerating
+    ? "生成中"
+    : props.activePreview === "monthly"
+      ? "生成月报"
+      : props.activePreview === "weekly"
+        ? "生成周报"
+        : props.activePreview === "custom"
+          ? "生成自定义报告"
+          : "生成日报";
+  const generateButtonIcon = isGenerating
+    ? <Loader2 className="spin" size={15} />
+    : props.activePreview === "monthly"
+      ? <FileDown size={15} />
+      : props.activePreview === "weekly" || props.activePreview === "custom"
+        ? <CalendarDays size={15} />
+        : <GitBranch size={15} />;
   const enabledRepoCount = props.repos.filter((repo) => !props.disabledRepos.includes(repo.path)).length;
   const activeRangeLabel = formatActiveRange(props.activePreview, props.dailyDate, props.weeklyRange, props.monthlyRange, props.customRange);
   const exportConfigured = props.canExport;
-  const exportButtonLabel = exportConfigured ? "导出" : "设置导出";
+  const exportButtonLabel = isExporting ? "导出中" : exportConfigured ? "导出" : "设置导出";
   const exportButtonTitle = exportConfigured
     ? "导出为 Markdown"
     : props.outputEnabled
       ? "请选择输出目录后再导出报告"
       : "请先开启输出到文件并选择输出目录";
-  const repoMeta = enabledRepoCount === props.repos.length
-    ? `${props.repos.length} repos`
-    : `${enabledRepoCount}/${props.repos.length} repos`;
-  const scanProgressText = props.scanProgress
-    ? `已检查 ${props.scanProgress.scannedDirs} 个目录 · 发现 ${props.scanProgress.foundRepos} 个仓库`
-    : "";
   const extractProgressText = props.extractProgress && !props.extractProgress.done
-    ? `${props.extractProgress.completedRepos}/${props.extractProgress.totalRepos} 仓库 · ${props.extractProgress.concurrency} 并发 · ${props.extractProgress.commitCount} 条提交`
-    : props.status;
+    ? `提取中 · ${props.extractProgress.completedRepos}/${props.extractProgress.totalRepos} 仓库 · ${props.extractProgress.commitCount} 提交`
+    : activeTaskStatus || props.status;
+  const visibleStatus = isGenerating && props.extractProgress && !props.extractProgress.done
+    ? extractProgressText
+    : activeTaskStatus || props.status;
   const emptyReportAdvice = props.previewText && props.commitCount === 0 && !props.blankDayDraftActive
     ? buildEmptyReportAdvice({
       activePreview: props.activePreview,
@@ -318,13 +385,13 @@ export function Workbench(props: Props) {
         <div className="hero-copy">
           <div className="brand-logo hero-brand" role="img" aria-label="GitPulse" />
           <h2>工作报告工作台</h2>
-          <p className="hero-subcopy">本地 Git 数据源 · 日报可选单日 · 周报可选周次 · 月报可选月份 · 自定义可选周期</p>
+          <p className="hero-subcopy">扫描本地 Git，一键生成工作报告</p>
         </div>
         <div className="hero-aside">
           <div className="hero-actions">
             <div className="run-status">
-              {props.isBusy && <Loader2 className="spin" size={16} />}
-              <span>{props.status}</span>
+              {hasActiveTasks(props.activeTasks) && <Loader2 className="spin" size={16} />}
+              <span>{visibleStatus}</span>
             </div>
             <button className="settings-trigger" type="button" onClick={props.onOpenSettings} aria-label="打开设置">
               <Settings2 size={16} />
@@ -361,10 +428,22 @@ export function Workbench(props: Props) {
           role="tab"
           aria-selected={workbenchView === "insights"}
           className={workbenchView === "insights" ? "active" : ""}
+          disabled={reviewPending}
           onClick={() => handleViewChange("insights")}
         >
           <Activity size={14} />
           洞察
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={workbenchView === "health"}
+          className={workbenchView === "health" ? "active" : ""}
+          disabled={reviewPending}
+          onClick={() => handleViewChange("health")}
+        >
+          <ShieldCheck size={14} />
+          健康
         </button>
       </div>
 
@@ -375,19 +454,19 @@ export function Workbench(props: Props) {
             <div className="canvas-topline">
               <PanelTitle icon={<Sparkles size={17} />} title="报告预览" meta={previewMeta} />
               <div className="report-switch" aria-label="报告类型切换">
-                <button type="button" aria-pressed={props.activePreview === "summary"} className={props.activePreview === "summary" ? "active" : ""} onClick={() => handlePreviewChange("summary")}>
+                <button type="button" aria-pressed={props.activePreview === "summary"} className={props.activePreview === "summary" ? "active" : ""} disabled={reviewPending} onClick={() => handlePreviewChange("summary")}>
                   <span>Daily</span>
                   日报
                 </button>
-                <button type="button" aria-pressed={props.activePreview === "weekly"} className={props.activePreview === "weekly" ? "active" : ""} onClick={() => handlePreviewChange("weekly")}>
+                <button type="button" aria-pressed={props.activePreview === "weekly"} className={props.activePreview === "weekly" ? "active" : ""} disabled={reviewPending} onClick={() => handlePreviewChange("weekly")}>
                   <span>Weekly</span>
                   周报
                 </button>
-                <button type="button" aria-pressed={props.activePreview === "monthly"} className={props.activePreview === "monthly" ? "active" : ""} onClick={() => handlePreviewChange("monthly")}>
+                <button type="button" aria-pressed={props.activePreview === "monthly"} className={props.activePreview === "monthly" ? "active" : ""} disabled={reviewPending} onClick={() => handlePreviewChange("monthly")}>
                   <span>Monthly</span>
                   月报
                 </button>
-                <button type="button" aria-pressed={props.activePreview === "custom"} className={props.activePreview === "custom" ? "active" : ""} onClick={() => handlePreviewChange("custom")}>
+                <button type="button" aria-pressed={props.activePreview === "custom"} className={props.activePreview === "custom" ? "active" : ""} disabled={reviewPending} onClick={() => handlePreviewChange("custom")}>
                   <span>Custom</span>
                   自定义
                 </button>
@@ -403,13 +482,13 @@ export function Workbench(props: Props) {
                   monthlyMonth={props.monthlyMonth}
                   monthlyRange={props.monthlyRange}
                   customRange={props.customRange}
-                  isBusy={props.isBusy}
+                  periodLocked={isGenerating || reviewPending}
                   onDailyDateChange={props.onDailyDateChange}
                   onWeeklyWeekChange={props.onWeeklyWeekChange}
                   onMonthlyMonthChange={props.onMonthlyMonthChange}
                   onOpenCustomRange={() => setCustomDialogOpen(true)}
                 />
-                <button className="preview-generate-button" type="button" onClick={handleGenerate} disabled={props.isBusy}>
+                <button className="preview-generate-button" type="button" onClick={handleGenerate} disabled={generateBlocked}>
                   {generateButtonIcon}
                   {generateButtonLabel}
                 </button>
@@ -417,9 +496,8 @@ export function Workbench(props: Props) {
                   className="preview-generate-button"
                   type="button"
                   onClick={props.onOpenBatch}
-                  disabled={props.isBusy}
+                  disabled={generateBlocked}
                   title="批量生成多份报告"
-                  style={{ marginLeft: 4 }}
                 >
                   <Layers size={15} />
                   批量
@@ -428,7 +506,7 @@ export function Workbench(props: Props) {
                   <div className="blank-day-entry">
                     {blankDayTipOpen && (
                       <div className="blank-day-tip" role="status">
-                        <span>今天仓库静悄悄？用近几天的工作线索补一份日报草稿</span>
+                        <span>今天无提交？参考近期工作生成草稿</span>
                         <button
                           type="button"
                           className="blank-day-tip-close"
@@ -446,9 +524,8 @@ export function Workbench(props: Props) {
                       className={`preview-generate-button blank-day-button ${!props.aiConfigured ? "warning" : ""}`}
                       type="button"
                       onClick={props.onOpenBlankDayFill}
-                      disabled={props.isBusy || !props.aiConfigured}
+                      disabled={generateBlocked || !props.aiConfigured}
                       title={props.aiConfigured ? "基于近期 Git 线索，生成可编辑的日报延续草稿" : "请先配置 AI"}
-                      style={{ marginLeft: 4 }}
                     >
                       <Wand2 size={15} />
                       空白日补写
@@ -460,28 +537,42 @@ export function Workbench(props: Props) {
                 {props.previewText && (
                   <div className="polish-split">
                     <button
+                      ref={polishButtonRef}
                       className={`preview-polish-button ${!props.aiConfigured ? "warning" : ""}`}
                       type="button"
                       onClick={() => props.onPolish()}
-                      disabled={props.isBusy}
+                      disabled={polishBlocked || !props.aiConfigured}
                       title={props.aiConfigured ? "使用 AI 润色当前报告" : "请在设置中配置 AI"}
                     >
-                      <Sparkles size={15} />
-                      AI润色
+                      {isPolishing ? <Loader2 className="spin" size={15} /> : <Sparkles size={15} />}
+                      {isPolishing ? "润色中" : "AI润色"}
                     </button>
                     <button
+                      ref={polishMenuButtonRef}
                       className={`polish-split-toggle ${!props.aiConfigured ? "warning" : ""}`}
                       type="button"
-                      onClick={() => setPolishMenuOpen((current) => !current)}
-                      disabled={props.isBusy}
+                      onClick={() => {
+                        setExportMenuOpen(false);
+                        setCopyAsMenuOpen(false);
+                        setPolishMenuOpen((current) => !current);
+                      }}
+                      disabled={polishBlocked || !props.aiConfigured}
                       aria-expanded={polishMenuOpen}
+                      aria-haspopup="dialog"
+                      aria-controls="polish-extra-popover"
                       aria-label="带本次额外要求润色"
                       title="带本次额外要求润色"
                     >
                       <ChevronDown size={14} />
                     </button>
                     {polishMenuOpen && (
-                      <div className="polish-popover" role="dialog" aria-label="本次额外要求">
+                      <div
+                        ref={polishPopoverRef}
+                        id="polish-extra-popover"
+                        className="polish-popover"
+                        role="dialog"
+                        aria-label="本次额外要求"
+                      >
                         <span className="polish-popover-label">本次额外要求（可选）</span>
                         <textarea
                           className="polish-popover-input"
@@ -502,7 +593,7 @@ export function Workbench(props: Props) {
                               setPolishExtra("");
                               setPolishMenuOpen(false);
                             }}
-                            disabled={props.isBusy}
+                            disabled={polishBlocked || !props.aiConfigured}
                           >
                             <Sparkles size={14} />
                             带要求润色
@@ -514,25 +605,38 @@ export function Workbench(props: Props) {
                 )}
                 {props.previewText && (
                   <div className={`export-split ${exportConfigured ? "has-menu" : "needs-setup"}`}>
-                    <button className="preview-save-button" type="button" onClick={() => handleExport("markdown")} disabled={props.isBusy} title={exportButtonTitle}>
-                      <FileDown size={15} />
+                    <button className="preview-save-button" type="button" onClick={() => handleExport("markdown")} disabled={exportBlocked} title={exportButtonTitle}>
+                      {isExporting ? <Loader2 className="spin" size={15} /> : <FileDown size={15} />}
                       {exportButtonLabel}
                     </button>
                     {exportConfigured && (
                       <>
                         <button
+                          ref={exportMenuButtonRef}
                           className="export-split-toggle"
                           type="button"
-                          onClick={() => setExportMenuOpen((current) => !current)}
-                          disabled={props.isBusy}
+                          onClick={() => {
+                            setPolishMenuOpen(false);
+                            setCopyAsMenuOpen(false);
+                            setExportMenuOpen((current) => !current);
+                          }}
+                          disabled={exportBlocked}
                           aria-expanded={exportMenuOpen}
+                          aria-haspopup="menu"
+                          aria-controls="report-export-menu"
                           aria-label="选择导出格式"
                           title="选择导出格式"
                         >
                           <ChevronDown size={14} />
                         </button>
                         {exportMenuOpen && (
-                          <div className="export-popover" role="menu" aria-label="导出格式">
+                          <div
+                            ref={exportPopoverRef}
+                            id="report-export-menu"
+                            className="export-popover"
+                            role="menu"
+                            aria-label="导出格式"
+                          >
                             <button type="button" className="export-option" role="menuitem" onClick={() => handleExport("markdown")}>
                               <FileText size={15} />
                               <span>
@@ -561,25 +665,38 @@ export function Workbench(props: Props) {
                   </div>
                 )}
                 <div className="copy-split">
-                  <button className="preview-copy-button" type="button" onClick={props.onCopy} disabled={!props.previewText}>
-                    <Clipboard size={15} />
-                    复制
+                  <button className="preview-copy-button" type="button" onClick={props.onCopy} disabled={!props.previewText || interactionBlocked}>
+                    {isInteracting ? <Loader2 className="spin" size={15} /> : <Clipboard size={15} />}
+                    {isInteracting ? "复制中" : "复制"}
                   </button>
                   {props.previewText && (
                     <>
                       <button
+                        ref={copyMenuButtonRef}
                         className="copy-split-toggle"
                         type="button"
-                        onClick={() => setCopyAsMenuOpen((current) => !current)}
-                        disabled={!props.previewText}
+                        onClick={() => {
+                          setPolishMenuOpen(false);
+                          setExportMenuOpen(false);
+                          setCopyAsMenuOpen((current) => !current);
+                        }}
+                        disabled={!props.previewText || interactionBlocked}
                         aria-expanded={copyAsMenuOpen}
+                        aria-haspopup="menu"
+                        aria-controls="report-copy-menu"
                         aria-label="复制为其他格式"
                         title="复制为其他格式"
                       >
                         <ChevronDown size={14} />
                       </button>
                       {copyAsMenuOpen && (
-                        <div className="copy-as-popover" role="menu" aria-label="复制格式">
+                        <div
+                          ref={copyPopoverRef}
+                          id="report-copy-menu"
+                          className="copy-as-popover"
+                          role="menu"
+                          aria-label="复制格式"
+                        >
                           {REPORT_FORMAT_PRESETS.filter((p) => p.id !== "default").map((preset) => (
                             <button
                               key={preset.id}
@@ -606,6 +723,11 @@ export function Workbench(props: Props) {
                 </div>
               </div>
             </div>
+            <SupplementalItemsEditor
+              value={props.supplementalItemsText}
+              disabled={isGenerating || isPolishing || reviewPending}
+              onChange={props.onSupplementalItemsChange}
+            />
             <GenerationScopeStrip
               activePreview={props.activePreview}
               rangeLabel={activeRangeLabel}
@@ -620,7 +742,14 @@ export function Workbench(props: Props) {
             />
           </div>
           <div className="preview-shell">
-            {props.isBusy ? (
+            {props.polishReview ? (
+              <ReportPolishReviewPanel
+                review={props.polishReview}
+                accepting={isExporting}
+                onAccept={props.onAcceptPolishReview}
+                onReject={props.onRejectPolishReview}
+              />
+            ) : isGenerating ? (
               <div className="preview-loading">
                 <Loader2 className="spin" size={32} />
                 <p>{extractProgressText}</p>
@@ -680,91 +809,30 @@ export function Workbench(props: Props) {
 
           <div className="assist-panel">
             {visibleAssistPanel === "repos" && (
-              <section className="repo-drawer" aria-label="仓库索引">
-                <PanelTitle
-                  icon={<TerminalSquare size={17} />}
-                  title="仓库索引"
-                  meta={repoMeta}
-                  action={(
-                    <button
-                      className="repo-refresh-button"
-                      type="button"
-                      onClick={props.isRepoScanning ? props.onCancelRepoScan : props.onRefreshRepos}
-                      disabled={props.isBusy && !props.isRepoScanning}
-                      aria-label={props.isRepoScanning ? "取消仓库扫描" : "重新扫描仓库索引"}
-                      title={props.isRepoScanning ? "取消仓库扫描" : "重新扫描仓库索引"}
-                    >
-                      {props.isRepoScanning ? <XCircle size={14} /> : <RefreshCw size={14} />}
-                      {props.isRepoScanning ? "取消扫描" : "重新扫描"}
-                    </button>
-                  )}
-                />
-                {props.isRepoScanning && props.scanProgress && (
-                  <div className="repo-scan-progress" role="status" aria-live="polite">
-                    <div>
-                      <Loader2 className="spin" size={14} />
-                      <span>{scanProgressText}</span>
-                    </div>
-                    {props.scanProgress.currentPath && (
-                      <span className="repo-scan-path" title={props.scanProgress.currentPath}>
-                        {props.scanProgress.currentPath}
-                      </span>
-                    )}
-                  </div>
-                )}
-                <div className="repo-list">
-                  {props.repos.length === 0 && (
-                    <RepoEmptyState
-                      hasRootDirs={props.rootDirs.length > 0}
-                      isBusy={props.isBusy}
-                      isRepoScanning={props.isRepoScanning}
-                      onAddRootDirs={props.onAddRootDirs}
-                      onRefreshRepos={props.onRefreshRepos}
-                      onOpenSettings={props.onOpenSettings}
-                    />
-                  )}
-                  {props.repos.map((repo) => {
-                    const enabled = !props.disabledRepos.includes(repo.path);
-                    const displayName = resolveRepoDisplayName(repo, props.projectNames);
-                    const isMapped = displayName !== repo.name;
-                    return (
-                      <article className={`repo-row ${enabled ? "" : "disabled"}`} key={repo.path}>
-                        <label
-                          className="repo-toggle"
-                          title={enabled ? "已纳入报告，点击排除该仓库" : "已排除，点击重新纳入报告"}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={enabled}
-                            onChange={(event) => props.onToggleRepo(repo.path, event.target.checked)}
-                          />
-                          <span aria-hidden="true" />
-                        </label>
-                        <button
-                          type="button"
-                          className="repo-info"
-                          onClick={() => props.onEditRepo(repo)}
-                          title="点击编辑项目映射名称"
-                        >
-                          <strong className="repo-display-name">{displayName}</strong>
-                          <span className="repo-meta">
-                            {isMapped && <em className="repo-origin">{repo.name}</em>}
-                            <em className="repo-branch" title={repo.branch}>{repo.branch}</em>
-                          </span>
-                          <span className="repo-path">{repo.path}</span>
-                        </button>
-                      </article>
-                    );
-                  })}
-                </div>
-              </section>
+              <RepositoryPanel
+                repos={props.repos}
+                disabledRepos={props.disabledRepos}
+                projectNames={props.projectNames}
+                rootDirs={props.rootDirs}
+                isScanning={isRepoScanning}
+                scanBlocked={scanBlocked}
+                scanProgress={props.scanProgress}
+                onToggleRepo={props.onToggleRepo}
+                onSetReposEnabled={props.onSetReposEnabled}
+                onEditRepo={props.onEditRepo}
+                onRefreshRepos={props.onRefreshRepos}
+                onCancelRepoScan={props.onCancelRepoScan}
+                onAddRootDirs={props.onAddRootDirs}
+                onOpenSettings={props.onOpenSettings}
+              />
             )}
 
             {visibleAssistPanel === "history" && (
               <ReportHistoryPanel
                 entries={props.reportHistory}
                 activeHistoryId={props.activeHistoryId}
-                isBusy={props.isBusy}
+                generationBlocked={generateBlocked}
+                reportLocked={reviewPending}
                 onOpen={props.onOpenHistory}
                 onCopy={props.onCopyHistory}
                 onRegenerate={props.onRegenerateHistory}
@@ -787,7 +855,7 @@ export function Workbench(props: Props) {
           </div>
         </aside>
       </div>
-      ) : (
+      ) : workbenchView === "insights" ? (
       <InsightsView
         heatmapData={heatmapData}
         heatmapLoading={heatmapLoading}
@@ -804,7 +872,7 @@ export function Workbench(props: Props) {
         onRefresh={refreshInsightsData}
         reportHistory={props.reportHistory}
         aiConfigured={props.aiConfigured}
-        isBusy={props.isBusy}
+        generationBlocked={generateBlocked}
         onOpenHistory={(entry) => {
           setWorkbenchView("report");
           props.onOpenHistory(entry);
@@ -817,6 +885,21 @@ export function Workbench(props: Props) {
           setWorkbenchView("report");
           props.onOpenBlankDayFillFromCalendar(date);
         }}
+      />
+      ) : (
+      <WorkspaceHealthView
+        result={props.workspaceHealth}
+        loading={props.workspaceHealthLoading}
+        error={props.workspaceHealthError}
+        scannedAt={props.repoScannedAt}
+        rootDirs={props.rootDirs}
+        rescanning={isRepoScanning}
+        scanBlocked={scanBlocked}
+        onRefresh={props.onRefreshWorkspaceHealth}
+        onRescan={props.onRefreshRepos}
+        onOpenSettings={props.onOpenSettings}
+        onToggleRepo={props.onToggleRepo}
+        onRemoveRepo={props.onRemoveRepoFromIndex}
       />
       )}
 
@@ -843,10 +926,10 @@ export function Workbench(props: Props) {
                 {emptyReportAdvice.checks.map((check) => <li key={check}>{check}</li>)}
               </ul>
               <div className="empty-report-actions">
-                <button type="button" onClick={props.onOpenSettings} disabled={props.isBusy}>
+                <button type="button" onClick={props.onOpenSettings}>
                   检查作者/分支
                 </button>
-                <button type="button" onClick={props.onRefreshRepos} disabled={props.isBusy || props.isRepoScanning}>
+                <button type="button" onClick={props.onRefreshRepos} disabled={scanBlocked}>
                   重新扫描仓库
                 </button>
               </div>
@@ -858,7 +941,7 @@ export function Workbench(props: Props) {
       <CustomRangeDialog
         open={customDialogOpen}
         initialRange={props.customRange}
-        isBusy={props.isBusy}
+        generationBlocked={generateBlocked}
         onClose={() => setCustomDialogOpen(false)}
         onConfirm={generateCustom}
       />
@@ -869,7 +952,8 @@ export function Workbench(props: Props) {
 function ReportHistoryPanel({
   entries,
   activeHistoryId,
-  isBusy,
+  generationBlocked,
+  reportLocked,
   onOpen,
   onCopy,
   onRegenerate,
@@ -877,7 +961,8 @@ function ReportHistoryPanel({
 }: {
   entries: ReportHistoryEntry[];
   activeHistoryId: string;
-  isBusy: boolean;
+  generationBlocked: boolean;
+  reportLocked: boolean;
   onOpen: (entry: ReportHistoryEntry) => void;
   onCopy: (entry: ReportHistoryEntry) => void;
   onRegenerate: (entry: ReportHistoryEntry) => void;
@@ -920,14 +1005,14 @@ function ReportHistoryPanel({
         title="最近报告"
         meta={entries.length > 0 ? (hasFilters ? `${filteredEntries.length}/${entries.length} 条` : `${entries.length} 条`) : "生成后自动记录"}
         action={(
-          <button className="history-clear-button" type="button" onClick={onClear} disabled={entries.length === 0 || isBusy}>
+          <button className="history-clear-button" type="button" onClick={onClear} disabled={entries.length === 0 || generationBlocked || reportLocked}>
             <Trash2 size={13} />
             清空
           </button>
         )}
       />
       {entries.length === 0 ? (
-        <p className="history-empty">生成报告后会在这里保留最近记录，可重新打开、复制或按同一周期重新生成。</p>
+        <p className="history-empty">暂无历史报告，生成后可在此打开、复制或重新生成。</p>
       ) : (
         <>
           <HistoryFilterBar
@@ -941,12 +1026,13 @@ function ReportHistoryPanel({
             onReset={resetFilters}
           />
           {filteredEntries.length === 0 ? (
-            <p className="history-empty">没有匹配的历史报告，请调整筛选条件。</p>
+            <p className="history-empty">没有匹配记录，请调整筛选。</p>
           ) : (
             <HistoryList
               entries={filteredEntries}
               activeHistoryId={activeHistoryId}
-              isBusy={isBusy}
+              generationBlocked={generationBlocked}
+              reportLocked={reportLocked}
               onOpen={onOpen}
               onCopy={onCopy}
               onRegenerate={onRegenerate}
@@ -1017,79 +1103,19 @@ function HistoryFilterBar({
   );
 }
 
-function RepoEmptyState({
-  hasRootDirs,
-  isBusy,
-  isRepoScanning,
-  onAddRootDirs,
-  onRefreshRepos,
-  onOpenSettings,
-}: {
-  hasRootDirs: boolean;
-  isBusy: boolean;
-  isRepoScanning: boolean;
-  onAddRootDirs: () => void;
-  onRefreshRepos: () => void;
-  onOpenSettings: () => void;
-}) {
-  const scanningDisabled = isBusy || isRepoScanning;
-  return (
-    <section className="repo-empty-state" aria-label="仓库索引为空">
-      <div className="repo-empty-icon" aria-hidden="true">
-        <TerminalSquare size={18} />
-      </div>
-      <div className="repo-empty-copy">
-        <strong>{hasRootDirs ? "还没有扫描到 Git 仓库" : "先添加仓库根目录"}</strong>
-        <p>
-          {hasRootDirs
-            ? "已配置目录，但当前索引为空。通常是目录层级不对、目录下没有 .git，或扫描还没有重新执行。"
-            : "选择存放代码项目的文件夹后，GitPulse 会扫描其中的本地 Git 仓库。"}
-        </p>
-      </div>
-      {hasRootDirs ? (
-        <ul className="repo-empty-checks">
-          <li>确认选择的是包含项目的上层目录。</li>
-          <li>确认项目目录内存在 `.git`。</li>
-          <li>移动或新增仓库后请重新扫描。</li>
-        </ul>
-      ) : (
-        <ul className="repo-empty-checks">
-          <li>可以选择 `D:\workspace` 这类项目集合目录。</li>
-          <li>多个工作区可分次添加。</li>
-        </ul>
-      )}
-      <div className="repo-empty-actions">
-        <button type="button" onClick={onAddRootDirs} disabled={isBusy}>
-          <FolderPlus size={14} />
-          {hasRootDirs ? "添加其他目录" : "添加目录"}
-        </button>
-        {hasRootDirs ? (
-          <button type="button" onClick={onRefreshRepos} disabled={scanningDisabled}>
-            <RefreshCw size={14} />
-            重新扫描
-          </button>
-        ) : (
-          <button type="button" onClick={onOpenSettings}>
-            <Settings2 size={14} />
-            打开设置
-          </button>
-        )}
-      </div>
-    </section>
-  );
-}
-
 function HistoryList({
   entries,
   activeHistoryId,
-  isBusy,
+  generationBlocked,
+  reportLocked,
   onOpen,
   onCopy,
   onRegenerate,
 }: {
   entries: ReportHistoryEntry[];
   activeHistoryId: string;
-  isBusy: boolean;
+  generationBlocked: boolean;
+  reportLocked: boolean;
   onOpen: (entry: ReportHistoryEntry) => void;
   onCopy: (entry: ReportHistoryEntry) => void;
   onRegenerate: (entry: ReportHistoryEntry) => void;
@@ -1101,7 +1127,8 @@ function HistoryList({
           key={entry.id}
           entry={entry}
           active={entry.id === activeHistoryId}
-          isBusy={isBusy}
+          generationBlocked={generationBlocked}
+          reportLocked={reportLocked}
           onOpen={onOpen}
           onCopy={onCopy}
           onRegenerate={onRegenerate}
@@ -1114,21 +1141,23 @@ function HistoryList({
 function HistoryRow({
   entry,
   active,
-  isBusy,
+  generationBlocked,
+  reportLocked,
   onOpen,
   onCopy,
   onRegenerate,
 }: {
   entry: ReportHistoryEntry;
   active: boolean;
-  isBusy: boolean;
+  generationBlocked: boolean;
+  reportLocked: boolean;
   onOpen: (entry: ReportHistoryEntry) => void;
   onCopy: (entry: ReportHistoryEntry) => void;
   onRegenerate: (entry: ReportHistoryEntry) => void;
 }) {
   return (
     <article className={`history-row ${active ? "active" : ""}`}>
-      <button className="history-open-button" type="button" onClick={() => onOpen(entry)} aria-pressed={active} title="打开这份历史报告">
+      <button className="history-open-button" type="button" onClick={() => onOpen(entry)} disabled={reportLocked} aria-pressed={active} title="打开这份历史报告">
         <span className="history-kind">{getHistoryKindLabel(entry.mode)}</span>
         <span className="history-mainline">
           <strong>{entry.title}</strong>
@@ -1146,7 +1175,7 @@ function HistoryRow({
           <Clipboard size={13} />
           复制
         </button>
-        <button type="button" onClick={() => onRegenerate(entry)} disabled={isBusy} title="按该周期重新生成">
+        <button type="button" onClick={() => onRegenerate(entry)} disabled={generationBlocked} title="按该周期重新生成">
           <RotateCcw size={13} />
           重跑
         </button>
@@ -1203,7 +1232,7 @@ function ReportPeriodControl({
   monthlyMonth,
   monthlyRange,
   customRange,
-  isBusy,
+  periodLocked,
   onDailyDateChange,
   onWeeklyWeekChange,
   onMonthlyMonthChange,
@@ -1216,7 +1245,7 @@ function ReportPeriodControl({
   monthlyMonth: string;
   monthlyRange: DateRange;
   customRange: DateRange;
-  isBusy: boolean;
+  periodLocked: boolean;
   onDailyDateChange: (date: string) => void;
   onWeeklyWeekChange: (week: string) => void;
   onMonthlyMonthChange: (month: string) => void;
@@ -1240,7 +1269,7 @@ function ReportPeriodControl({
         <input
           type="date"
           value={dailyDate}
-          disabled={isBusy}
+          disabled={periodLocked}
           aria-label="选择日报日期"
           onChange={(event) => event.target.value && onDailyDateChange(event.target.value)}
         />
@@ -1249,7 +1278,7 @@ function ReportPeriodControl({
         <input
           type="week"
           value={weeklyWeek}
-          disabled={isBusy}
+          disabled={periodLocked}
           aria-label="选择周报周次"
           onChange={(event) => event.target.value && onWeeklyWeekChange(event.target.value)}
         />
@@ -1258,7 +1287,7 @@ function ReportPeriodControl({
         <input
           type="month"
           value={monthlyMonth}
-          disabled={isBusy}
+          disabled={periodLocked}
           aria-label="选择月报月份"
           onChange={(event) => event.target.value && onMonthlyMonthChange(event.target.value)}
         />
@@ -1267,7 +1296,7 @@ function ReportPeriodControl({
         <button
           className="period-range-button"
           type="button"
-          disabled={isBusy}
+          disabled={periodLocked}
           onClick={onOpenCustomRange}
         >
           {rangeLabel}

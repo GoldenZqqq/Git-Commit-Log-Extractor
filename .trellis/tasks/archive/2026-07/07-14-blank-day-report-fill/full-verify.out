@@ -1,0 +1,21 @@
+start 2026-07-14T19:56:11.8750078+08:00
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.75s
+     Running unittests src\lib.rs (target\debug\deps\gitpulse_lib-959423b060461830.exe)
+
+running 1 test
+test ai::tests::blank_day_user_prompt_includes_item_count ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 98 filtered out; finished in 0.00s
+
+     Running unittests src\main.rs (target\debug\deps\gitpulse-c2dc4addc30d6f5e.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+test_exit=0
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.54s
+check_exit=0
+npm warn Unknown user config "sass_binary_site". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+tsc_exit=0
+DONE 2026-07-14T19:56:25.3788866+08:00
