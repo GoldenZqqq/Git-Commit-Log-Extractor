@@ -36,7 +36,7 @@ dry-run 执行第 1、2 项并展示版本计划，不读取签名密钥、不�
 3. 确认 draft 资产完整后，将 draft 发布；GitHub 以已经通过验证的 `origin/main` SHA 创建 tag。
 4. draft 创建或上传失败时删除本次 draft；远端不产生新 tag，也不会更新 `latest`。
 
-`current` 模式只允许现有 tag 指向当前主线提交，用于重传同版本资产；不移动 tag。既有已发布 Release 不在失败补偿中删除。
+`current` 模式只用于恢复已经 push 但尚未完成的版本提交：current-version tag 必须仍不存在，然后继续走新 draft 事务。已发布 Windows 资产保持不可变，脚本拒绝覆盖已有 tag/Release；macOS/Linux 补包继续走受控 `workflow_dispatch`。
 
 ## Documentation Scope
 

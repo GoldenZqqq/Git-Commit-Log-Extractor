@@ -105,7 +105,7 @@ export const pageContent: Record<Locale, PageContent> = {
       actionsLabel: "主要操作",
       factsLabel: "产品特性摘要",
       facts: [
-        { value: "12+", label: "核心功能" },
+        { value: "18+", label: "核心功能" },
         { value: "CLI", label: "命令行支持" },
         { value: "0", label: "默认云端依赖" },
       ],
@@ -145,7 +145,11 @@ export const pageContent: Record<Locale, PageContent> = {
         { title: "CLI 命令行模式", body: "无 GUI 依赖的 gitpulse-cli，可集成到 cron job、CI pipeline 和飞书机器人。" },
         { title: "IM 格式适配", body: "内置飞书、钉钉、企微、Confluence、纯文本预设，一键复制成目标平台格式。" },
         { title: "项目名映射", body: "把仓库名和分支名映射成业务项目名，报告读起来更像真实交付。" },
-        { title: "AI 润色可选", body: "支持 OpenAI 兼容、Anthropic 原生与 Codex OAuth，失败时自动回退本地模板。" },
+        { title: "补充工作事项", body: "把会议、设计、联调和上线支持等非 Git 事实纳入报告与历史。" },
+        { title: "可审计 AI 润色", body: "接受前查看原稿与润色稿差异；Codex OAuth 明确标为实验能力，失败时回退本地模板。" },
+        { title: "工作区健康", body: "识别不可访问或异常仓库，并支持搜索、批量启停和快速重扫。" },
+        { title: "本地历史与项目回顾", body: "带备份恢复的文件化历史，按项目回看报告、提交证据、AI 与导出状态。" },
+        { title: "脱敏配置迁移", body: "导入导出可共享配置，不包含 API Key 等敏感凭据。" },
         { title: "报告脱敏", body: "可配置替换规则，对仓库名、分支、作者、commit hash 系统化脱敏后安全分享。" },
         { title: "桌面轻量", body: "Tauri 2 + Rust 打包，启动快，不需要 Python 或额外运行时。" },
       ],
@@ -193,6 +197,24 @@ export const pageContent: Record<Locale, PageContent> = {
       eyebrow: "Changelog",
       title: "版本更新日志",
       versions: [
+        {
+          version: "0.5.3",
+          date: "2026-07-18",
+          changes: [
+            "支持脱敏配置方案导入导出，并隔离实验性 Codex OAuth",
+            "加固弹层键盘操作、焦点管理与 320px / 200% 缩放布局",
+            "补齐 a11y、响应式与真实 Windows Tauri WebView smoke 门禁",
+          ],
+        },
+        {
+          version: "0.5.2",
+          date: "2026-07-16",
+          changes: [
+            "报告历史迁移到带备份恢复的本地文件存储，并增加项目回顾",
+            "新增工作区健康、仓库搜索批量启停和扫描循环保护",
+            "支持补充非 Git 工作事项与 AI 润色前后对照",
+          ],
+        },
         {
           version: "0.4.3",
           date: "2026-07-10",
@@ -257,7 +279,7 @@ export const pageContent: Record<Locale, PageContent> = {
       actionsLabel: "Primary actions",
       factsLabel: "Product facts",
       facts: [
-        { value: "12+", label: "core features" },
+        { value: "18+", label: "core features" },
         { value: "CLI", label: "command-line support" },
         { value: "0", label: "default cloud dependency" },
       ],
@@ -297,7 +319,11 @@ export const pageContent: Record<Locale, PageContent> = {
         { title: "CLI mode", body: "GUI-free gitpulse-cli binary for cron jobs, CI pipelines, and chat-bot integrations." },
         { title: "IM format presets", body: "Built-in templates for Feishu, DingTalk, WeCom, Confluence, and plain text — copy in one click." },
         { title: "Project name mapping", body: "Map repositories and branches to readable business project names for cleaner reports." },
-        { title: "Optional AI polishing", body: "Use OpenAI-compatible, Anthropic native, or Codex OAuth APIs, with local template fallback." },
+        { title: "Supplemental work items", body: "Include meetings, design, integration, and production support that have no Git commit." },
+        { title: "Reviewable AI polishing", body: "Review the original and polished drafts before accepting; Codex OAuth stays explicitly experimental." },
+        { title: "Workspace health", body: "Find inaccessible or stale repositories, then search, bulk enable or disable, and rescan." },
+        { title: "Local history and project review", body: "File-backed history with recovery, plus project timelines for evidence, AI, and exports." },
+        { title: "Redacted config migration", body: "Move shareable settings between machines without API keys or other credentials." },
         { title: "Report redaction", body: "Configurable rules to mask repo names, branches, authors, and commit hashes before sharing." },
         { title: "Light desktop app", body: "Built with Tauri 2 and Rust, with fast startup and no Python runtime dependency." },
       ],
@@ -345,6 +371,24 @@ export const pageContent: Record<Locale, PageContent> = {
       eyebrow: "Changelog",
       title: "Release Notes",
       versions: [
+        {
+          version: "0.5.3",
+          date: "2026-07-18",
+          changes: [
+            "Added redacted configuration import/export and isolated experimental Codex OAuth",
+            "Hardened keyboard focus, dialogs, 320px layouts, and 200% equivalent zoom",
+            "Added accessibility, responsive, and real Windows Tauri WebView CI gates",
+          ],
+        },
+        {
+          version: "0.5.2",
+          date: "2026-07-16",
+          changes: [
+            "Moved report history to recoverable local file storage and added project review",
+            "Added workspace health, repository bulk controls, and scan loop protection",
+            "Added supplemental non-Git work items and reviewable AI polish diffs",
+          ],
+        },
         {
           version: "0.4.3",
           date: "2026-07-10",

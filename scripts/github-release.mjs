@@ -2,7 +2,6 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   captureGit,
-  ensureGitRepo,
   runGit,
   tryCaptureGit,
 } from "./git-cli.mjs";
@@ -43,61 +42,62 @@ export function buildReleaseAssetDownloadUrl(config, tagName, assetName) {
   return `${config.webBaseUrl}/${encodeRepoPath(config.repo)}/releases/download/${encodeURIComponent(tagName)}/${encodeURIComponent(assetName)}`;
 }
 
-export function validateGitHubReleaseWorktree(rootDir) {
-  ensureGitRepo(rootDir);
-  const branch = captureGit(rootDir, ["rev-parse", "--abbrev-ref", "HEAD"]);
-  if (!branch || branch === "HEAD") {
-    throw new Error("GitHub Release 发布必须在具名分支上执行，当前不支持 detached HEAD");
+export async function stageAndPublishGitHubRelease({
+  filePaths,
+  fetchImpl = fetch,
+  githubConfig,
+  releasePayload,
+}) {
+  const existing = await getReleaseByTag(
+    githubConfig,
+    releasePayload.tagName,
+    fetchImpl,
+  );
+  if (existing) {
+    throw new Error(`Release ${releasePayload.tagName} 已存在；新版本发布不会覆盖既有 Release`);
+  }
+  const existingTag = await getTagRef(githubConfig, releasePayload.tagName, fetchImpl);
+  if (existingTag) {
+    throw new Error(`标签 ${releasePayload.tagName} 已存在；新版本发布不会移动或复用既有标签`);
   }
 
-  const dirtyFiles = captureGit(rootDir, ["status", "--short"]);
-  if (dirtyFiles) {
-    throw new Error("启用 GitHub Release 前请先提交或暂存现有改动，避免源码 tag 与安装包不一致");
+  let draft;
+  try {
+    draft = await createDraftRelease(githubConfig, releasePayload, fetchImpl);
+    await syncReleaseAssets(githubConfig, draft, filePaths, fetchImpl);
+    return await publishDraftRelease(githubConfig, draft.id, releasePayload, fetchImpl);
+  } catch (error) {
+    await cleanupReleaseTransaction(githubConfig, draft, releasePayload, fetchImpl);
+    throw error;
   }
-
-  captureGit(rootDir, ["remote", "get-url", "origin"]);
-  return { branch };
 }
 
-export async function publishGitHubRelease({
-  branch,
-  githubConfig,
-  installerArtifact,
-  installerUrl,
-  manifestPath,
-  manifestUrl,
-  notes,
-  releasePlan,
-  releaseVersion,
-  rootDir,
-  updaterSignaturePath,
-}) {
-  console.log("准备同步 GitHub Release...");
-  syncRemoteTags(rootDir);
+export function commitReleaseVersion(rootDir, releaseVersion) {
+  const filesToStage = VERSION_FILES
+    .map((filePath) => path.join(rootDir, filePath))
+    .filter((filePath) => fs.existsSync(filePath))
+    .map((filePath) => path.relative(rootDir, filePath));
 
-  if (releasePlan.kind !== "current") {
-    commitReleaseVersion(rootDir, releaseVersion);
+  runGit(rootDir, ["add", "--", ...filesToStage]);
+  const staged = captureGit(rootDir, ["diff", "--cached", "--name-only"]);
+  if (!staged) return false;
+
+  runGit(rootDir, ["commit", "-m", `chore: 发布 v${releaseVersion}`]);
+  return true;
+}
+
+export function pushReleaseBranch(rootDir, branch = "main") {
+  runGit(rootDir, ["push", "origin", branch]);
+}
+
+export function findLocalTagAtHead(rootDir, tagName) {
+  const headSha = captureGit(rootDir, ["rev-parse", "HEAD"]);
+  const tagSha = tryCaptureGit(rootDir, ["rev-list", "-n", "1", tagName]);
+  if (!tagSha) return null;
+  if (tagSha !== headSha) {
+    throw new Error(`标签 ${tagName} 未指向当前主线提交，current 模式拒绝继续`);
   }
-
-  const tagName = `v${releaseVersion}`;
-  ensureLocalTagAtHead(rootDir, tagName);
-  pushReleaseRefs(rootDir, branch, tagName);
-
-  const releasePayload = {
-    body: buildReleaseBody(notes, installerUrl, manifestUrl),
-    name: `GitPulse ${tagName}`,
-    tagName,
-    targetCommitish: branch,
-  };
-
-  const release = await upsertRelease(githubConfig, releasePayload);
-  await syncReleaseAssets(githubConfig, release, [
-    installerArtifact,
-    updaterSignaturePath,
-    manifestPath,
-  ]);
-
-  return release.html_url;
+  return tagSha;
 }
 
 function resolveGitHubRepo(rootDir) {
@@ -110,43 +110,7 @@ function resolveGitHubRepo(rootDir) {
   return match[1];
 }
 
-function syncRemoteTags(rootDir) {
-  runGit(rootDir, ["fetch", "origin", "--tags"]);
-}
-
-function commitReleaseVersion(rootDir, releaseVersion) {
-  const filesToStage = VERSION_FILES
-    .map((filePath) => path.join(rootDir, filePath))
-    .filter((filePath) => fs.existsSync(filePath))
-    .map((filePath) => path.relative(rootDir, filePath));
-
-  runGit(rootDir, ["add", "--", ...filesToStage]);
-  const staged = captureGit(rootDir, ["diff", "--cached", "--name-only"]);
-  if (!staged) return;
-
-  runGit(rootDir, ["commit", "-m", `chore: 发布 v${releaseVersion}`]);
-}
-
-function ensureLocalTagAtHead(rootDir, tagName) {
-  const headSha = captureGit(rootDir, ["rev-parse", "HEAD"]);
-  const tagSha = tryCaptureGit(rootDir, ["rev-list", "-n", "1", tagName]);
-
-  if (!tagSha) {
-    runGit(rootDir, ["tag", tagName]);
-    return;
-  }
-
-  if (tagSha !== headSha) {
-    throw new Error(`标签 ${tagName} 已存在，但未指向当前提交，请先人工处理`);
-  }
-}
-
-function pushReleaseRefs(rootDir, branch, tagName) {
-  runGit(rootDir, ["push", "origin", branch]);
-  runGit(rootDir, ["push", "origin", tagName]);
-}
-
-function buildReleaseBody(notes, installerUrl, manifestUrl) {
+export function buildReleaseBody(notes, installerUrl, manifestUrl) {
   return [
     notes,
     "",
@@ -156,44 +120,123 @@ function buildReleaseBody(notes, installerUrl, manifestUrl) {
   ].join("\n");
 }
 
-async function upsertRelease(config, releasePayload) {
-  const existing = await getReleaseByTag(config, releasePayload.tagName);
-  if (existing) {
-    return githubJson(config, `/repos/${config.repo}/releases/${existing.id}`, {
-      body: {
-        body: releasePayload.body,
-        draft: false,
-        make_latest: "true",
-        name: releasePayload.name,
-        prerelease: false,
-        target_commitish: releasePayload.targetCommitish,
-      },
-      method: "PATCH",
-    });
-  }
-
+async function createDraftRelease(config, releasePayload, fetchImpl) {
   return githubJson(config, `/repos/${config.repo}/releases`, {
     body: {
       body: releasePayload.body,
-      draft: false,
-      make_latest: "true",
+      draft: true,
+      make_latest: "false",
       name: releasePayload.name,
       prerelease: false,
       tag_name: releasePayload.tagName,
       target_commitish: releasePayload.targetCommitish,
     },
     method: "POST",
-  });
+  }, fetchImpl);
 }
 
-async function getReleaseByTag(config, tagName) {
-  const response = await githubFetch(config, `/repos/${config.repo}/releases/tags/${encodeURIComponent(tagName)}`);
+async function publishDraftRelease(config, releaseId, releasePayload, fetchImpl) {
+  return githubJson(config, `/repos/${config.repo}/releases/${releaseId}`, {
+    body: {
+      body: releasePayload.body,
+      draft: false,
+      make_latest: "true",
+      name: releasePayload.name,
+      prerelease: false,
+      target_commitish: releasePayload.targetCommitish,
+    },
+    method: "PATCH",
+  }, fetchImpl);
+}
+
+async function cleanupDraftRelease(config, releaseId, fetchImpl) {
+  try {
+    const release = await githubJson(
+      config,
+      `/repos/${config.repo}/releases/${releaseId}`,
+      { method: "GET" },
+      fetchImpl,
+    );
+    if (!release?.draft) return;
+    await githubJson(
+      config,
+      `/repos/${config.repo}/releases/${releaseId}`,
+      { method: "DELETE" },
+      fetchImpl,
+    );
+  } catch (cleanupError) {
+    const reason = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+    console.error(`清理 draft Release ${releaseId} 失败：${reason}`);
+  }
+}
+
+async function cleanupReleaseTransaction(config, draft, releasePayload, fetchImpl) {
+  let draftToClean = draft;
+  if (!draftToClean) {
+    try {
+      draftToClean = await findDraftReleaseByTag(config, releasePayload.tagName, fetchImpl);
+    } catch (cleanupError) {
+      const reason = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+      console.error(`查找事务 draft ${releasePayload.tagName} 失败：${reason}`);
+    }
+  }
+  if (draftToClean) await cleanupDraftRelease(config, draftToClean.id, fetchImpl);
+  await cleanupTransactionTag(config, releasePayload, fetchImpl);
+}
+
+async function findDraftReleaseByTag(config, tagName, fetchImpl) {
+  const releases = await githubJson(
+    config,
+    `/repos/${config.repo}/releases?per_page=100`,
+    { method: "GET" },
+    fetchImpl,
+  );
+  return releases.find((release) => release.draft && release.tag_name === tagName);
+}
+
+async function cleanupTransactionTag(config, releasePayload, fetchImpl) {
+  try {
+    const published = await getReleaseByTag(config, releasePayload.tagName, fetchImpl);
+    if (published && !published.draft) return;
+    const tagRef = await getTagRef(config, releasePayload.tagName, fetchImpl);
+    if (!tagRef || tagRef.object?.sha !== releasePayload.targetCommitish) return;
+    await githubJson(
+      config,
+      `/repos/${config.repo}/git/refs/tags/${encodeURIComponent(releasePayload.tagName)}`,
+      { method: "DELETE" },
+      fetchImpl,
+    );
+  } catch (cleanupError) {
+    const reason = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+    console.error(`清理事务标签 ${releasePayload.tagName} 失败：${reason}`);
+  }
+}
+
+async function getTagRef(config, tagName, fetchImpl = fetch) {
+  const response = await githubFetch(
+    config,
+    `/repos/${config.repo}/git/ref/tags/${encodeURIComponent(tagName)}`,
+    {},
+    fetchImpl,
+  );
   if (response.status === 404) return null;
   return parseGitHubResponse(response);
 }
 
-async function syncReleaseAssets(config, release, filePaths) {
+async function getReleaseByTag(config, tagName, fetchImpl = fetch) {
+  const response = await githubFetch(
+    config,
+    `/repos/${config.repo}/releases/tags/${encodeURIComponent(tagName)}`,
+    {},
+    fetchImpl,
+  );
+  if (response.status === 404) return null;
+  return parseGitHubResponse(response);
+}
+
+async function syncReleaseAssets(config, release, filePaths, fetchImpl = fetch) {
   const assetsByName = new Map((release.assets || []).map((asset) => [asset.name, asset]));
+  const uploadedAssets = [];
 
   for (const filePath of filePaths) {
     const assetName = path.basename(filePath);
@@ -201,20 +244,22 @@ async function syncReleaseAssets(config, release, filePaths) {
     if (existingAsset) {
       await githubJson(config, `/repos/${config.repo}/releases/assets/${existingAsset.id}`, {
         method: "DELETE",
-      });
+      }, fetchImpl);
     }
 
-    await uploadReleaseAsset(config, release.upload_url, filePath);
+    uploadedAssets.push(await uploadReleaseAsset(config, release.upload_url, filePath, fetchImpl));
   }
+
+  return uploadedAssets;
 }
 
-async function uploadReleaseAsset(config, uploadUrl, filePath) {
+async function uploadReleaseAsset(config, uploadUrl, filePath, fetchImpl = fetch) {
   const fileName = path.basename(filePath);
   const baseUploadUrl = uploadUrl.replace(/\{.*$/, "");
   const targetUrl = new URL(baseUploadUrl);
   targetUrl.searchParams.set("name", fileName);
 
-  const response = await fetch(targetUrl, {
+  const response = await fetchImpl(targetUrl, {
     body: fs.readFileSync(filePath),
     headers: {
       ...DEFAULT_HEADERS,
@@ -224,20 +269,20 @@ async function uploadReleaseAsset(config, uploadUrl, filePath) {
     method: "POST",
   });
 
-  await parseGitHubResponse(response);
+  return parseGitHubResponse(response);
 }
 
-async function githubJson(config, pathName, { body, method }) {
+async function githubJson(config, pathName, { body, method }, fetchImpl = fetch) {
   const response = await githubFetch(config, pathName, {
     body: body ? JSON.stringify(body) : undefined,
     headers: body ? { "Content-Type": "application/json" } : undefined,
     method,
-  });
+  }, fetchImpl);
   return parseGitHubResponse(response);
 }
 
-async function githubFetch(config, pathName, options = {}) {
-  return fetch(`${config.apiBaseUrl}${pathName}`, {
+async function githubFetch(config, pathName, options = {}, fetchImpl = fetch) {
+  return fetchImpl(`${config.apiBaseUrl}${pathName}`, {
     ...options,
     headers: {
       ...DEFAULT_HEADERS,

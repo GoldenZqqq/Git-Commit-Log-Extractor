@@ -2,8 +2,8 @@ name: Release (macOS / Linux)
 
 # 这个 workflow 只负责补齐 macOS 与 Linux 安装包，并追加到 Release 上。
 # Windows 安装包与自动更新清单（gitpulse-latest.json）仍由本地 `npm run release:win` 生成。
-# 时序：release:win 先推送 vX.Y.Z tag → 触发本 workflow；本地随即创建 Release 并上传
-# Windows 资产；本 workflow 构建完 mac/Linux 后，把产物追加到同一个 Release。
+# 时序：release:win 在 draft 中上传完整 Windows 资产并发布 → GitHub 创建 vX.Y.Z tag
+# → 触发本 workflow；validate 先核对 main 祖先与 CI，再构建并追加 mac/Linux 产物。
 
 on:
   push:
@@ -18,11 +18,38 @@ on:
 
 # 允许默认 GITHUB_TOKEN 上传 Release 资产（无需额外配置 secret）
 permissions:
+  actions: read
   contents: write
 
 jobs:
+  validate:
+    name: Validate release source
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Resolve release tag
+        id: tag
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "name=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify main ancestry and successful CI
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node ./scripts/check-release-source.mjs --tag "${{ steps.tag.outputs.name }}"
+
   build:
     name: Build ${{ matrix.label }}
+    needs: validate
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -131,7 +158,7 @@ jobs:
           rm -f "$dmg_dir"/*.dmg
           echo "::warning::macOS DMG bundling failed; uploaded app zip will be used as the fallback installer."
 
-      # 等待本地 release:win 创建出对应 Release，再追加资产（消除时序竞争）
+      # Release API 创建 tag 与 Release 可见性存在短暂时序差，等待公开 Release 后追加资产。
       - name: Wait for GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

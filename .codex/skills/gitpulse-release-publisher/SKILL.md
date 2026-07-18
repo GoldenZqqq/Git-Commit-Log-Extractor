@@ -20,10 +20,10 @@ Use this skill for GitPulse release work inside `C:\Learn\git_pulse`.
 2. Decide the release mode from the user request:
    - Default to `patch` when the user says `发布新版本` but does not specify a mode.
    - Use `minor` / `major` / `set` only when the user explicitly asks.
-   - Use `current` only for rebuild or re-upload of the same version.
+   - Use `current` only to resume a version commit that was pushed but never received its tag; published Windows assets are immutable.
 
-3. Refuse to start the build with pending product changes:
-   - Check `git status --short`.
+3. Refuse to start the build from an ungoverned source:
+   - Require a clean `main` exactly aligned with `origin/main`.
    - If there are source changes meant to ship, commit them first.
    - Prefer the `$git-commit-generator` skill when the user wants Codex to handle the commit.
    - Do not let version-bump commits swallow unrelated feature work.
@@ -36,7 +36,7 @@ Use this skill for GitPulse release work inside `C:\Learn\git_pulse`.
 5. Publish through the repository scripts instead of hand-rolling Git commands:
    - Use `npm run release:win[:mode]` for normal releases.
    - Use `npm run release:win:set -- X.Y.Z` for explicit versions.
-   - The publish script handles version sync, Tauri build, updater manifest, optional GitHub Release creation, asset upload, and release-only commit/tag push.
+   - The publish script handles version sync, pushes the version commit, waits for successful main CI, builds/signs assets, stages a draft Release, and publishes only after all Windows assets upload.
 
 6. Verify the result after publishing:
    - Confirm the script output includes the target version and GitHub Release URL when GitHub publishing is enabled.

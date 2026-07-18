@@ -15,6 +15,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  release-governance:
+    name: Release governance
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Release governance tests
+        run: npm run test:release-governance
+
   desktop-checks:
     name: Desktop checks (${{ matrix.label }})
     timeout-minutes: 35

@@ -16,6 +16,7 @@ Rust owns local Git scanning, commit extraction, report rendering/export, option
 | [Project Retrospective Attribution](./project-retrospective.md) | Structured project attribution, history compatibility, and retrospective projection | Filled |
 | [Quality Guidelines](./quality-guidelines.md) | Rust verification and safety rules | Filled |
 | [Desktop Quality Gates](../frontend/desktop-quality-gates.md) | Real Windows WebView startup and IPC smoke contract | Filled |
+| [Release Governance](./release-governance.md) | Main-only source, CI ancestry gate, and draft Release transaction | Filled |
 
 ## Pre-Development Checklist
 
@@ -26,6 +27,7 @@ Rust owns local Git scanning, commit extraction, report rendering/export, option
 - [ ] For report-history work, follow `report-history-storage.md`; do not write report bodies back to WebView localStorage.
 - [ ] For project retrospective work, follow `project-retrospective.md`; generate attribution before persistence and never parse Markdown identity.
 - [ ] For configuration-profile work, follow `config-profile-io.md`; keep schema validation in one frontend owner and file I/O bounded in Rust.
+- [ ] For version, tag, updater, or release workflow changes, follow `release-governance.md`; never build from an unverified branch or publish partial new-release assets.
 
 ## Quality Check
 
@@ -33,3 +35,4 @@ Rust owns local Git scanning, commit extraction, report rendering/export, option
 - [ ] `cd src-tauri && cargo test` passes when behavior changes.
 - [ ] Cross-layer payload changes are covered by frontend builders/validators.
 - [ ] No plain persisted secrets are introduced.
+- [ ] Release workflow changes preserve main ancestry, successful-CI, tag immutability, and draft cleanup contracts.

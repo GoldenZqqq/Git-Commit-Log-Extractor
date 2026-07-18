@@ -19,11 +19,20 @@ import {
 } from "./version-utils.mjs";
 import {
   buildLatestReleaseAssetDownloadUrl,
+  buildReleaseBody,
   buildReleaseAssetDownloadUrl,
-  publishGitHubRelease,
+  commitReleaseVersion,
+  findLocalTagAtHead,
+  pushReleaseBranch,
   readGitHubReleaseConfig,
-  validateGitHubReleaseWorktree,
+  stageAndPublishGitHubRelease,
 } from "./github-release.mjs";
+import {
+  assertReleaseTagAbsent,
+  validateReleaseSource,
+  validateReleaseTag,
+  waitForSuccessfulCiRun,
+} from "./release-governance.mjs";
 
 const rootDir = getRootDir(import.meta.url);
 try {
@@ -37,40 +46,71 @@ async function main() {
   const releasePlan = createReleasePlan(process.argv.slice(2));
   const currentVersion = readCurrentVersion(rootDir);
   const releaseVersion = resolveReleaseVersion(currentVersion, releasePlan);
+  validateReleaseSource(rootDir);
 
-  console.log("GitPulse 自动发布流程");
-  console.log(`当前版本：${currentVersion}`);
-  console.log(`发布模式：${releasePlan.label}`);
-  console.log(`${releasePlan.dryRun ? "计划发布" : "发布版本"}：${releaseVersion}`);
+  printReleasePlan({ currentVersion, releasePlan, releaseVersion });
 
   if (releasePlan.dryRun) {
-    if (releasePlan.kind !== "current") {
-      for (const update of syncVersion(rootDir, releaseVersion, { dryRun: true })) {
-        console.log(update);
-      }
-    }
-    console.log("dry-run 完成，未写入版本文件、未构建、未上传。");
+    previewReleaseVersion(releasePlan, releaseVersion);
     return;
   }
 
+  const context = loadReleaseContext(releaseVersion);
+  const releaseSource = await prepareVerifiedReleaseCommit({
+    githubConfig: context.githubConfig,
+    releasePlan,
+    releaseVersion,
+  });
+  const artifacts = buildReleaseArtifacts(context, releaseVersion);
+  const githubReleaseUrl = await publishReleaseArtifacts({
+    ...artifacts,
+    ...context,
+    releaseVersion,
+    ...releaseSource,
+  });
+  validateReleaseTag(rootDir, `v${releaseVersion}`);
+  await verifyManifest(artifacts.manifestUrl, releaseVersion);
+  printReleaseResult({ ...artifacts, githubReleaseUrl, releaseVersion });
+}
+
+function loadReleaseContext(releaseVersion) {
   const releaseEnv = loadReleaseEnv(path.join(rootDir, ".release.env.local"));
   const githubConfig = readGitHubReleaseConfig(rootDir, releaseEnv);
-  const gitReleaseState = validateGitHubReleaseWorktree(rootDir);
-  if (releasePlan.kind !== "current") {
-    for (const update of syncVersion(rootDir, releaseVersion)) {
-      console.log(update);
-    }
-  }
   const config = readReleaseConfig(rootDir, releaseEnv);
   const { notes, sourceLabel } = resolveReleaseNotes(releaseEnv, releaseVersion);
   const manifestPath = path.join(rootDir, "src-tauri", "target", "release", "bundle", "gitpulse-latest.json");
   const privateKey = fs.readFileSync(config.privateKeyPath, "utf8");
   console.log(`Release Notes 来源：${sourceLabel}`);
+  return { config, githubConfig, manifestPath, notes, privateKey };
+}
 
+async function prepareVerifiedReleaseCommit({ githubConfig, releasePlan, releaseVersion }) {
+  const tagName = `v${releaseVersion}`;
+  if (releasePlan.kind === "current") {
+    if (findLocalTagAtHead(rootDir, tagName)) {
+      throw new Error(`版本 ${releaseVersion} 已发布；为保护既有资产，current 模式不会覆盖 Release`);
+    }
+    console.log(`标签 ${tagName} 尚不存在，将恢复并完成当前版本发布`);
+  } else {
+    assertReleaseTagAbsent(rootDir, tagName);
+    for (const update of syncVersion(rootDir, releaseVersion)) console.log(update);
+    if (!commitReleaseVersion(rootDir, releaseVersion)) {
+      throw new Error("版本文件没有变化；如需重传同版本，请显式使用 release:win:current");
+    }
+    pushReleaseBranch(rootDir);
+  }
+
+  const { headSha } = validateReleaseSource(rootDir);
+  const run = await waitForSuccessfulCiRun({ githubConfig, sha: headSha });
+  console.log(`主线 CI 已通过：${run.html_url || run.id}`);
+  return { targetCommitish: validateReleaseSource(rootDir).headSha };
+}
+
+function buildReleaseArtifacts(context, releaseVersion) {
   runReleaseBuild({
     ...process.env,
-    TAURI_SIGNING_PRIVATE_KEY: privateKey,
-    TAURI_SIGNING_PRIVATE_KEY_PASSWORD: config.privateKeyPassword,
+    TAURI_SIGNING_PRIVATE_KEY: context.privateKey,
+    TAURI_SIGNING_PRIVATE_KEY_PASSWORD: context.config.privateKeyPassword,
   });
 
   const bundleDir = path.join(rootDir, "src-tauri", "target", "release", "bundle", "nsis");
@@ -81,13 +121,30 @@ async function main() {
   const updaterSignaturePath = `${installerArtifact}.sig`;
   const tagName = `v${releaseVersion}`;
   const installerUrl = buildReleaseAssetDownloadUrl(
-    githubConfig,
+    context.githubConfig,
     tagName,
     path.basename(installerArtifact),
   );
-  const manifestUrl = buildLatestReleaseAssetDownloadUrl(githubConfig, path.basename(manifestPath));
+  const manifestUrl = buildLatestReleaseAssetDownloadUrl(
+    context.githubConfig,
+    path.basename(context.manifestPath),
+  );
   const signature = fs.readFileSync(updaterSignaturePath, "utf8").trim();
+  writeManifest({
+    installerUrl,
+    manifestPath: context.manifestPath,
+    notes: context.notes,
+    releaseVersion,
+    signature,
+  });
+  return {
+    filePaths: [installerArtifact, updaterSignaturePath, context.manifestPath],
+    installerUrl,
+    manifestUrl,
+  };
+}
 
+function writeManifest({ installerUrl, manifestPath, notes, releaseVersion, signature }) {
   const manifest = {
     version: releaseVersion,
     notes,
@@ -105,22 +162,47 @@ async function main() {
 
   fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
   fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+}
 
-  const githubReleaseUrl = await publishGitHubRelease({
-    branch: gitReleaseState.branch,
+async function publishReleaseArtifacts({
+  filePaths,
+  githubConfig,
+  installerUrl,
+  manifestUrl,
+  notes,
+  releaseVersion,
+  targetCommitish,
+}) {
+  const tagName = `v${releaseVersion}`;
+  const releasePayload = {
+    body: buildReleaseBody(notes, installerUrl, manifestUrl),
+    name: `GitPulse ${tagName}`,
+    tagName,
+    targetCommitish,
+  };
+  const release = await stageAndPublishGitHubRelease({
+    filePaths,
     githubConfig,
-    installerArtifact,
-    installerUrl,
-    manifestPath,
-    manifestUrl,
-    notes,
-    releasePlan,
-    releaseVersion,
-    rootDir,
-    updaterSignaturePath,
+    releasePayload,
   });
-  await verifyManifest(manifestUrl, releaseVersion);
+  return release.html_url;
+}
 
+function printReleasePlan({ currentVersion, releasePlan, releaseVersion }) {
+  console.log("GitPulse 自动发布流程");
+  console.log(`当前版本：${currentVersion}`);
+  console.log(`发布模式：${releasePlan.label}`);
+  console.log(`${releasePlan.dryRun ? "计划发布" : "发布版本"}：${releaseVersion}`);
+}
+
+function previewReleaseVersion(releasePlan, releaseVersion) {
+  if (releasePlan.kind !== "current") {
+    for (const update of syncVersion(rootDir, releaseVersion, { dryRun: true })) console.log(update);
+  }
+  console.log("dry-run 完成：main 已与 origin/main 同步；未写文件、未构建、未上传。");
+}
+
+function printReleaseResult({ githubReleaseUrl, installerUrl, manifestUrl, releaseVersion }) {
   console.log(`GitPulse ${releaseVersion} 发布完成`);
   console.log(`Updater: ${installerUrl}`);
   console.log(`Installer: ${installerUrl}`);

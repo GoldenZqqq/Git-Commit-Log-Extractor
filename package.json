@@ -10,6 +10,7 @@
     "test:e2e": "playwright test",
     "test:e2e:a11y": "playwright test tests/e2e/accessibility.spec.ts",
     "test:e2e:responsive": "playwright test tests/e2e/responsive-hardening.spec.ts",
+    "test:release-governance": "node --test tests/scripts/release-governance.test.mjs",
     "tauri": "tauri",
     "build:tauri:smoke": "node ./scripts/build-tauri-smoke.mjs",
     "test:tauri-smoke": "node ./scripts/tauri-smoke.mjs",

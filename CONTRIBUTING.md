@@ -15,6 +15,7 @@ Run these before opening a PR:
 
 ```bash
 npx playwright install chromium   # 首次运行浏览器 e2e 前执行一次
+npm run test:release-governance
 npm run build
 npm run test:e2e:a11y
 npm run test:e2e:responsive
@@ -95,7 +96,7 @@ node ./scripts/generate-release-notes.mjs patch --from-tag 82d4287
 ### 发布到 GitHub Release（含在线更新包）
 
 ```bash
-# 发版前门禁：smoke、前端构建、Rust check/test、diff check、发布计划 dry-run
+# 发版前门禁：发布治理、smoke、前端、Rust、diff check 与发布计划 dry-run
 npm run verify:release
 # 需要连本机 Windows 安装包也一起验证时（要求签名环境）
 npm run verify:release -- --package
@@ -110,7 +111,7 @@ npm run release:win:minor
 npm run release:win:major
 npm run release:win:set -- 1.2.3
 
-# 按当前版本重新构建并发布（适合重传安装包）
+# 完成已提交但尚未打 tag 的当前版本；已发布版本不会被覆盖
 npm run release:win:current
 
 # 预览升级计划：不写文件、不构建、不上传
@@ -132,22 +133,22 @@ GITPULSE_RELEASE_NOTES_FILE=release-notes/v0.1.1.md
 
 `npm run release:win*` 会自动：
 
-- 要求当前 Git 工作区保持干净，避免源码 tag 与安装包不一致
-- 提交版本号同步改动（提交信息 `chore: 发布 vX.Y.Z`）
-- 创建并推送 `vX.Y.Z` tag
-- 创建或更新对应的 GitHub Release
-- 上传 `.exe`、`.exe.sig` 与 `gitpulse-latest.json` 到该 release
+- 要求当前位于干净且与 `origin/main` 完全同步的 `main`；dry-run 也执行这项校验
+- 提交并推送版本号同步改动（提交信息 `chore: 发布 vX.Y.Z`）
+- 等待该版本提交的 `CI` main push run 全部成功，并再次确认主线没有前进
+- 构建、签名 Windows 资产，在 draft Release 中完整上传 `.exe`、`.exe.sig` 与 `gitpulse-latest.json`
+- 资产齐全后发布 draft，由 GitHub 在已验证的 main 提交上创建 `vX.Y.Z` tag；上传失败会清理本次 draft
 
-Tauri updater 固定读取 `https://github.com/GoldenZqqq/GitPulse/releases/latest/download/gitpulse-latest.json`。给 Token 配置 GitHub `Contents: Read and write` 权限即可。若存在 `release-notes/vX.Y.Z.md`，发布脚本会优先用它作为 release 正文；否则回退到 `GITPULSE_RELEASE_NOTES` 或默认模板。
+Tauri updater 固定读取 `https://github.com/GoldenZqqq/GitPulse/releases/latest/download/gitpulse-latest.json`。Token 需要 GitHub `Contents: Read and write` 与 `Actions: Read` 权限。若存在 `release-notes/vX.Y.Z.md`，发布脚本会优先用它作为 release 正文；否则回退到 `GITPULSE_RELEASE_NOTES` 或默认模板。
 
 ### 跨平台安装包（macOS / Linux）
 
 macOS 与 Linux 包不在本地构建（Tauri 必须在对应系统上打包），由 GitHub Actions 自动补齐：
 
-- 上面的 `release:win*` 推送 `vX.Y.Z` tag 后，`.github/workflows/release.yml` 被触发，在 macOS / Ubuntu runner 上分别构建**通用 `.dmg`**（Intel + Apple Silicon）与 **Linux `.AppImage`**，并追加到本地脚本刚创建的同一个 Release。
+- 上面的 `release:win*` 发布 draft 并创建 `vX.Y.Z` tag 后，`.github/workflows/release.yml` 先验证 tag 属于 `origin/main` 且对应主线 CI 成功，再在 macOS / Ubuntu runner 上分别构建**通用 `.dmg`**（Intel + Apple Silicon）与 **Linux `.AppImage`**，并追加到同一个 Release。
 - CI 用基础 `tauri.conf.json` 构建（**不带** `--config tauri.release.conf.json`），不生成 updater 产物，因此**不需要签名私钥、无需配置任何 secret**（仅用默认 `GITHUB_TOKEN` 上传资产）。
 - macOS 包**未签名**：用户首次打开需右键「打开」或执行 `xattr -dr com.apple.quarantine`。
 - **自动更新仅 Windows**：macOS / Linux 不参与 updater，发新版后用户到 Releases 手动下载即可。
 - 想对**已存在的 tag** 补传 mac/Linux 包：在 GitHub Actions 里手动运行该 workflow（`workflow_dispatch`）并填入对应 tag。
 
-> 不要改动 `tauri.release.conf.json`、`scripts/publish-release.mjs` 或 `gitpulse-latest.json` 的生成逻辑——Windows 安装包与自动更新链路依赖它们保持现状。
+> 修改 `tauri.release.conf.json`、发布脚本或 updater manifest 契约时，必须同步 release-governance 测试、`.github/workflows/release.yml` 与 `.trellis/spec/tauri-rust/release-governance.md`。

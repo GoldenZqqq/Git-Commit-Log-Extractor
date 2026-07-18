@@ -15,7 +15,7 @@ Use this skill when the user says things like:
 - `minor`: `npm run release:notes:minor` then `npm run release:win:minor`
 - `major`: `npm run release:notes:major` then `npm run release:win:major`
 - `set`: `npm run release:notes:set -- X.Y.Z` then `npm run release:win:set -- X.Y.Z`
-- `current`: `npm run release:notes:current` then `npm run release:win:current`
+- `current`: `npm run release:notes:current` then `npm run release:win:current` only to resume a pushed version whose tag is still absent
 
 If the repository's latest tag belongs to an older product line, run `node ./scripts/generate-release-notes.mjs <mode> --from-tag <ref>` to narrow the compare range before publishing.
 
@@ -49,7 +49,9 @@ Usually exclude these from the polished release body unless they matter to users
 
 ## Verification Checklist
 
-- `git status --short` is clean before the publish step
+- the checkout is a clean `main` exactly aligned with `origin/main`
+- `npm run test:release-governance` passes
 - `release-notes/vX.Y.Z.md` exists and matches the target version
+- the version commit has a successful `CI` main push run before packaging starts
 - publish output shows the final version and, when enabled, the GitHub Release URL
 - GitHub Release assets include `.exe`, `.exe.sig`, and `gitpulse-latest.json`

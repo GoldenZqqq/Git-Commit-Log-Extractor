@@ -17,6 +17,7 @@ Usage:
   npm run verify:release -- --package
 
 Default checks:
+  - release governance unit tests
   - frontend smoke guard
   - browser-level Playwright e2e
   - TypeScript and Vite production build
@@ -32,6 +33,7 @@ Options:
 }
 
 const steps = [
+  ["发布治理单元测试", "npm", ["run", "test:release-governance"], rootDir],
   ["前端 smoke", "node", ["scripts/frontend-smoke.mjs"], rootDir],
   ["浏览器 e2e", "npm", ["run", "test:e2e"], rootDir],
   ["前端生产构建", "npm", ["run", "build"], rootDir],
