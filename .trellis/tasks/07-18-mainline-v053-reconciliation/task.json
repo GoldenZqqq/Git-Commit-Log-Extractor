@@ -3,7 +3,7 @@
   "name": "mainline-v053-reconciliation",
   "title": "将 v0.5.3 发布分支收口到 main",
   "description": "合并 codex/roadmap-completion，解决 Trellis 冲突并以完整 CI 建立主线基线",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,
