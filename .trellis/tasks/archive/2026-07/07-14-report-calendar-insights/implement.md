@@ -23,3 +23,10 @@ npx tsc --noEmit
 2. 洞察 → 报告日历月份切换与落点
 3. 空日快捷生成日报 / 补写
 4. 点击历史条目打开工作台
+
+## Archive Verification (2026-07-18)
+
+- [x] `npm run build`
+- [x] `npm run test:e2e`（20 passed）
+- [x] GitHub Actions CI `29405253090`：Windows / Linux 的前端 E2E、前端构建、`cargo check`、`cargo test` 全部通过
+- [x] 对照 PRD 复核历史上限、清空历史、月历落点、单条/多条打开、空日快捷操作与明暗色样式
