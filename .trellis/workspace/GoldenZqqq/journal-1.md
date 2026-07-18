@@ -144,3 +144,36 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 5: 建立大型工作区性能基线
+
+**Date**: 2026-07-18
+**Task**: 建立大型工作区性能基线
+**Branch**: `main`
+
+### Summary
+
+新增完全离线的 smoke/standard/large 工作区基准与版本化 JSON 输出，修复报告正则重复编译和 O(n²) 去重热点；三个 profile、本地全量门禁及 exact-SHA CI 29651022507 全部通过。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f6538e2` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
