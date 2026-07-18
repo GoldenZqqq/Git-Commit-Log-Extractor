@@ -13,6 +13,7 @@ use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
+use std::sync::OnceLock;
 
 pub struct ExtractReportFormat<'a> {
     pub start_date: &'a str,
@@ -1139,17 +1140,32 @@ fn clean_commit_message(message: &str) -> String {
         .trim_start_matches(|ch: char| ch == '\u{feff}' || ('\u{200b}'..='\u{200f}').contains(&ch));
     // 兼容 Conventional Commits 的 `type(scope):` 写法：scope 为可选括号段，
     // 与无 scope 的 `type:` 一并在此剥离，避免带 scope 的提交前缀残留进报告。
-    let prefix = Regex::new(
-        r"(?i)^(feat|fix|refactor|chore|docs|style|test|perf|ci|build|revert|init)(\([^)]*\))?:\s*",
-    )
-    .unwrap();
-    let no_prefix = prefix.replace(message, "");
+    let no_prefix = commit_prefix_regex().replace(message, "");
     let flattened = no_prefix.replace('"', "").replace("['']", "");
-    let whitespace = Regex::new(r"\s+").unwrap().replace_all(&flattened, " ");
-    Regex::new(r"\s+-\s+")
-        .unwrap()
+    let whitespace = whitespace_regex().replace_all(&flattened, " ");
+    separator_regex()
         .replace_all(whitespace.trim(), "；")
         .to_string()
+}
+
+fn commit_prefix_regex() -> &'static Regex {
+    static REGEX: OnceLock<Regex> = OnceLock::new();
+    REGEX.get_or_init(|| {
+        Regex::new(
+            r"(?i)^(feat|fix|refactor|chore|docs|style|test|perf|ci|build|revert|init)(\([^)]*\))?:\s*",
+        )
+        .expect("commit prefix regex must be valid")
+    })
+}
+
+fn whitespace_regex() -> &'static Regex {
+    static REGEX: OnceLock<Regex> = OnceLock::new();
+    REGEX.get_or_init(|| Regex::new(r"\s+").expect("whitespace regex must be valid"))
+}
+
+fn separator_regex() -> &'static Regex {
+    static REGEX: OnceLock<Regex> = OnceLock::new();
+    REGEX.get_or_init(|| Regex::new(r"\s+-\s+").expect("separator regex must be valid"))
 }
 
 fn resolve_project_name(project_names: &HashMap<String, String>, commit: &CommitRecord) -> String {
@@ -1360,8 +1376,7 @@ fn extract_evidence_references(message: &str) -> Vec<EvidenceReference> {
     let mut references = Vec::new();
     let mut seen = HashSet::new();
 
-    let pr_pattern = Regex::new(r"(?i)\bPR\s*#(\d+)\b").unwrap();
-    for captures in pr_pattern.captures_iter(&compact) {
+    for captures in pr_reference_regex().captures_iter(&compact) {
         if let Some(id) = captures.get(1) {
             let position = captures
                 .get(0)
@@ -1379,8 +1394,7 @@ fn extract_evidence_references(message: &str) -> Vec<EvidenceReference> {
         }
     }
 
-    let hash_pattern = Regex::new(r"#(\d+)\b").unwrap();
-    for captures in hash_pattern.captures_iter(&compact) {
+    for captures in hash_reference_regex().captures_iter(&compact) {
         let Some(reference_match) = captures.get(0) else {
             continue;
         };
@@ -1400,8 +1414,7 @@ fn extract_evidence_references(message: &str) -> Vec<EvidenceReference> {
         }
     }
 
-    let key_pattern = Regex::new(r"\b([A-Z][A-Z0-9]{1,9})-(\d+)\b").unwrap();
-    for captures in key_pattern.captures_iter(&compact) {
+    for captures in key_reference_regex().captures_iter(&compact) {
         let (Some(prefix), Some(id), Some(label)) =
             (captures.get(1), captures.get(2), captures.get(0))
         else {
@@ -1493,10 +1506,26 @@ fn short_hash(hash: &str) -> String {
 }
 
 fn compact_message(message: &str) -> String {
-    Regex::new(r"\s+")
-        .unwrap()
+    whitespace_regex()
         .replace_all(message.trim(), " ")
         .to_string()
+}
+
+fn pr_reference_regex() -> &'static Regex {
+    static REGEX: OnceLock<Regex> = OnceLock::new();
+    REGEX.get_or_init(|| Regex::new(r"(?i)\bPR\s*#(\d+)\b").expect("PR regex must be valid"))
+}
+
+fn hash_reference_regex() -> &'static Regex {
+    static REGEX: OnceLock<Regex> = OnceLock::new();
+    REGEX.get_or_init(|| Regex::new(r"#(\d+)\b").expect("hash regex must be valid"))
+}
+
+fn key_reference_regex() -> &'static Regex {
+    static REGEX: OnceLock<Regex> = OnceLock::new();
+    REGEX.get_or_init(|| {
+        Regex::new(r"\b([A-Z][A-Z0-9]{1,9})-(\d+)\b").expect("key regex must be valid")
+    })
 }
 
 fn inline_code_text(value: &str) -> String {
@@ -1653,16 +1682,12 @@ fn render_monthly_summary_content(
 }
 
 fn unique_items(items: &[ProjectCommitItem]) -> Vec<ProjectCommitItem> {
-    let mut result = Vec::new();
-    for item in items {
-        if !result
-            .iter()
-            .any(|current: &ProjectCommitItem| current.title == item.title)
-        {
-            result.push(item.clone());
-        }
-    }
-    result
+    let mut seen = HashSet::new();
+    items
+        .iter()
+        .filter(|item| seen.insert(item.title.as_str()))
+        .cloned()
+        .collect()
 }
 
 fn join_focus_items(items: &[ProjectCommitItem]) -> String {
@@ -2549,6 +2574,81 @@ mod tests {
             clean_commit_message("\u{200b}fix(ExamUser): 修复字典绑定空指针"),
             "修复字典绑定空指针"
         );
+    }
+
+    #[test]
+    fn clean_commit_message_reuses_regexes_for_large_commit_batches() {
+        let started_at = std::time::Instant::now();
+
+        for _ in 0..10_000 {
+            let cleaned = clean_commit_message("feat(benchmark): normalize  commit - evidence");
+            std::hint::black_box(cleaned);
+        }
+
+        assert!(
+            started_at.elapsed() < std::time::Duration::from_secs(5),
+            "10k commit messages should not recompile regexes per item"
+        );
+    }
+
+    #[test]
+    fn report_helpers_scale_to_large_unique_batches() {
+        let items = (0..10_000)
+            .map(|index| ProjectCommitItem {
+                title: format!("item-{index}"),
+                evidence: String::new(),
+                additions: 0,
+                deletions: 0,
+                changed_files: 0,
+            })
+            .collect::<Vec<_>>();
+        let started_at = std::time::Instant::now();
+
+        assert_eq!(10_000, unique_items(&items).len());
+        for _ in 0..10_000 {
+            std::hint::black_box(extract_evidence_references("feat: ABC-12 PR #34 and #56"));
+        }
+
+        assert!(
+            started_at.elapsed() < std::time::Duration::from_secs(5),
+            "large report batches should use cached regexes and linear dedupe"
+        );
+    }
+
+    #[test]
+    fn unique_items_preserves_the_first_seen_item_and_order() {
+        let items = vec![
+            ProjectCommitItem {
+                title: "first".to_string(),
+                evidence: "original".to_string(),
+                additions: 1,
+                deletions: 0,
+                changed_files: 1,
+            },
+            ProjectCommitItem {
+                title: "second".to_string(),
+                evidence: String::new(),
+                additions: 2,
+                deletions: 0,
+                changed_files: 1,
+            },
+            ProjectCommitItem {
+                title: "first".to_string(),
+                evidence: "duplicate".to_string(),
+                additions: 3,
+                deletions: 0,
+                changed_files: 1,
+            },
+        ];
+
+        let unique = unique_items(&items);
+
+        assert_eq!(vec!["first", "second"], titles(&unique));
+        assert_eq!("original", unique[0].evidence);
+    }
+
+    fn titles(items: &[ProjectCommitItem]) -> Vec<&str> {
+        items.iter().map(|item| item.title.as_str()).collect()
     }
 
     fn commit(project_name: &str, branch_name: &str, message: &str) -> CommitRecord {

@@ -1,12 +1,12 @@
 # 大规模工作区基准实施计划
 
-1. [ ] 收敛 profile、指标、结果 schema、安全清理和回归阈值设计并激活任务。
-2. [ ] 先为 profile 规模、nearest-rank P50/P95、阈值判断、参数错误和 marker 清理保护增加 Rust 测试。
-3. [ ] 实现流式 `git fast-import` synthetic fixture，校验 5/50/200 仓库与精确总提交数，保持完全离线。
-4. [ ] 实现 benchmark runner：first-pass/warm scan、完整 extraction、扫描取消、RSS、磁盘与输出规模采集。
-5. [ ] 实现 versioned JSON 输出、`--output`、`--keep-fixture`、`--iterations` 与失败后先落盘再非零退出。
-6. [ ] 运行 smoke 后执行 standard/large 实测，依据真实数据确认保守阈值；阻断问题直接修复或创建后续 Trellis 任务。
-7. [ ] 新增性能基线 code-spec 与 `docs/performance-baseline.md`，记录环境、口径、实测结果、阈值和复测命令。
+1. [x] 收敛 profile、指标、结果 schema、安全清理和回归阈值设计并激活任务。
+2. [x] 先为 profile 规模、nearest-rank P50/P95、阈值判断、参数错误和 marker 清理保护增加 Rust 测试。
+3. [x] 实现流式 `git fast-import` synthetic fixture，校验 5/50/200 仓库与精确总提交数，保持完全离线。
+4. [x] 实现 benchmark runner：first-pass/warm scan、完整 extraction、扫描取消、RSS、磁盘与输出规模采集。
+5. [x] 实现 versioned JSON 输出、`--output`、`--keep-fixture`、`--iterations` 与失败后先落盘再非零退出。
+6. [x] 运行 smoke 后执行 standard/large 实测，依据真实数据确认保守阈值；阻断问题直接修复或创建后续 Trellis 任务。
+7. [x] 新增性能基线 code-spec 与 `docs/performance-baseline.md`，记录环境、口径、实测结果、阈值和复测命令。
 8. [ ] 运行定向 Rust 测试、三个 profile、全量 build/E2E/Rust/真实 WebView CI 与 `git diff --check`。
 9. [ ] 勾选 AC、记录功能提交与 exact-SHA CI 证据，归档任务并独立 push。
 
