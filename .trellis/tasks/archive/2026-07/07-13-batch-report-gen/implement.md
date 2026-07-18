@@ -179,3 +179,10 @@
 - [x] Render every supported template variable as a keyboard-accessible button
 - [x] Copy the complete token to the clipboard and reuse the global success/error toast
 - [x] Verify all 10 tokens, clipboard content, and success feedback in Playwright
+
+## Archive Verification (2026-07-18)
+
+- [x] `npm run build`
+- [x] `npm run test:e2e`（20 passed）
+- [x] GitHub Actions CI `29405253090`：Windows / Linux 的前端 E2E、前端构建、`cargo check`、`cargo test` 全部通过
+- [x] PRD Acceptance Criteria 已全部完成
