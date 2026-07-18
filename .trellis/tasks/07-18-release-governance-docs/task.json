@@ -3,7 +3,7 @@
   "name": "release-governance-docs",
   "title": "加固发布治理并同步产品文档",
   "description": "限制非 main 发版，补发布前 CI/祖先校验并同步 v0.5.3 文档",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,
