@@ -3,7 +3,7 @@
   "name": "upgrade-migration-hardening",
   "title": "加固升级迁移与恢复路径",
   "description": "覆盖 v0.5.1 到 v0.5.3 设置、报告历史、配置方案迁移及损坏恢复",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,
