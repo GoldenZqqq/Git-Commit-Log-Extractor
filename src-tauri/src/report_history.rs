@@ -7,6 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 const STORE_VERSION: u32 = 1;
 const DEFAULT_HISTORY_LIMIT: usize = 120;
+const MAX_STORE_BYTES: u64 = 32 * 1024 * 1024;
 const PRIMARY_FILE_NAME: &str = "report-history.json";
 const BACKUP_FILE_NAME: &str = "report-history.json.bak";
 const TEMP_FILE_NAME: &str = "report-history.json.tmp";
@@ -225,9 +226,16 @@ fn recover_backup(
 }
 
 fn read_store(path: &Path, limit: usize) -> Result<Option<Vec<ReportHistoryEntry>>, String> {
+    let metadata = match fs::metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(format!("读取报告历史文件信息失败：{error}")),
+    };
+    if metadata.len() > MAX_STORE_BYTES {
+        return Err("报告历史文件超过 32 MiB，已拒绝加载".to_string());
+    }
     let text = match fs::read_to_string(path) {
         Ok(text) => text,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(error) => return Err(format!("读取报告历史文件失败：{error}")),
     };
     let envelope: ReportHistoryEnvelope =
@@ -277,6 +285,9 @@ fn write_snapshot(path: &Path, entries: &[ReportHistoryEntry]) -> Result<(), Str
     };
     let bytes = serde_json::to_vec_pretty(&envelope)
         .map_err(|error| format!("序列化报告历史失败：{error}"))?;
+    if bytes.len() as u64 > MAX_STORE_BYTES {
+        return Err("报告历史文件不能超过 32 MiB，请缩短单份报告或减少历史条数".to_string());
+    }
     let mut file = File::create(path).map_err(|error| format!("写入报告历史失败：{error}"))?;
     file.write_all(&bytes)
         .and_then(|_| file.sync_all())
@@ -490,9 +501,60 @@ mod tests {
     }
 
     #[test]
+    fn oversized_save_keeps_the_previous_primary_store() {
+        let root = temp_root("oversized-save");
+        let original = sample_entry(8);
+        save(&root, vec![original.clone()], 120).unwrap();
+        let mut oversized = sample_entry(9);
+        oversized.report_text = "x".repeat(MAX_STORE_BYTES as usize);
+
+        let error = save(&root, vec![oversized], 120).unwrap_err();
+        let loaded = load(&root, None, 120).unwrap();
+
+        assert!(error.contains("32 MiB"));
+        assert_eq!(vec![original], loaded.entries);
+        cleanup(&root);
+    }
+
+    #[test]
+    fn oversized_primary_is_isolated_and_recovers_backup() {
+        let root = temp_root("oversized-primary");
+        let original = sample_entry(10);
+        save(&root, vec![original.clone()], 120).unwrap();
+        save(&root, vec![sample_entry(11)], 120).unwrap();
+        fs::write(
+            root.join(PRIMARY_FILE_NAME),
+            vec![b'x'; MAX_STORE_BYTES as usize + 1],
+        )
+        .unwrap();
+
+        let loaded = load(&root, None, 120).unwrap();
+
+        assert!(loaded.recovered_from_backup);
+        assert_eq!(vec![original], loaded.entries);
+        assert!(loaded.warning.unwrap().contains("32 MiB"));
+        assert_eq!(1, corrupt_files(&root).len());
+        cleanup(&root);
+    }
+
+    #[test]
+    fn temporary_write_failure_keeps_the_previous_primary_store() {
+        let root = temp_root("temporary-write-failure");
+        let original = sample_entry(12);
+        save(&root, vec![original.clone()], 120).unwrap();
+        fs::create_dir(root.join(TEMP_FILE_NAME)).unwrap();
+
+        assert!(save(&root, vec![sample_entry(13)], 120).is_err());
+        let loaded = load(&root, None, 120).unwrap();
+
+        assert_eq!(vec![original], loaded.entries);
+        cleanup(&root);
+    }
+
+    #[test]
     fn round_trip_preserves_optional_structured_projects() {
         let root = temp_root("structured-projects");
-        let mut entry = sample_entry(8);
+        let mut entry = sample_entry(14);
         entry.projects = Some(vec![crate::project_retrospective::ReportHistoryProject {
             name: "研发平台".to_string(),
             commit_count: 2,

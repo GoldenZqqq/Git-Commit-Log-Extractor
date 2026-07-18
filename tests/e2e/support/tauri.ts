@@ -1,6 +1,8 @@
 import { expect, type Page } from "@playwright/test";
 
 const STORAGE_KEY = "gitpulse-settings";
+const LEGACY_SETTINGS_KEY = "git-report-studio-settings";
+const SETTINGS_MIGRATION_BACKUP_KEY = "gitpulse-settings-migration-backup";
 const REPO_INDEX_CACHE_KEY = "gitpulse-repo-index-cache";
 const REPORT_HISTORY_KEY = "gitpulse-report-history";
 
@@ -35,6 +37,9 @@ type ReportHistoryProject = {
 
 type MockScenario = {
   settings?: Record<string, unknown>;
+  settingsRaw?: string;
+  legacySettingsRaw?: string;
+  settingsMigrationBackupRaw?: string;
   repoCache?: { rootDirs: string[]; repos: RepoInfo[]; scannedAt: string };
   reportHistory?: ReportHistoryEntry[];
   legacyReportHistoryRaw?: string;
@@ -48,6 +53,7 @@ type MockScenario = {
   appVersion?: string;
   gitIdentity?: { userName: string; userEmail: string };
   secureApiKey?: string | null;
+  secureApiKeySaveError?: string;
   codexAuthStatus?: { authenticated: boolean; email?: string };
   scanRepos?: RepoInfo[];
   scanWarnings?: string[];
@@ -157,6 +163,9 @@ export function createHistoryEntry(
 export async function launchApp(page: Page, scenario: MockScenario) {
   const payload = {
     settings: scenario.settings,
+    settingsRaw: scenario.settingsRaw,
+    legacySettingsRaw: scenario.legacySettingsRaw,
+    settingsMigrationBackupRaw: scenario.settingsMigrationBackupRaw,
     repoCache: scenario.repoCache,
     reportHistory: scenario.reportHistory,
     legacyReportHistoryRaw: scenario.legacyReportHistoryRaw,
@@ -173,6 +182,7 @@ export async function launchApp(page: Page, scenario: MockScenario) {
       userEmail: "playwright@example.com",
     },
     secureApiKey: scenario.secureApiKey ?? null,
+    secureApiKeySaveError: scenario.secureApiKeySaveError,
     codexAuthStatus: scenario.codexAuthStatus ?? { authenticated: false },
     scanRepos: scenario.scanRepos ?? scenario.repoCache?.repos ?? [],
     scanWarnings: scenario.scanWarnings ?? [],
@@ -195,7 +205,14 @@ export async function launchApp(page: Page, scenario: MockScenario) {
   };
 
   await page.addInitScript(
-    ({ state, storageKey, repoIndexCacheKey, reportHistoryKey }) => {
+    ({
+      state,
+      storageKey,
+      legacySettingsKey,
+      settingsMigrationBackupKey,
+      repoIndexCacheKey,
+      reportHistoryKey,
+    }) => {
       const callbacks = new Map();
       let nextCallbackId = 1;
       let nextEventId = 1;
@@ -255,8 +272,16 @@ export async function launchApp(page: Page, scenario: MockScenario) {
       });
 
       window.localStorage.clear();
-      if (state.settings) {
+      if (state.settingsRaw !== undefined) {
+        window.localStorage.setItem(storageKey, state.settingsRaw);
+      } else if (state.settings) {
         window.localStorage.setItem(storageKey, JSON.stringify(state.settings));
+      }
+      if (state.legacySettingsRaw !== undefined) {
+        window.localStorage.setItem(legacySettingsKey, state.legacySettingsRaw);
+      }
+      if (state.settingsMigrationBackupRaw !== undefined) {
+        window.localStorage.setItem(settingsMigrationBackupKey, state.settingsMigrationBackupRaw);
       }
       if (state.repoCache) {
         window.localStorage.setItem(repoIndexCacheKey, JSON.stringify(state.repoCache));
@@ -400,9 +425,14 @@ export async function launchApp(page: Page, scenario: MockScenario) {
             case "plugin:updater|check":
               return state.updateMetadata;
             case "get_secure_ai_api_key":
-              return state.secureApiKey;
+              return mockState.secureApiKey;
             case "set_secure_ai_api_key":
+              if (state.secureApiKeySaveError) throw new Error(state.secureApiKeySaveError);
+              mockState.secureApiKey = String(args.apiKey ?? "");
+              return null;
             case "clear_secure_ai_api_key":
+              mockState.secureApiKey = null;
+              return null;
             case "cancel_repo_scan":
             case "write_mapping_template_xlsx":
             case "codex_oauth_logout":
@@ -473,6 +503,8 @@ export async function launchApp(page: Page, scenario: MockScenario) {
     {
       state: payload,
       storageKey: STORAGE_KEY,
+      legacySettingsKey: LEGACY_SETTINGS_KEY,
+      settingsMigrationBackupKey: SETTINGS_MIGRATION_BACKUP_KEY,
       repoIndexCacheKey: REPO_INDEX_CACHE_KEY,
       reportHistoryKey: REPORT_HISTORY_KEY,
     },

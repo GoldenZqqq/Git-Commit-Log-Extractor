@@ -372,12 +372,15 @@ export type LoadedSettingsState = {
   settings: AppSettings;
   recoveredLegacyApiKey: boolean;
   recoveredCorruptedSettings: boolean;
+  settingsMigrationPending: boolean;
 };
 
 export const STORAGE_KEY = "gitpulse-settings";
 const REPO_INDEX_CACHE_KEY = "gitpulse-repo-index-cache";
 export const REPORT_HISTORY_KEY = "gitpulse-report-history";
 const LEGACY_STORAGE_KEY = "git-report-studio-settings";
+const SETTINGS_MIGRATION_BACKUP_KEY = "gitpulse-settings-migration-backup";
+const SETTINGS_CORRUPT_BACKUP_KEY = "gitpulse-settings-corrupt-backup";
 const ENV_VAR_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const EVIDENCE_PRESERVATION_INSTRUCTION =
   "已启用提交证据详情。请保留每条事项下方的「来源」引用块，不要改写仓库、分支、日期、commit hash 或原始提交信息。";
@@ -446,126 +449,196 @@ export const defaultSettings: AppSettings = {
   reportHistoryLimit: DEFAULT_REPORT_HISTORY_LIMIT,
 };
 
+type RawSettings = Partial<AppSettings> & {
+  aiKeyEnv?: unknown;
+  startDate?: unknown;
+  endDate?: unknown;
+  rootDir?: unknown;
+};
+
+type SettingsSource = {
+  key: string;
+  raw: RawSettings;
+  text: string;
+};
+
 export function loadSettingsState(): LoadedSettingsState {
-  const saved = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
-  localStorage.removeItem(LEGACY_STORAGE_KEY);
-  if (!saved) {
-    return {
-      settings: { ...defaultSettings },
-      recoveredLegacyApiKey: false,
-      recoveredCorruptedSettings: false,
-    };
-  }
+  const currentText = localStorage.getItem(STORAGE_KEY);
+  const legacyText = localStorage.getItem(LEGACY_STORAGE_KEY);
+  const backupText = localStorage.getItem(SETTINGS_MIGRATION_BACKUP_KEY);
+  const current = parseSettingsSource(STORAGE_KEY, currentText);
+  const legacy = parseSettingsSource(LEGACY_STORAGE_KEY, legacyText);
+  const backup = parseSettingsSource(SETTINGS_MIGRATION_BACKUP_KEY, backupText);
+  const currentCorrupt = currentText !== null && !current;
+  if (currentCorrupt) preserveCorruptSettings(currentText);
 
-  let rawSettings: Partial<AppSettings> & {
-    aiKeyEnv?: string;
-    startDate?: string;
-    endDate?: string;
-    rootDir?: string;
-  };
-  try {
-    rawSettings = JSON.parse(saved);
-  } catch {
-    localStorage.removeItem(STORAGE_KEY);
-    return {
-      settings: { ...defaultSettings },
-      recoveredLegacyApiKey: false,
-      recoveredCorruptedSettings: true,
-    };
-  }
-  if (!rawSettings || typeof rawSettings !== "object" || Array.isArray(rawSettings)) {
-    localStorage.removeItem(STORAGE_KEY);
-    return {
-      settings: { ...defaultSettings },
-      recoveredLegacyApiKey: false,
-      recoveredCorruptedSettings: true,
-    };
-  }
+  const source = current ?? legacy ?? backup;
+  if (!source) return defaultLoadedSettings(currentCorrupt);
 
-  const persistedSettings = { ...rawSettings };
-  delete persistedSettings.startDate;
-  delete persistedSettings.endDate;
-  delete persistedSettings.rootDir;
-  const parsed = { ...defaultSettings, ...persistedSettings } as AppSettings;
-  parsed.rootDirs = Array.isArray(parsed.rootDirs) ? parsed.rootDirs.filter(isNonEmptyString) : [];
-  parsed.disabledRepos = Array.isArray(parsed.disabledRepos)
-    ? parsed.disabledRepos.filter(isNonEmptyString).map(stripWindowsVerbatimPrefix)
-    : [];
-  parsed.aiApiKey = typeof parsed.aiApiKey === "string" ? parsed.aiApiKey : "";
-  parsed.proxyUrl = typeof parsed.proxyUrl === "string" ? parsed.proxyUrl : "";
-  parsed.proxyUsername = typeof parsed.proxyUsername === "string" ? parsed.proxyUsername : "";
-  parsed.proxyPassword = "";
-  parsed.authorAliasesText = typeof parsed.authorAliasesText === "string" ? parsed.authorAliasesText : "";
-  parsed.evidenceLinkPrefixesText = typeof parsed.evidenceLinkPrefixesText === "string" ? parsed.evidenceLinkPrefixesText : "";
-  parsed.redactionRulesText = typeof parsed.redactionRulesText === "string" ? parsed.redactionRulesText : "";
-  parsed.aiApiKeySaved = Boolean(parsed.aiApiKeySaved);
-  parsed.proxyPasswordSaved = Boolean(parsed.proxyPasswordSaved);
-  parsed.aiProvider = normalizeAiProvider(parsed.aiProvider);
-  parsed.proxyMode = normalizeProxyMode(parsed.proxyMode);
-  parsed.themeMode = normalizeThemeMode(parsed.themeMode);
-  parsed.commitItemPrefixMode = normalizeCommitItemPrefixMode(parsed.commitItemPrefixMode);
-  parsed.reportPurposePreset = normalizeReportPurposePreset(parsed.reportPurposePreset);
-  parsed.reportTemplateProfile = normalizeReportTemplateProfile(parsed.reportTemplateProfile);
-  parsed.excludeMergeCommits = parsed.excludeMergeCommits !== false;
-  parsed.excludeRevertCommits = parsed.excludeRevertCommits !== false;
-  parsed.excludeBotCommits = parsed.excludeBotCommits !== false;
-  parsed.showEvidenceDetails = Boolean(parsed.showEvidenceDetails);
-  parsed.redactionEnabled = Boolean(parsed.redactionEnabled);
-  parsed.dailyReportFormatTemplate = normalizeReportFormatTemplate(
-    parsed.dailyReportFormatTemplate,
-    DEFAULT_DAILY_REPORT_FORMAT_TEMPLATE,
+  const directApiKey = settingsFromRawApiKey(source.raw);
+  const directKeyNeedsSecureMigration = Boolean(directApiKey && !isAiKeyReference(directApiKey));
+  const legacyApiKey = findLegacyApiKey(source, [backup, legacy, current]);
+  const settings = normalizeLoadedSettings(source.raw, legacyApiKey);
+  const recoveredLegacyApiKey = directKeyNeedsSecureMigration || Boolean(legacyApiKey);
+  const settingsMigrationPending = Boolean(
+    source.key !== STORAGE_KEY
+    || legacy
+    || backup
+    || legacyApiKey
+    || directKeyNeedsSecureMigration,
   );
-  parsed.weeklyReportFormatTemplate = normalizeReportFormatTemplate(
-    parsed.weeklyReportFormatTemplate,
-    DEFAULT_WEEKLY_REPORT_FORMAT_TEMPLATE,
-  );
-  parsed.monthlyReportFormatTemplate = normalizeReportFormatTemplate(
-    parsed.monthlyReportFormatTemplate,
-    DEFAULT_MONTHLY_REPORT_FORMAT_TEMPLATE,
-  );
-  parsed.customReportFormatTemplate = normalizeReportFormatTemplate(
-    parsed.customReportFormatTemplate,
-    DEFAULT_CUSTOM_REPORT_FORMAT_TEMPLATE,
-  );
-  parsed.aiTemperature = Number.isFinite(parsed.aiTemperature) ? parsed.aiTemperature : defaultSettings.aiTemperature;
-  parsed.reportHistoryLimit = normalizeReportHistoryLimit(parsed.reportHistoryLimit);
-  // 旧版本只持久化单个 rootDir 字符串，迁移为 rootDirs 数组，避免老用户工作区配置失效。
-  if (parsed.rootDirs.length === 0 && rawSettings.rootDir?.trim()) {
-    parsed.rootDirs = [rawSettings.rootDir.trim()];
-  }
-  // Settings saved before the onboarding flow existed imply a configured workspace.
-  if (rawSettings.onboardingDone === undefined && parsed.rootDirs.length > 0) {
-    parsed.onboardingDone = true;
-  }
-  const legacyAiKeyEnv = rawSettings.aiKeyEnv?.trim() ?? "";
-  const aiApiKey = parsed.aiApiKey.trim();
-
-  if (!aiApiKey && legacyAiKeyEnv && !looksLikeEnvVarName(legacyAiKeyEnv)) {
-    return {
-      settings: {
-        ...parsed,
-        aiApiKey: legacyAiKeyEnv,
-      },
-      recoveredLegacyApiKey: true,
-      recoveredCorruptedSettings: false,
-    };
-  }
-  if (!aiApiKey && legacyAiKeyEnv && looksLikeEnvVarName(legacyAiKeyEnv)) {
-    return {
-      settings: {
-        ...parsed,
-        aiApiKey: legacyAiKeyEnv,
-      },
-      recoveredLegacyApiKey: true,
-      recoveredCorruptedSettings: false,
-    };
-  }
-
+  preserveMigrationSource({
+    source,
+    legacyApiKey,
+    directKeyNeedsSecureMigration,
+    backupText,
+    legacy,
+    backup,
+  });
   return {
-    settings: parsed,
-    recoveredLegacyApiKey: false,
-    recoveredCorruptedSettings: false,
+    settings,
+    recoveredLegacyApiKey,
+    recoveredCorruptedSettings: currentCorrupt,
+    settingsMigrationPending,
   };
+}
+
+export function finalizeSettingsMigration() {
+  localStorage.removeItem(LEGACY_STORAGE_KEY);
+  localStorage.removeItem(SETTINGS_MIGRATION_BACKUP_KEY);
+}
+
+function parseSettingsSource(key: string, text: string | null): SettingsSource | null {
+  if (text === null) return null;
+  try {
+    const raw: unknown = JSON.parse(text);
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+    return { key, raw: raw as RawSettings, text };
+  } catch {
+    return null;
+  }
+}
+
+function preserveCorruptSettings(text: string) {
+  localStorage.setItem(SETTINGS_CORRUPT_BACKUP_KEY, text);
+  localStorage.removeItem(STORAGE_KEY);
+}
+
+function preserveMigrationSource(options: {
+  source: SettingsSource;
+  legacyApiKey: string;
+  directKeyNeedsSecureMigration: boolean;
+  backupText: string | null;
+  legacy: SettingsSource | null;
+  backup: SettingsSource | null;
+}) {
+  const { source, legacyApiKey, directKeyNeedsSecureMigration, backupText, legacy, backup } = options;
+  if (backupText !== null) return;
+  const keySource = [source, legacy, backup].find((candidate) => (
+    legacyApiKeyFrom(candidate?.raw) === legacyApiKey
+  ));
+  if (source.key !== STORAGE_KEY || legacyApiKey || directKeyNeedsSecureMigration) {
+    localStorage.setItem(SETTINGS_MIGRATION_BACKUP_KEY, (keySource ?? source).text);
+  }
+}
+
+function findLegacyApiKey(
+  source: SettingsSource,
+  candidates: Array<SettingsSource | null>,
+) {
+  if (settingsFromRawApiKey(source.raw)) return "";
+  for (const candidate of [source, ...candidates]) {
+    const value = legacyApiKeyFrom(candidate?.raw);
+    if (value) return value;
+  }
+  return "";
+}
+
+function settingsFromRawApiKey(raw: RawSettings) {
+  return typeof raw.aiApiKey === "string" ? raw.aiApiKey.trim() : "";
+}
+
+function legacyApiKeyFrom(raw: RawSettings | undefined) {
+  return typeof raw?.aiKeyEnv === "string" ? raw.aiKeyEnv.trim() : "";
+}
+
+function defaultLoadedSettings(recoveredCorruptedSettings: boolean): LoadedSettingsState {
+  return {
+    settings: { ...defaultSettings },
+    recoveredLegacyApiKey: false,
+    recoveredCorruptedSettings,
+    settingsMigrationPending: false,
+  };
+}
+
+function normalizeLoadedSettings(raw: RawSettings, legacyApiKey: string): AppSettings {
+  const persisted = { ...raw };
+  delete persisted.aiKeyEnv;
+  delete persisted.startDate;
+  delete persisted.endDate;
+  delete persisted.rootDir;
+  const settings = { ...defaultSettings, ...persisted } as AppSettings;
+  normalizePrimitiveSettings(settings);
+  settings.rootDirs = normalizePathList(settings.rootDirs);
+  settings.disabledRepos = normalizePathList(settings.disabledRepos);
+  const legacyRoot = typeof raw.rootDir === "string" ? raw.rootDir.trim() : "";
+  if (settings.rootDirs.length === 0 && legacyRoot) settings.rootDirs = [legacyRoot];
+  if (raw.onboardingDone === undefined && settings.rootDirs.length > 0) settings.onboardingDone = true;
+  if (!settings.aiApiKey.trim() && legacyApiKey) settings.aiApiKey = legacyApiKey;
+  return settings;
+}
+
+const STRING_SETTING_KEYS = [
+  "outputDir", "author", "authorAliasesText", "evidenceLinkPrefixesText",
+  "redactionRulesText", "projectNamesText", "aiBaseUrl", "aiModel", "aiApiKey",
+  "refinementInstruction", "dailySystemPrompt", "monthlySystemPrompt", "proxyUrl",
+  "proxyUsername",
+] as const satisfies readonly (keyof AppSettings)[];
+
+const BOOLEAN_SETTING_KEYS = [
+  "onboardingDone", "outputEnabled", "extractAllBranches", "excludeMergeCommits",
+  "excludeRevertCommits", "excludeBotCommits", "detailedOutput", "showProjectAndBranch",
+  "showEvidenceDetails", "redactionEnabled", "aiEnabled", "aiApiKeySaved",
+  "proxyPasswordSaved",
+] as const satisfies readonly (keyof AppSettings)[];
+
+function normalizePrimitiveSettings(settings: AppSettings) {
+  for (const key of STRING_SETTING_KEYS) normalizeSetting(settings, key, (value) => typeof value === "string");
+  for (const key of BOOLEAN_SETTING_KEYS) normalizeSetting(settings, key, (value) => typeof value === "boolean");
+  settings.proxyPassword = "";
+  settings.aiProvider = normalizeAiProvider(settings.aiProvider);
+  settings.proxyMode = normalizeProxyMode(settings.proxyMode);
+  settings.themeMode = normalizeThemeMode(settings.themeMode);
+  settings.commitItemPrefixMode = normalizeCommitItemPrefixMode(settings.commitItemPrefixMode);
+  settings.reportPurposePreset = normalizeReportPurposePreset(settings.reportPurposePreset);
+  settings.reportTemplateProfile = normalizeReportTemplateProfile(settings.reportTemplateProfile);
+  settings.dailyReportFormatTemplate = normalizeReportFormatTemplate(settings.dailyReportFormatTemplate, DEFAULT_DAILY_REPORT_FORMAT_TEMPLATE);
+  settings.weeklyReportFormatTemplate = normalizeReportFormatTemplate(settings.weeklyReportFormatTemplate, DEFAULT_WEEKLY_REPORT_FORMAT_TEMPLATE);
+  settings.monthlyReportFormatTemplate = normalizeReportFormatTemplate(settings.monthlyReportFormatTemplate, DEFAULT_MONTHLY_REPORT_FORMAT_TEMPLATE);
+  settings.customReportFormatTemplate = normalizeReportFormatTemplate(settings.customReportFormatTemplate, DEFAULT_CUSTOM_REPORT_FORMAT_TEMPLATE);
+  settings.aiTemperature = normalizeAiTemperature(settings.aiTemperature);
+  settings.reportHistoryLimit = typeof settings.reportHistoryLimit === "number"
+    ? normalizeReportHistoryLimit(settings.reportHistoryLimit)
+    : defaultSettings.reportHistoryLimit;
+}
+
+function normalizeSetting<K extends keyof AppSettings>(
+  settings: AppSettings,
+  key: K,
+  isValid: (value: AppSettings[K]) => boolean,
+) {
+  if (!isValid(settings[key])) settings[key] = defaultSettings[key];
+}
+
+function normalizePathList(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isNonEmptyString).map((path) => stripWindowsVerbatimPrefix(path.trim()));
+}
+
+function normalizeAiTemperature(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 2
+    ? value
+    : defaultSettings.aiTemperature;
 }
 
 export function settingsForPersistence(settings: AppSettings): AppSettings {

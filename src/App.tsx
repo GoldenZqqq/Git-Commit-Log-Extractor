@@ -44,6 +44,7 @@ import {
   clearRepoIndexCache,
   isBlankDayHistoryEntry,
   formatMonthLabel,
+  finalizeSettingsMigration,
   getMonthRange,
   getPreviousMonthInput,
   getSingleDayRange,
@@ -133,7 +134,7 @@ function App() {
   const [polishReview, setPolishReview] = useState<ReportPolishReview | null>(null);
   const [status, setStatusText] = useState(
     loadedSettings.recoveredCorruptedSettings
-      ? "本地设置损坏，已恢复默认配置"
+      ? "本地设置损坏，已保留原文并使用可恢复配置"
       : loadedSettings.recoveredLegacyApiKey
         ? "已迁移旧配置中的 AI 密钥引用"
         : "就绪",
@@ -222,9 +223,17 @@ function App() {
   useEffect(() => {
     const currentApiKey = settings.aiApiKey.trim();
     if (currentApiKey) {
-      if (!isAiKeyReference(currentApiKey)) void persistSecureAiApiKey(currentApiKey);
+      if (!isAiKeyReference(currentApiKey)) {
+        void persistSecureAiApiKey(currentApiKey).then((saved) => {
+          if (saved && loadedSettings.settingsMigrationPending) finalizeSettingsMigration();
+        });
+      } else if (loadedSettings.settingsMigrationPending) {
+        finalizeSettingsMigration();
+      }
       return;
     }
+
+    if (loadedSettings.settingsMigrationPending) finalizeSettingsMigration();
 
     invoke<string | null>("get_secure_ai_api_key")
       .then((apiKey) => {
@@ -1017,13 +1026,13 @@ function App() {
     }, 500);
   }
 
-  async function persistSecureAiApiKey(value: string) {
+  async function persistSecureAiApiKey(value: string): Promise<boolean> {
     const apiKey = value.trim();
     try {
       if (!apiKey || isAiKeyReference(apiKey)) {
         await invoke("clear_secure_ai_api_key");
         setSettings((current) => ({ ...current, aiApiKeySaved: false }));
-        return;
+        return true;
       }
 
       await invoke("set_secure_ai_api_key", { apiKey });
@@ -1031,8 +1040,10 @@ function App() {
         if (current.aiApiKey.trim() !== apiKey) return current;
         return { ...current, aiApiKeySaved: true };
       });
+      return true;
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error), { tone: "error", notify: true, duration: 4200 });
+      return false;
     }
   }
 

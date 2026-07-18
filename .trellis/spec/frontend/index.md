@@ -18,6 +18,7 @@ The frontend owns state, layout, validation prompts, preview interactions, and T
 | [Component Guidelines](./component-guidelines.md) | Component patterns, props, composition | Filled |
 | [Hook Guidelines](./hook-guidelines.md) | Custom hooks and runtime integration | Filled |
 | [State Management](./state-management.md) | Local state, persisted state, derived state | Filled |
+| [Settings Migration](./settings-migration.md) | v0.5.x local settings recovery and secure credential handoff | Filled |
 | [Quality Guidelines](./quality-guidelines.md) | Code standards, verification, forbidden patterns | Filled |
 | [Desktop Quality Gates](./desktop-quality-gates.md) | Browser, responsive, accessibility, and real WebView smoke contract | Filled |
 | [Type Safety](./type-safety.md) | Type patterns and validation | Filled |
@@ -32,6 +33,7 @@ The frontend owns state, layout, validation prompts, preview interactions, and T
 - [ ] Check `src/model.ts` before adding new frontend shapes, defaults, validators, or command option builders.
 - [ ] Keep report generation controls and current scope visible in the workbench.
 - [ ] Preserve local-first privacy language and never put raw API keys in plain persisted settings.
+- [ ] For persisted-settings or startup credential changes, follow `settings-migration.md`; never delete the only legacy credential copy before secure-store success.
 - [ ] For configuration-profile work, use the explicit versioned whitelist; never export `AppSettings` by spreading it.
 - [ ] For desktop startup, responsive, overlay, or CI changes, follow `desktop-quality-gates.md`.
 

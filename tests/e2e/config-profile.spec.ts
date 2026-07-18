@@ -50,7 +50,9 @@ test("previews then merges or replaces shareable settings without touching secre
       projectNamesText: "shared(*) -> 本机名称\nlocal(*) -> 本机项目",
       authorAliasesText: "团队 -> local@example.com\n本机 -> local-only@example.com",
       evidenceLinkPrefixesText: "JIRA -> https://old.example/{id}\nLOCAL -> https://local/{id}",
-      aiApiKey: "sk-stays-local",
+      aiApiKey: "env:OPENAI_API_KEY",
+      aiApiKeySaved: false,
+      proxyPasswordSaved: true,
       rootDirs: ["C:/workspace-stays-local"],
     }),
     dialogResponses: ["C:/profiles/merge.json", "C:/profiles/replace.json"],
@@ -74,7 +76,9 @@ test("previews then merges or replaces shareable settings without touching secre
   expect(stored.authorAliasesText).toContain("团队 -> imported@example.com");
   expect(stored.authorAliasesText).toContain("本机 -> local-only@example.com");
   expect(stored.dailyReportFormatTemplate).toContain("导入日报");
-  expect(stored.aiApiKey).toBe("");
+  expect(stored.aiApiKey).toBe("env:OPENAI_API_KEY");
+  expect(stored.aiApiKeySaved).toBe(false);
+  expect(stored.proxyPasswordSaved).toBe(true);
   expect(stored.rootDirs).toEqual(["C:/workspace-stays-local"]);
 
   await page.getByRole("button", { name: "导入方案" }).click();
@@ -86,6 +90,8 @@ test("previews then merges or replaces shareable settings without touching secre
   expect(stored.authorAliasesText).toBe("仅导入 -> only@example.com");
   expect(stored.evidenceLinkPrefixesText).toBe("ONLY -> https://only.example/{id}");
   expect(stored.rootDirs).toEqual(["C:/workspace-stays-local"]);
+  expect(stored.aiApiKey).toBe("env:OPENAI_API_KEY");
+  expect(stored.proxyPasswordSaved).toBe(true);
   expect(await commandCount(page, "clear_secure_ai_api_key")).toBe(0);
   expect(await commandCount(page, "clear_secure_proxy_password")).toBe(0);
 });
@@ -93,6 +99,8 @@ test("previews then merges or replaces shareable settings without touching secre
 test("cancels preview and rejects unsupported or damaged packages without changing settings", async ({ page }) => {
   const base = profile({ projectNamesText: "remote(*) -> 远程项目" });
   const unknownVersion = { ...base, schemaVersion: 99 };
+  const unknownRoot = { ...base, unexpected: true };
+  const missingSettings = { schemaVersion: 1, exportedAt: base.exportedAt };
   const unknownField = { ...base, settings: { ...base.settings, aiApiKey: "must-reject" } };
   const oversized = "x".repeat(2 * 1024 * 1024 + 1);
   await launchApp(page, {
@@ -100,6 +108,8 @@ test("cancels preview and rejects unsupported or damaged packages without changi
     dialogResponses: [
       "C:/profiles/cancel.json",
       "C:/profiles/version.json",
+      "C:/profiles/root.json",
+      "C:/profiles/missing.json",
       "C:/profiles/field.json",
       "C:/profiles/broken.json",
       "C:/profiles/oversized.json",
@@ -107,6 +117,8 @@ test("cancels preview and rejects unsupported or damaged packages without changi
     textFiles: {
       "C:/profiles/cancel.json": JSON.stringify(base),
       "C:/profiles/version.json": JSON.stringify(unknownVersion),
+      "C:/profiles/root.json": JSON.stringify(unknownRoot),
+      "C:/profiles/missing.json": JSON.stringify(missingSettings),
       "C:/profiles/field.json": JSON.stringify(unknownField),
       "C:/profiles/broken.json": "{broken",
       "C:/profiles/oversized.json": oversized,
@@ -119,6 +131,8 @@ test("cancels preview and rejects unsupported or damaged packages without changi
   expect((await storedSettings(page)).projectNamesText).toBe("local(*) -> 本机项目");
 
   await expectImportError(page, "不支持的配置方案版本：99");
+  await expectImportError(page, "配置方案包含未知字段：unexpected");
+  await expectImportError(page, "配置方案缺少字段：settings");
   await expectImportError(page, "settings包含未知字段：aiApiKey");
   await expectImportError(page, "配置方案不是有效的 JSON 文件");
   await expectImportError(page, "配置方案不能超过 2 MiB");

@@ -58,6 +58,7 @@ useReportHistoryStorage(limit, onWarning): {
 - Version 1 is `{ "version": 1, "entries": [...] }`. Unsupported versions are invalid, not silently reinterpreted.
 - `ReportHistoryEntry.projects?: ReportHistoryProject[]` is a backward-compatible optional field inside version 1; adding it does not bump the envelope version.
 - Supported limits are 30, 60, 120, and 200; any other value normalizes to 120. First-seen ID wins and ordering stays newest-first.
+- Each primary, backup, or serialized replacement is limited to 32 MiB. Reads reject before allocating the full text; writes reject before creating/replacing the temp snapshot.
 - Normal save writes and syncs the temp file, rotates primary to backup, then renames temp to primary. A failed final rename restores the backup when possible.
 - Clear prepares two empty envelopes, moves the old primary to rollback, replaces backup and primary, then deletes rollback. Any returned error must leave the old primary recoverable.
 - On load, a missing primary plus rollback means an interrupted clear: restore rollback before reading backup. A valid primary is authoritative.
@@ -76,6 +77,7 @@ useReportHistoryStorage(limit, onWarning): {
 - Both files missing, valid legacy array -> normalize, write primary, return `migrationComplete = true`.
 - Legacy JSON or any entry invalid -> pass `legacyEntries = null`, preserve the old key, show the migration warning.
 - Directory/temp/write/rename failure -> return a Chinese `Err`; frontend keeps current memory and appends a persistent warning.
+- Primary over 32 MiB -> isolate it and try backup. Save over 32 MiB -> return `Err` without rotating the existing primary/backup.
 - Clear fails before completion -> restore rollback as primary and return `Err`; frontend restores pre-clear memory.
 - Startup load is pending when a mutation occurs -> replay the mutation against the returned file entries, then persist the combined result.
 
@@ -91,7 +93,7 @@ useReportHistoryStorage(limit, onWarning): {
 
 ## 6. Tests Required
 
-- Rust unit tests assert envelope round-trip, supported-limit trimming, first-ID dedupe, migration idempotence, unsupported-version isolation, backup recovery, interrupted-clear recovery, failed-clear rollback, and empty-backup recovery after clear.
+- Rust unit tests assert envelope round-trip, supported-limit trimming, first-ID dedupe, migration idempotence, unsupported-version isolation, backup recovery, interrupted-clear recovery, failed-clear rollback, empty-backup recovery after clear, 32 MiB read/write rejection, and temp-write failure preservation.
 - Playwright asserts valid legacy migration and key deletion, existing-file authority, invalid legacy preservation, load/save/clear warnings, save-failure memory fallback, and clear-failure UI rollback.
 - Defer `load_report_history`, generate a report before release, then assert the file store contains both old and new entries.
 - Existing AI polish, supplemental facts, report opening/filtering, and history clear flows must read the mock file store and remain green.

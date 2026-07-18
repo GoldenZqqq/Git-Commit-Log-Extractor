@@ -57,6 +57,34 @@ test("preserves malformed legacy data and explains why migration was skipped", a
   expect(load.args.legacyEntries).toBeNull();
 });
 
+test("preserves a structurally invalid legacy array without partially importing it", async ({ page }) => {
+  const invalid = JSON.stringify([{ id: "incomplete-history" }]);
+  await launchApp(page, {
+    settings,
+    repoCache: createRepoCache(["C:/workspace"], [repo]),
+    legacyReportHistoryRaw: invalid,
+  });
+
+  await expectWorkbench(page);
+  await expect(page.locator(".event-log")).toContainText("旧报告历史格式异常");
+  expect(await legacyStorageValue(page)).toBe(invalid);
+  expect((await lastCommand(page, "load_report_history")).args.legacyEntries).toBeNull();
+});
+
+test("keeps valid legacy history when the file migration command fails", async ({ page }) => {
+  const legacy = historyEntry("retry-after-load-failure", "等待下次迁移");
+  await launchApp(page, {
+    settings,
+    repoCache: createRepoCache(["C:/workspace"], [repo]),
+    reportHistory: [legacy],
+    reportHistoryLoadError: "模拟历史目录不可写",
+  });
+
+  await expectWorkbench(page);
+  await expect(page.locator(".app-message.warning")).toContainText("报告历史文件加载失败");
+  expect(JSON.parse(await legacyStorageValue(page) ?? "[]")[0].id).toBe(legacy.id);
+});
+
 test("keeps the generated report in memory when the file save fails", async ({ page }) => {
   await launchApp(page, {
     settings,
