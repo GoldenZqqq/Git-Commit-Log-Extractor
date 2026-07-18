@@ -21,11 +21,11 @@
 
 ## Acceptance Criteria
 
-- [ ] AC1：一条 `cargo run --release --bin gitpulse-workspace-benchmark -- ...` 命令可生成任一 profile 并输出有效 JSON 结果。
-- [ ] AC2：自动化测试覆盖 profile 规模、percentile/阈值计算、fixture 清理保护、扫描取消和最小端到端 smoke。
-- [ ] AC3：基线文档记录环境、样本口径、standard/large 实测值、P50/P95、资源与输出规模、回归阈值。
-- [ ] AC4：基准验证真实扫描仓库数和提取提交数与 profile 完全一致，发现的阻断性能问题已修复或形成明确后续任务。
-- [ ] AC5：现有 build、E2E、Rust 测试、真实 Tauri smoke 和 `git diff --check` 保持通过。
+- [x] AC1：一条 `cargo run --release --bin gitpulse-workspace-benchmark -- ...` 命令可生成任一 profile 并输出有效 JSON 结果。
+- [x] AC2：自动化测试覆盖 profile 规模、percentile/阈值计算、fixture 清理保护、扫描取消和最小端到端 smoke。
+- [x] AC3：基线文档记录环境、样本口径、standard/large 实测值、P50/P95、资源与输出规模、回归阈值。
+- [x] AC4：基准验证真实扫描仓库数和提取提交数与 profile 完全一致，发现的阻断性能问题已修复或形成明确后续任务。
+- [x] AC5：现有 build、E2E、Rust 测试、真实 Tauri smoke 和 `git diff --check` 保持通过。
 
 ## Out of Scope
 

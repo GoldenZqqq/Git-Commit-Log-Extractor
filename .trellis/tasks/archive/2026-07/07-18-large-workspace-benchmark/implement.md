@@ -7,8 +7,22 @@
 5. [x] 实现 versioned JSON 输出、`--output`、`--keep-fixture`、`--iterations` 与失败后先落盘再非零退出。
 6. [x] 运行 smoke 后执行 standard/large 实测，依据真实数据确认保守阈值；阻断问题直接修复或创建后续 Trellis 任务。
 7. [x] 新增性能基线 code-spec 与 `docs/performance-baseline.md`，记录环境、口径、实测结果、阈值和复测命令。
-8. [ ] 运行定向 Rust 测试、三个 profile、全量 build/E2E/Rust/真实 WebView CI 与 `git diff --check`。
-9. [ ] 勾选 AC、记录功能提交与 exact-SHA CI 证据，归档任务并独立 push。
+8. [x] 运行定向 Rust 测试、三个 profile、全量 build/E2E/Rust/真实 WebView CI 与 `git diff --check`。
+9. [x] 勾选 AC、记录功能提交与 exact-SHA CI 证据，归档任务并独立 push。
+
+## Verification Evidence
+
+- Functional commit: `f6538e258ad6ad3bb6327e2606016dc8f931411b`.
+- Exact-SHA CI: run `29651022507`; Release governance, Linux desktop checks,
+  Windows desktop checks, and real Windows Tauri WebView smoke all passed.
+- Local Rust: `cargo fmt --all -- --check`, benchmark binary tests (`11`),
+  `cargo check`, and full `cargo test` (`131` library + `11` binary) passed.
+- Local frontend: `npm run build` and Playwright E2E (`73/73`) passed.
+- Profiles: smoke (`5/500`, extraction P95 `43 ms`), standard (`50/50000`,
+  extraction P95 `2,145 ms`), and large (`200/50000`, extraction P95
+  `2,758 ms`) passed with exact counts and no failures.
+- `git diff --check` and all three `schemaVersion: 1` JSON contract checks passed;
+  no benchmark fixture directory remained after cleanup.
 
 ## Validation Commands
 
