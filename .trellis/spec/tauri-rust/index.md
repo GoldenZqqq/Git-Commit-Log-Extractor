@@ -15,6 +15,7 @@ Rust owns local Git scanning, commit extraction, report rendering/export, option
 | [Configuration Profiles](./config-profile-io.md) | Versioned shareable config and bounded file I/O contract | Filled |
 | [Project Retrospective Attribution](./project-retrospective.md) | Structured project attribution, history compatibility, and retrospective projection | Filled |
 | [Quality Guidelines](./quality-guidelines.md) | Rust verification and safety rules | Filled |
+| [Desktop Quality Gates](../frontend/desktop-quality-gates.md) | Real Windows WebView startup and IPC smoke contract | Filled |
 
 ## Pre-Development Checklist
 

@@ -76,11 +76,21 @@ jobs:
         if: matrix.os == 'windows-2022'
         run: npx playwright install chromium
 
-      - name: Frontend e2e
+      - name: Accessibility e2e
+        run: npm run test:e2e:a11y
+
+      - name: Responsive e2e
+        run: npm run test:e2e:responsive
+
+      - name: Full browser mocked e2e
         run: npm run test:e2e
 
       - name: Frontend build
         run: npm run build
+
+      - name: Rust format check
+        working-directory: src-tauri
+        run: cargo fmt -- --check
 
       - name: Rust cargo check
         working-directory: src-tauri
@@ -102,3 +112,68 @@ jobs:
             playwright-report/
             test-results/
           if-no-files-found: ignore
+
+  tauri-smoke-windows:
+    name: Tauri WebView smoke (Windows)
+    timeout-minutes: 45
+    runs-on: windows-2022
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Install tauri-driver
+        run: cargo install tauri-driver --locked
+
+      - name: Prepare matching EdgeDriver
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $edgeCandidates = @(
+            "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe",
+            "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe"
+          )
+          $edgePath = $edgeCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+          if (-not $edgePath) { throw 'Microsoft Edge is not installed on the runner' }
+          $edgeVersion = (Get-Item -LiteralPath $edgePath).VersionInfo.ProductVersion
+          $driverRoot = Join-Path $env:RUNNER_TEMP 'msedgedriver'
+          $archive = Join-Path $env:RUNNER_TEMP 'msedgedriver.zip'
+          Invoke-WebRequest -Uri "https://msedgedriver.microsoft.com/$edgeVersion/edgedriver_win64.zip" -OutFile $archive
+          Expand-Archive -LiteralPath $archive -DestinationPath $driverRoot -Force
+          $driver = Get-ChildItem -LiteralPath $driverRoot -Filter msedgedriver.exe -Recurse | Select-Object -First 1
+          if (-not $driver) { throw 'msedgedriver.exe was not found after extraction' }
+          Add-Content -LiteralPath $env:GITHUB_PATH -Value $driver.DirectoryName -Encoding utf8
+          & $driver.FullName --version
+
+      - name: Build debug Tauri application
+        run: npm run build:tauri:smoke
+
+      - name: Run real WebView smoke
+        env:
+          TAURI_SMOKE_ARTIFACT_DIR: artifacts/tauri-smoke
+        run: npm run test:tauri-smoke -- src-tauri/target/debug/gitpulse.exe
+
+      - name: Upload Tauri smoke artifacts
+        if: ${{ !cancelled() && failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-smoke-windows
+          path: artifacts/tauri-smoke/
+          if-no-files-found: warn

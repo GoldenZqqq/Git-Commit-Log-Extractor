@@ -19,6 +19,7 @@ The frontend owns state, layout, validation prompts, preview interactions, and T
 | [Hook Guidelines](./hook-guidelines.md) | Custom hooks and runtime integration | Filled |
 | [State Management](./state-management.md) | Local state, persisted state, derived state | Filled |
 | [Quality Guidelines](./quality-guidelines.md) | Code standards, verification, forbidden patterns | Filled |
+| [Desktop Quality Gates](./desktop-quality-gates.md) | Browser, responsive, accessibility, and real WebView smoke contract | Filled |
 | [Type Safety](./type-safety.md) | Type patterns and validation | Filled |
 | [Configuration Profiles](../tauri-rust/config-profile-io.md) | Versioned shareable config whitelist, preview, and import semantics | Filled |
 | [Project Retrospective Attribution](../tauri-rust/project-retrospective.md) | Cross-layer project history and insights projection contract | Filled |
@@ -32,6 +33,7 @@ The frontend owns state, layout, validation prompts, preview interactions, and T
 - [ ] Keep report generation controls and current scope visible in the workbench.
 - [ ] Preserve local-first privacy language and never put raw API keys in plain persisted settings.
 - [ ] For configuration-profile work, use the explicit versioned whitelist; never export `AppSettings` by spreading it.
+- [ ] For desktop startup, responsive, overlay, or CI changes, follow `desktop-quality-gates.md`.
 
 ## Quality Check
 

@@ -12,6 +12,7 @@ dist
 dist-ssr
 playwright-report/
 test-results/
+artifacts/
 site/.astro/
 site/public/assets/
 src-tauri/target
