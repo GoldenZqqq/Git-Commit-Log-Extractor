@@ -3,7 +3,7 @@
   "name": "large-workspace-benchmark",
   "title": "建立大规模工作区性能基线",
   "description": "覆盖多仓库与大提交量的扫描、提取、取消和资源消耗基线",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,
