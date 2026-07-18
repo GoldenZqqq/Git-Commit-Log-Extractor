@@ -44,6 +44,13 @@ cd src-tauri; cargo check
 npm run build
 ```
 
+## Archive Verification (2026-07-18)
+
+- [x] `npm run build`
+- [x] `npm run test:e2e`（20 passed）
+- [x] GitHub Actions CI `29405253090`：Windows / Linux 的前端 E2E、前端构建、`cargo check`、`cargo test` 全部通过
+- [x] 对照 PRD 复核入口、默认值、仓库筛选、AI 约束、历史写入、替换确认及错误处理路径
+
 ## Risk Files
 
 - `src/components/Workbench.tsx` — 工具栏拥挤风险
