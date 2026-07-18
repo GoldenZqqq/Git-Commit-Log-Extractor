@@ -495,7 +495,6 @@ export function Workbench(props: Props) {
                   onClick={props.onOpenBatch}
                   disabled={generateBlocked}
                   title="批量生成多份报告"
-                  style={{ marginLeft: 4 }}
                 >
                   <Layers size={15} />
                   批量
@@ -524,7 +523,6 @@ export function Workbench(props: Props) {
                       onClick={props.onOpenBlankDayFill}
                       disabled={generateBlocked || !props.aiConfigured}
                       title={props.aiConfigured ? "基于近期 Git 线索，生成可编辑的日报延续草稿" : "请先配置 AI"}
-                      style={{ marginLeft: 4 }}
                     >
                       <Wand2 size={15} />
                       空白日补写

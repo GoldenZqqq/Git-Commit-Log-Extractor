@@ -1818,6 +1818,44 @@
     width: 100%;
   }
 
+  .canvas-primary-actions,
+  .canvas-actions-group {
+    gap: 7px;
+  }
+
+  .blank-day-entry,
+  .polish-split,
+  .export-split,
+  .copy-split {
+    max-width: 100%;
+  }
+
+  .blank-day-entry {
+    width: 100%;
+  }
+
+  .canvas-actions-group {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .polish-popover {
+    width: min(280px, calc(100vw - 32px));
+  }
+
+  .export-popover,
+  .copy-as-popover {
+    width: min(232px, calc(100vw - 32px));
+  }
+
+  .report-period-control input {
+    width: min(148px, calc(100vw - 104px));
+  }
+
+  .report-canvas {
+    min-height: 520px;
+  }
+
   .report-period-control {
     width: 100%;
   }

@@ -1416,12 +1416,15 @@
   display: grid;
   gap: 14px;
   width: min(460px, 100%);
+  max-height: calc(100dvh - 36px);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   color: var(--ink);
   background: var(--paper);
   box-shadow: 0 24px 64px rgba(24, 35, 52, 0.22);
   padding: 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .range-dialog-header,
@@ -1887,6 +1890,62 @@
 
   .report-format-kind-control {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px), (max-height: 640px) {
+  .dialog-backdrop,
+  .compact-backdrop {
+    padding: 8px;
+  }
+
+  .settings-dialog {
+    height: min(680px, calc(100dvh - 16px));
+  }
+
+  .settings-nav {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    padding: 8px;
+  }
+
+  .settings-nav button {
+    justify-content: center;
+    gap: 4px;
+    min-height: 36px;
+    padding-inline: 5px;
+    font-size: 12px;
+  }
+
+  .settings-content {
+    padding: 10px;
+  }
+
+  .settings-section {
+    padding: 10px;
+  }
+
+  .range-dialog {
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - 16px);
+    padding: 12px;
+  }
+
+  .range-dialog-header {
+    position: sticky;
+    z-index: 2;
+    top: -12px;
+    margin: -12px -12px 0;
+    padding: 12px;
+    border-bottom: 1px solid var(--line);
+    background: var(--paper);
+  }
+
+  .range-dialog-header h2 {
+    font-size: 18px;
+    line-height: 24px;
   }
 }
 

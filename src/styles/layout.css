@@ -769,12 +769,28 @@
 }
 
 @media (max-width: 1040px) {
+  body {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
   .app-root {
     padding: 12px;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
   }
 
   .studio-grid {
     grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+    align-content: start;
+    min-height: auto;
+  }
+
+  .workbench {
+    height: auto;
+    min-height: calc(100vh - 24px);
   }
 
   .hero-band {
@@ -785,10 +801,18 @@
   .hero-aside {
     justify-items: start;
     width: 100%;
+    min-width: 0;
   }
 
   .hero-actions {
     justify-content: flex-start;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .run-status {
+    flex: 1 1 220px;
+    max-width: none;
   }
 
   .context-chips,
@@ -798,5 +822,48 @@
 
   .repo-list {
     max-height: none;
+  }
+}
+
+@media (max-width: 720px) {
+  body {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .app-root {
+    padding: 8px;
+    min-height: 100dvh;
+  }
+
+  .workbench {
+    min-height: calc(100dvh - 16px);
+    gap: 8px;
+  }
+
+  .hero-band {
+    padding: 12px;
+  }
+
+  .hero-aside {
+    gap: 8px;
+  }
+
+  .run-status {
+    flex-basis: 180px;
+  }
+
+  .settings-trigger {
+    padding-inline: 10px;
+  }
+
+  .workbench-view-tabs {
+    width: 100%;
+  }
+
+  .workbench-view-tabs button {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-inline: 8px;
   }
 }
