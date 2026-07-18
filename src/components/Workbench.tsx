@@ -149,7 +149,7 @@ export function Workbench(props: Props) {
   const exportBlocked = reviewPending || !taskCanStart(props.activeTasks, "export");
   const interactionBlocked = !taskCanStart(props.activeTasks, "interaction");
   const scanBlocked = !taskCanStart(props.activeTasks, "scan");
-  const visibleStatus = activeTaskLabel(props.activeTasks) || props.status;
+  const activeTaskStatus = activeTaskLabel(props.activeTasks);
   const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
   const [blankDayTipOpen, setBlankDayTipOpen] = useState(() => !loadBlankDayTipDismissed());
   const [customDialogOpen, setCustomDialogOpen] = useState(false);
@@ -349,8 +349,11 @@ export function Workbench(props: Props) {
       ? "请选择输出目录后再导出报告"
       : "请先开启输出到文件并选择输出目录";
   const extractProgressText = props.extractProgress && !props.extractProgress.done
-    ? `${props.extractProgress.completedRepos}/${props.extractProgress.totalRepos} 仓库 · ${props.extractProgress.concurrency} 并发 · ${props.extractProgress.commitCount} 条提交`
-    : visibleStatus;
+    ? `提取中 · ${props.extractProgress.completedRepos}/${props.extractProgress.totalRepos} 仓库 · ${props.extractProgress.commitCount} 提交`
+    : activeTaskStatus || props.status;
+  const visibleStatus = isGenerating && props.extractProgress && !props.extractProgress.done
+    ? extractProgressText
+    : activeTaskStatus || props.status;
   const emptyReportAdvice = props.previewText && props.commitCount === 0 && !props.blankDayDraftActive
     ? buildEmptyReportAdvice({
       activePreview: props.activePreview,

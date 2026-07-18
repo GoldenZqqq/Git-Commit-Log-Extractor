@@ -483,7 +483,7 @@ function App() {
     setExtractProgress(null);
     await runTask({
       kind: "generate",
-      label: "正在提取提交记录",
+      label: "提取提交",
       task: async () => {
         const supplementalItems = supplementalItemsFor("summary", range, supplementalOverride);
         const result = await invoke<ExtractResult>("extract_commits", {
@@ -1364,7 +1364,7 @@ function formatReportExportLabel(format: ReportExportFormat) {
 function formatExtractProgress(progress: CommitExtractProgress) {
   const total = progress.totalRepos;
   if (total === 0) return "没有启用的仓库可提取";
-  return `提取中：${progress.completedRepos}/${total} 仓库 · ${progress.commitCount} 条提交`;
+  return `提取中 · ${progress.completedRepos}/${total} 仓库 · ${progress.commitCount} 提交`;
 }
 
 export default App;
