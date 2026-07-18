@@ -276,7 +276,7 @@ test("keeps export setup visible when output is not configured", async ({ page }
 
   await page.getByRole("button", { name: "设置导出" }).click();
 
-  await expect(page.getByRole("dialog", { name: "应用设置" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "设置" })).toBeVisible();
   await expect(page.getByRole("status").getByText("请先开启输出到文件并选择输出目录")).toBeVisible();
   await expect(page.getByText("基础配置")).toBeVisible();
   await expect(page.getByText("输出到文件", { exact: true })).toBeVisible();
@@ -340,7 +340,7 @@ test("guides users when workspace has no indexed repositories", async ({ page })
   const emptyState = page.getByLabel("仓库索引为空");
   await expect(emptyState).toBeVisible();
   await expect(emptyState.getByText("先添加仓库根目录")).toBeVisible();
-  await expect(emptyState.getByText("选择存放代码项目的文件夹后，GitPulse 会扫描其中的本地 Git 仓库。")).toBeVisible();
+  await expect(emptyState.getByText("添加代码目录后即可扫描 Git 仓库。")).toBeVisible();
   await expect(emptyState.getByText("多个工作区可分次添加。")).toBeVisible();
 
   await emptyState.getByRole("button", { name: "添加目录" }).click();
@@ -353,6 +353,23 @@ test("guides users when workspace has no indexed repositories", async ({ page })
   );
   expect(scanCalls).toHaveLength(1);
   expect(scanCalls[0].args.rootDirs).toEqual(["C:/empty-workspace"]);
+});
+
+test("keeps valid repositories and shows skipped path warnings after scanning", async ({ page }) => {
+  const scanWarning = "扫描已跳过“C:/workspace/broken-link”：读取链接目标失败（找不到指定文件）";
+  await launchApp(page, {
+    settings,
+    repoCache: createRepoCache(["C:/workspace"], []),
+    scanRepos: repos,
+    scanWarnings: [scanWarning],
+  });
+
+  await expectWorkbench(page);
+  await page.getByLabel("仓库索引为空").getByRole("button", { name: "重新扫描" }).click();
+
+  await expect(page.locator(".run-status")).toContainText("已发现 1 个仓库，部分路径已跳过");
+  await expect(page.getByText(scanWarning)).toBeVisible();
+  await expect(page.getByText("gitpulse", { exact: true })).toBeVisible();
 });
 
 test("shows actionable guidance for empty daily reports", async ({ page }) => {
@@ -541,6 +558,9 @@ test("passes redaction options when generating a traceable weekly report", async
         reportKind: "weekly",
         projectCount: 1,
         commitCount: 1,
+        projects: [
+          { name: "仓库1(分支1)", commitCount: 1, evidenceIds: ["commit-1"] },
+        ],
       },
     },
     outputDir: "C:/exports",
@@ -566,6 +586,11 @@ test("passes redaction options when generating a traceable weekly report", async
       { find: "SECRET_TOKEN", replacement: "***" },
     ],
   });
+  const stored = await page.evaluate(() => window.__mockTauri.reportHistoryStore[0]);
+  expect(stored.projects).toEqual([
+    { name: "仓库1(分支1)", commitCount: 1, evidenceIds: ["commit-1"] },
+  ]);
+  expect(JSON.stringify(stored.projects)).not.toContain("gitpulse");
 });
 
 test("generates and exports a monthly report", async ({ page }) => {
@@ -637,7 +662,7 @@ test("opens and clears report history", async ({ page }) => {
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "清空" }).click();
 
-  await expect(page.getByText("生成报告后会在这里保留最近记录，可重新打开、复制或按同一周期重新生成。")).toBeVisible();
+  await expect(page.getByText("暂无历史报告，生成后可在此打开、复制或重新生成。")).toBeVisible();
 });
 
 test("filters report history by type date status and search", async ({ page }) => {

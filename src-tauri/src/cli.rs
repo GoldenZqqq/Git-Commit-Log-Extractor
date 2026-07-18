@@ -163,10 +163,7 @@ fn run(cli: &CliArgs) -> Result<String, String> {
 
     eprintln!("报告类型：{}", cli.report_type);
     eprintln!("统计周期：{} 至 {}", start_date, end_date);
-    eprintln!(
-        "作者：{}",
-        if author.is_empty() { "全部" } else { &author }
-    );
+    eprintln!("作者：{}", if author.is_empty() { "全部" } else { &author });
     eprintln!("工作区：{}", dirs.join(", "));
 
     if cli.format == "json" {
@@ -309,6 +306,7 @@ fn build_extract_options(
         author: author.to_string(),
         author_display_name: String::new(),
         author_aliases: Vec::new(),
+        supplemental_items: Vec::new(),
         start_date: start_date.to_string(),
         end_date: end_date.to_string(),
         period_label: period_label.to_string(),
@@ -380,6 +378,7 @@ fn generate_markdown_report(
                 author: author.to_string(),
                 author_display_name: String::new(),
                 author_aliases: Vec::new(),
+                supplemental_items: Vec::new(),
                 start_date: start_date.to_string(),
                 end_date: end_date.to_string(),
                 period_label: period_label.to_string(),
@@ -399,8 +398,7 @@ fn generate_markdown_report(
                 system_prompt: String::new(),
                 ai: disabled_ai(),
             };
-            let result =
-                commit_pipeline::generate_period_report_sync(options, progress_callback)?;
+            let result = commit_pipeline::generate_period_report_sync(options, progress_callback)?;
             print_warnings(&result.warnings);
             Ok(result.report_text)
         }

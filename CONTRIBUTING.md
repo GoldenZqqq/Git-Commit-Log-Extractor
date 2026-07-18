@@ -16,13 +16,34 @@ Run these before opening a PR:
 ```bash
 npx playwright install chromium   # 首次运行浏览器 e2e 前执行一次
 npm run build
+npm run test:e2e:a11y
+npm run test:e2e:responsive
 npm run test:e2e
 cd src-tauri
+cargo fmt -- --check
 cargo check
 cargo test
 ```
 
-GitHub Actions now runs the same desktop checks on every `pull_request` and on pushes to `main`, including frontend smoke, browser-level Playwright e2e, production build, Rust `check/test`, and `git diff --check`.
+GitHub Actions 在每个 `pull_request` 和 `main` 推送上运行 frontend smoke、browser mocked Playwright、a11y/响应式专项、生产构建、Rust `fmt/check/test` 与 `git diff --check`。Windows 还会运行真实 Tauri WebView smoke；Linux 不伪装桌面 WebView，只执行 browser mocked + Rust 门禁。macOS 安装包由 release workflow 在 tag 发布后构建，不参与当前 CI smoke。
+
+### Windows Tauri WebView smoke
+
+真实桌面 smoke 仅在 Windows 上运行，验证应用启动、首次引导跳过、工作台可见，以及 `get_git_identity` 本地命令往返。该流程不会调用 AI、更新器、GitHub API 或远程 Git。
+
+首次本地运行需要：
+
+- 安装与当前 Microsoft Edge **WebView2 Runtime** 版本一致的 `msedgedriver.exe` 并加入 `PATH`。桌面 Edge 浏览器与 WebView2 Runtime 可能版本不同，必须以 `Microsoft\EdgeWebView\Application` 下的 Runtime 版本为准。
+- 执行 `cargo install tauri-driver --locked`。
+
+```powershell
+$ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
+npm run build:tauri:smoke
+npm run test:tauri-smoke -- src-tauri/target/debug/gitpulse.exe
+```
+
+失败产物写入 `artifacts/tauri-smoke/`，包括 driver 标准输出、错误输出、应用交互日志、结构化摘要和可用时的截图。非 Windows 执行 `npm run test:tauri-smoke` 会明确跳过并返回成功；跨平台布局与交互仍由 Playwright 专项负责。
 
 For release-level verification:
 

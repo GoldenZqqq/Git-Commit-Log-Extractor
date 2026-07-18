@@ -3,6 +3,7 @@ import { ContributionHeatmap, type HeatmapResult } from "./ContributionHeatmap";
 import { WorkRhythmPanel, type WorkRhythmResult } from "./WorkRhythmPanel";
 import { TrendPanel, type TrendResult } from "./TrendPanel";
 import { ReportCalendar } from "./ReportCalendar";
+import { ProjectRetrospective } from "./ProjectRetrospective";
 import type { ReportHistoryEntry } from "../model";
 import "./InsightsView.css";
 
@@ -18,7 +19,7 @@ type Props = {
   onRefresh: () => void;
   reportHistory: ReportHistoryEntry[];
   aiConfigured: boolean;
-  isBusy: boolean;
+  generationBlocked: boolean;
   onOpenHistory: (entry: ReportHistoryEntry) => void;
   onGenerateDaily: (date: string) => void;
   onOpenBlankDayFill: (date: string) => void;
@@ -36,7 +37,7 @@ export function InsightsView({
   onRefresh,
   reportHistory,
   aiConfigured,
-  isBusy,
+  generationBlocked,
   onOpenHistory,
   onGenerateDaily,
   onOpenBlankDayFill,
@@ -79,12 +80,14 @@ export function InsightsView({
             <ReportCalendar
               entries={reportHistory}
               aiConfigured={aiConfigured}
-              isBusy={isBusy}
+              generationBlocked={generationBlocked}
               onOpenHistory={onOpenHistory}
               onGenerateDaily={onGenerateDaily}
               onOpenBlankDayFill={onOpenBlankDayFill}
             />
           </div>
+
+          <ProjectRetrospective entries={reportHistory} onOpenHistory={onOpenHistory} />
 
           <div className="insights-bottom-grid">
             <div className="insights-rhythm-section">

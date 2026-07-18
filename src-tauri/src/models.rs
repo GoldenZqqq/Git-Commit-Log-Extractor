@@ -22,6 +22,71 @@ pub struct RepoScanProgress {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct RepoScanResult {
+    pub repos: Vec<RepoInfo>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceHealthOptions {
+    #[serde(default)]
+    pub root_dirs: Vec<String>,
+    #[serde(default)]
+    pub indexed_repos: Vec<RepoInfo>,
+    #[serde(default)]
+    pub disabled_repos: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkspaceRootStatus {
+    Healthy,
+    Missing,
+    Inaccessible,
+    NotDirectory,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkspaceRepoStatus {
+    Healthy,
+    Missing,
+    Inaccessible,
+    NotGit,
+    BranchUnknown,
+    BranchChanged,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceRootHealth {
+    pub path: String,
+    pub status: WorkspaceRootStatus,
+    pub detail: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceRepoHealth {
+    pub path: String,
+    pub name: String,
+    pub cached_branch: String,
+    pub current_branch: String,
+    pub status: WorkspaceRepoStatus,
+    pub detail: String,
+    pub disabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceHealthResult {
+    pub roots: Vec<WorkspaceRootHealth>,
+    pub repos: Vec<WorkspaceRepoHealth>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CommitExtractProgress {
     pub total_repos: usize,
     pub completed_repos: usize,
@@ -103,6 +168,8 @@ pub struct ExtractOptions {
     pub author_display_name: String,
     #[serde(default)]
     pub author_aliases: Vec<AuthorAliasGroup>,
+    #[serde(default)]
+    pub supplemental_items: Vec<String>,
     pub start_date: String,
     pub end_date: String,
     #[serde(default)]
@@ -136,6 +203,7 @@ pub struct ExtractOptions {
 pub struct ExtractResult {
     pub repos: Vec<RepoInfo>,
     pub commits: Vec<CommitRecord>,
+    pub projects: Vec<crate::project_retrospective::ReportHistoryProject>,
     pub summary_text: String,
     pub detailed_text: String,
     pub warnings: Vec<String>,
@@ -250,7 +318,6 @@ pub struct BlankDayFillResult {
     pub source_commit_count: u32,
 }
 
-
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DiagnosticOptions {
@@ -333,6 +400,8 @@ pub struct MonthlyReportOptions {
     pub author_display_name: String,
     #[serde(default)]
     pub author_aliases: Vec<AuthorAliasGroup>,
+    #[serde(default)]
+    pub supplemental_items: Vec<String>,
     pub disabled_repos: Vec<String>,
     pub extract_all_branches: bool,
     pub exclude_merge_commits: bool,
@@ -379,6 +448,8 @@ pub struct PeriodReportOptions {
     pub author_display_name: String,
     #[serde(default)]
     pub author_aliases: Vec<AuthorAliasGroup>,
+    #[serde(default)]
+    pub supplemental_items: Vec<String>,
     pub start_date: String,
     pub end_date: String,
     pub period_label: String,
@@ -415,6 +486,7 @@ pub struct PeriodReportResult {
     pub report_kind: String,
     pub project_count: usize,
     pub commit_count: usize,
+    pub projects: Vec<crate::project_retrospective::ReportHistoryProject>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

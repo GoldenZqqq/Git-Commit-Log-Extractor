@@ -8,6 +8,11 @@ import {
   type ReportTemplateProfile,
   purposeRefinementInstruction,
 } from "./reportFormat";
+import {
+  isSupplementalItemsValue,
+  SUPPLEMENTAL_FACT_PRESERVATION_INSTRUCTION,
+  validateSupplementalItems,
+} from "./supplementalItems";
 
 export type RepoInfo = {
   path: string;
@@ -35,6 +40,41 @@ export type RepoScanProgress = {
   cancelled: boolean;
 };
 
+export type RepoScanResult = {
+  repos: RepoInfo[];
+  warnings: string[];
+};
+
+export type WorkspaceRootStatus = "healthy" | "missing" | "inaccessible" | "not_directory";
+export type WorkspaceRepoStatus =
+  | "healthy"
+  | "missing"
+  | "inaccessible"
+  | "not_git"
+  | "branch_unknown"
+  | "branch_changed";
+
+export type WorkspaceRootHealth = {
+  path: string;
+  status: WorkspaceRootStatus;
+  detail: string;
+};
+
+export type WorkspaceRepoHealth = {
+  path: string;
+  name: string;
+  cachedBranch: string;
+  currentBranch: string;
+  status: WorkspaceRepoStatus;
+  detail: string;
+  disabled: boolean;
+};
+
+export type WorkspaceHealthResult = {
+  roots: WorkspaceRootHealth[];
+  repos: WorkspaceRepoHealth[];
+};
+
 export type CommitExtractProgress = {
   totalRepos: number;
   completedRepos: number;
@@ -45,12 +85,19 @@ export type CommitExtractProgress = {
   done: boolean;
 };
 
+export type ReportHistoryProject = {
+  name: string;
+  commitCount: number;
+  evidenceIds: string[];
+};
+
 export type ExtractResult = {
   repos: RepoInfo[];
   summaryText: string;
   detailedText: string;
   warnings: string[];
   commits: CommitRecord[];
+  projects: ReportHistoryProject[];
 };
 
 export type MonthlyReportResult = {
@@ -75,6 +122,7 @@ export type PeriodReportResult = {
   reportKind: PeriodReportKind;
   projectCount: number;
   commitCount: number;
+  projects: ReportHistoryProject[];
 };
 
 export type ReportEnhanceResult = {
@@ -96,12 +144,16 @@ export const DEFAULT_BLANK_DAY_ITEM_COUNT: BlankDayItemCount = 5;
 export const BLANK_DAY_ITEM_COUNT_OPTIONS: BlankDayItemCount[] = [3, 5, 8];
 
 export const DEFAULT_BLANK_DAY_USER_PROMPT = [
-  "请基于我提供的历史 Git 提交线索，为目标日写一份克制的日报延续草稿。",
+  "请基于我提供的历史 Git 提交线索，为目标日写一份具体、可核对的日报延续草稿。",
   "要求：",
-  "1. 只围绕这些历史事项做合理延续，不编造新业务结论",
-  "2. 严格输出 N 条短要点列表（每行一条，可用 - 前缀），每条一句话，偏「跟进 / 排查 / 推进 / 整理」",
-  "3. 不要写已上线、已完成验收、百分比进度等无法核实的表述",
-  "4. 语气正式，可直接粘贴到日报",
+  "1. 每条必须从历史线索中指出一个具体锚点，如已有功能、接口、数据流、页面、脚本、测试、异常路径或技术对象",
+  "2. 优先写最可能的代码级延续：功能延伸、缺陷或回归修复、异常/边界/兼容性处理、测试补强，或已有接口与数据流的衔接",
+  "3. 不得只写「跟进 / 排查 / 推进 / 联调 / 整理」；如确需使用，必须同时写清具体对象、问题模式和拟采取的动作",
+  "4. 多条内容应覆盖不同历史锚点或不同具体动作，避免同义改写和注水",
+  "5. 严格输出 N 条短要点列表（每行一条，可用 - 前缀），每条一句话",
+  "6. 若历史线索条目带有项目前缀（如「映射项目名 - 」或「仓库(分支) - 」），每条输出必须保留同风格前缀，与日常日报配置一致",
+  "7. 潜在缺陷只能写拟采取的保护或修复动作，不得声称故障已经发生；不要写已上线、已完成验收、百分比进度等无法核实的表述",
+  "8. 语气正式，可直接粘贴到日报",
 ].join("\n");
 
 const BLANK_DAY_TIP_DISMISSED_KEY = "gitpulse.blankDayFillTipDismissed";
@@ -169,6 +221,29 @@ export type ReportHistoryEntry = {
   aiEnhanced: boolean;
   outputFile: string;
   reportText: string;
+  supplementalItems?: string[];
+  projects?: ReportHistoryProject[];
+};
+
+export type LegacyReportHistoryState = {
+  entries: ReportHistoryEntry[];
+  present: boolean;
+  valid: boolean;
+  warning: string;
+};
+
+export type ReportPolishReview = {
+  mode: PreviewMode;
+  range: DateRange;
+  periodLabel: string;
+  originalText: string;
+  polishedText: string;
+  warnings: string[];
+  repoCount: number;
+  commitCount: number;
+  projectCount: number;
+  supplementalItems: string[];
+  projects?: ReportHistoryProject[];
 };
 
 export type UpdateSummary = {
@@ -301,7 +376,7 @@ export type LoadedSettingsState = {
 
 export const STORAGE_KEY = "gitpulse-settings";
 const REPO_INDEX_CACHE_KEY = "gitpulse-repo-index-cache";
-const REPORT_HISTORY_KEY = "gitpulse-report-history";
+export const REPORT_HISTORY_KEY = "gitpulse-report-history";
 const LEGACY_STORAGE_KEY = "git-report-studio-settings";
 const ENV_VAR_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const EVIDENCE_PRESERVATION_INSTRUCTION =
@@ -532,7 +607,17 @@ export function saveRepoIndexCache(rootDirs: string[], repos: RepoInfo[]) {
     repos,
     scannedAt: new Date().toISOString(),
   };
-  localStorage.setItem(REPO_INDEX_CACHE_KEY, JSON.stringify(cache));
+  return persistRepoIndexCache(cache);
+}
+
+export function persistRepoIndexCache(cache: RepoIndexCache) {
+  const normalized: RepoIndexCache = {
+    rootDirs: cache.rootDirs.filter(isNonEmptyString).map(stripWindowsVerbatimPrefix),
+    repos: cache.repos.filter(isRepoInfo),
+    scannedAt: typeof cache.scannedAt === "string" ? cache.scannedAt : "",
+  };
+  localStorage.setItem(REPO_INDEX_CACHE_KEY, JSON.stringify(normalized));
+  return normalized;
 }
 
 export function clearRepoIndexCache() {
@@ -547,37 +632,43 @@ export function normalizeReportHistoryLimit(value: unknown): ReportHistoryLimit 
   return DEFAULT_REPORT_HISTORY_LIMIT;
 }
 
-export function loadReportHistory(limit: ReportHistoryLimit = DEFAULT_REPORT_HISTORY_LIMIT): ReportHistoryEntry[] {
+export function readLegacyReportHistory(
+  limit: ReportHistoryLimit = DEFAULT_REPORT_HISTORY_LIMIT,
+): LegacyReportHistoryState {
   const saved = localStorage.getItem(REPORT_HISTORY_KEY);
-  if (!saved) return [];
+  if (saved === null) return { entries: [], present: false, valid: true, warning: "" };
 
   let rawHistory: unknown;
   try {
     rawHistory = JSON.parse(saved);
   } catch {
-    localStorage.removeItem(REPORT_HISTORY_KEY);
-    return [];
+    return invalidLegacyHistory("旧报告历史不是有效 JSON，已保留原数据供手动恢复");
   }
 
-  if (!Array.isArray(rawHistory)) return [];
-  return rawHistory.filter(isReportHistoryEntry).slice(0, normalizeReportHistoryLimit(limit));
+  if (!Array.isArray(rawHistory) || !rawHistory.every(isReportHistoryEntry)) {
+    return invalidLegacyHistory("旧报告历史格式异常，已保留原数据供手动恢复");
+  }
+  return {
+    entries: normalizeReportHistoryEntries(rawHistory, limit),
+    present: true,
+    valid: true,
+    warning: "",
+  };
 }
 
-export function saveReportHistory(
+export function normalizeReportHistoryEntries(
   entries: ReportHistoryEntry[],
   limit: ReportHistoryLimit = DEFAULT_REPORT_HISTORY_LIMIT,
 ): ReportHistoryEntry[] {
-  let nextEntries = entries.filter(isReportHistoryEntry).slice(0, normalizeReportHistoryLimit(limit));
-  while (nextEntries.length > 0) {
-    try {
-      localStorage.setItem(REPORT_HISTORY_KEY, JSON.stringify(nextEntries));
-      return nextEntries;
-    } catch {
-      nextEntries = nextEntries.slice(0, Math.max(0, Math.floor(nextEntries.length / 2)));
-    }
-  }
-  localStorage.removeItem(REPORT_HISTORY_KEY);
-  return [];
+  const ids = new Set<string>();
+  return entries
+    .filter(isReportHistoryEntry)
+    .filter((entry) => {
+      if (ids.has(entry.id)) return false;
+      ids.add(entry.id);
+      return true;
+    })
+    .slice(0, normalizeReportHistoryLimit(limit));
 }
 
 export function rememberReportHistoryEntry(
@@ -585,7 +676,7 @@ export function rememberReportHistoryEntry(
   entry: ReportHistoryEntry,
   limit: ReportHistoryLimit = DEFAULT_REPORT_HISTORY_LIMIT,
 ): ReportHistoryEntry[] {
-  return saveReportHistory([entry, ...entries.filter((item) => item.id !== entry.id)], limit);
+  return normalizeReportHistoryEntries([entry, ...entries.filter((item) => item.id !== entry.id)], limit);
 }
 
 export function updateReportHistoryEntry(
@@ -596,11 +687,15 @@ export function updateReportHistoryEntry(
 ): ReportHistoryEntry[] {
   if (!id) return entries;
   const nextEntries = entries.map((entry) => (entry.id === id ? { ...entry, ...patch } : entry));
-  return saveReportHistory(nextEntries, limit);
+  return normalizeReportHistoryEntries(nextEntries, limit);
 }
 
-export function clearReportHistory() {
+export function clearLegacyReportHistory() {
   localStorage.removeItem(REPORT_HISTORY_KEY);
+}
+
+function invalidLegacyHistory(warning: string): LegacyReportHistoryState {
+  return { entries: [], present: true, valid: false, warning };
 }
 
 export function isBlankDayHistoryEntry(entry: ReportHistoryEntry) {
@@ -926,6 +1021,7 @@ export function buildExtractOptions(
   extraInstruction = "",
   indexedRepos: RepoInfo[] = [],
   reportKind: ExtractReportKind = "daily",
+  supplementalItems: string[] = [],
 ) {
   const range = dateRange ?? getTodayRange();
   const authorAliasGroups = parseAuthorAliases(settings.authorAliasesText);
@@ -940,6 +1036,7 @@ export function buildExtractOptions(
     endDate: range.endDate,
     periodLabel: reportKind === "custom" ? `${range.startDate} ~ ${range.endDate}` : range.startDate,
     reportKind,
+    supplementalItems: validateSupplementalItems(supplementalItems),
     disabledRepos: settings.disabledRepos,
     extractAllBranches: settings.extractAllBranches,
     excludeMergeCommits: settings.excludeMergeCommits,
@@ -965,6 +1062,7 @@ export function buildMonthlyOptions(
   aiEnabled: boolean,
   extraInstruction = "",
   indexedRepos: RepoInfo[] = [],
+  supplementalItems: string[] = [],
 ) {
   const authorAliasGroups = parseAuthorAliases(settings.authorAliasesText);
   const evidenceLinkRules = parseEvidenceLinkRules(settings.evidenceLinkPrefixesText);
@@ -976,6 +1074,7 @@ export function buildMonthlyOptions(
     author: buildAuthorFilter(settings.author, authorAliasGroups),
     authorDisplayName: buildAuthorDisplayName(settings.author, authorAliasGroups),
     authorAliases: authorAliasGroups,
+    supplementalItems: validateSupplementalItems(supplementalItems),
     extractAllBranches: settings.extractAllBranches,
     excludeMergeCommits: settings.excludeMergeCommits,
     excludeRevertCommits: settings.excludeRevertCommits,
@@ -1002,6 +1101,7 @@ export function buildPeriodReportOptions(
   aiEnabled: boolean,
   extraInstruction = "",
   indexedRepos: RepoInfo[] = [],
+  supplementalItems: string[] = [],
 ) {
   const authorAliasGroups = parseAuthorAliases(settings.authorAliasesText);
   const evidenceLinkRules = parseEvidenceLinkRules(settings.evidenceLinkPrefixesText);
@@ -1017,6 +1117,7 @@ export function buildPeriodReportOptions(
     endDate: range.endDate,
     periodLabel,
     reportKind: kind,
+    supplementalItems: validateSupplementalItems(supplementalItems),
     extractAllBranches: settings.extractAllBranches,
     excludeMergeCommits: settings.excludeMergeCommits,
     excludeRevertCommits: settings.excludeRevertCommits,
@@ -1106,21 +1207,80 @@ export function shiftDateInput(dateValue: string, days: number) {
   return formatDateInput(date);
 }
 
-export function buildBlankDayEvidenceText(commits: CommitRecord[], selectedRepoPaths: string[]) {
+// 与 Rust report.rs 的 display_prefix / commit_item_prefix 保持一致：
+// 映射名去掉末尾连接符后统一补 " - "；未配置映射时前缀为空。
+export function resolveCommitMappedProjectName(
+  commit: Pick<CommitRecord, "projectName" | "branchName">,
+  projectNames: Record<string, string>,
+): string {
+  const projectName = commit.projectName?.trim() ?? "";
+  const branchName = commit.branchName?.trim() ?? "";
+  if (!projectName) return "";
+  const exactKey = branchName ? `${projectName}(${branchName})` : "";
+  const mapped =
+    (exactKey ? projectNames[exactKey] : undefined)
+    ?? projectNames[`${projectName}(*)`]
+    ?? "";
+  return mapped.replace(TRAILING_CONNECTORS, "").trim();
+}
+
+function displayCommitItemPrefix(displayName: string): string {
+  const trimmed = displayName.replace(TRAILING_CONNECTORS, "").trim();
+  return trimmed ? `${trimmed} - ` : "";
+}
+
+/** 复刻日报 {commitItems} 的项目前缀规则，供空白日补写等前端侧线索拼装使用。 */
+export function buildCommitItemPrefix(
+  mode: CommitItemPrefixMode,
+  commit: Pick<CommitRecord, "projectName" | "branchName">,
+  projectNames: Record<string, string>,
+): string {
+  const mapped = resolveCommitMappedProjectName(commit, projectNames);
+  const repoBranch =
+    commit.projectName && commit.branchName
+      ? `${commit.projectName}(${commit.branchName})`
+      : commit.projectName || "";
+  switch (mode) {
+    case "mapped-project":
+      return displayCommitItemPrefix(mapped);
+    case "repo-branch-and-mapped":
+      return `${displayCommitItemPrefix(repoBranch)}${displayCommitItemPrefix(mapped)}`;
+    case "repo-branch":
+      return displayCommitItemPrefix(repoBranch);
+    case "none":
+      return "";
+    default:
+      return displayCommitItemPrefix(mapped);
+  }
+}
+
+export function buildBlankDayEvidenceText(
+  commits: CommitRecord[],
+  selectedRepoPaths: string[],
+  projectNames: Record<string, string> = {},
+  prefixMode: CommitItemPrefixMode = "mapped-project",
+) {
   const selected = new Set(selectedRepoPaths);
   const lines = commits
     .filter((commit) => selected.has(commit.repoPath))
     .slice(0, 80)
     .map((commit) => {
-      const project = commit.projectName || commit.repoPath;
-      const branch = commit.branchName ? `(${commit.branchName})` : "";
+      const prefix = buildCommitItemPrefix(prefixMode, commit, projectNames);
       const message = commit.message.replace(/\s+/g, " ").trim();
-      return `- [${commit.date.slice(0, 10)}] ${project}${branch}: ${message}`;
+      // 与日报一致：有映射时为「项目名 - 事项」；无映射时退回仓库(分支)线索，避免 AI 丢掉来源。
+      const fallback =
+        !prefix && commit.projectName
+          ? `${commit.projectName}${commit.branchName ? `(${commit.branchName})` : ""}: `
+          : "";
+      return `- [${commit.date.slice(0, 10)}] ${prefix || fallback}${message}`;
     });
   return lines.join("\n");
 }
 
-export function collectBlankDayRepoTags(commits: CommitRecord[]) {
+export function collectBlankDayRepoTags(
+  commits: CommitRecord[],
+  projectNames: Record<string, string> = {},
+) {
   const map = new Map<string, { path: string; label: string; count: number }>();
   for (const commit of commits) {
     const existing = map.get(commit.repoPath);
@@ -1129,8 +1289,9 @@ export function collectBlankDayRepoTags(commits: CommitRecord[]) {
       continue;
     }
     const pathParts = commit.repoPath.split(/[/\\]/).filter(Boolean);
-    const name = commit.projectName || pathParts[pathParts.length - 1] || commit.repoPath;
-    const branch = commit.branchName ? ` (${commit.branchName})` : "";
+    const mapped = resolveCommitMappedProjectName(commit, projectNames);
+    const name = mapped || commit.projectName || pathParts[pathParts.length - 1] || commit.repoPath;
+    const branch = !mapped && commit.branchName ? ` (${commit.branchName})` : "";
     map.set(commit.repoPath, {
       path: commit.repoPath,
       label: `${name}${branch}`,
@@ -1168,6 +1329,7 @@ export function buildReportEnhanceOptions(
   range: DateRange,
   baseReport: string,
   extraInstruction = "",
+  supplementalItems: string[] = [],
 ) {
   const authorAliasGroups = parseAuthorAliases(settings.authorAliasesText);
   const kind = mode === "summary" ? "daily" : mode;
@@ -1178,7 +1340,15 @@ export function buildReportEnhanceOptions(
     reportKind: kind,
     author: buildAuthorFilter(settings.author, authorAliasGroups),
     authorDisplayName: buildAuthorDisplayName(settings.author, authorAliasGroups),
-    refinementInstruction: buildReportRefinementInstruction(settings, extraInstruction),
+    refinementInstruction: buildReportRefinementInstruction(
+      settings,
+      mergeInstructions(
+        extraInstruction,
+        validateSupplementalItems(supplementalItems).length > 0
+          ? SUPPLEMENTAL_FACT_PRESERVATION_INSTRUCTION
+          : "",
+      ),
+    ),
     systemPrompt: buildReportSystemPrompt(settings, kind === "custom" ? "daily" : kind),
     ai: buildAiOptions(settings, true),
   };
@@ -1419,6 +1589,26 @@ function isReportHistoryEntry(value: unknown): value is ReportHistoryEntry {
     && typeof entry.aiEnhanced === "boolean"
     && typeof entry.outputFile === "string"
     && typeof entry.reportText === "string"
+    && isSupplementalItemsValue(entry.supplementalItems)
+    && isReportHistoryProjectsValue(entry.projects)
+  );
+}
+
+function isReportHistoryProjectsValue(value: unknown): value is ReportHistoryProject[] | undefined {
+  if (value === undefined) return true;
+  return Array.isArray(value) && value.every(isReportHistoryProject);
+}
+
+function isReportHistoryProject(value: unknown): value is ReportHistoryProject {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const project = value as Partial<ReportHistoryProject>;
+  return (
+    isNonEmptyString(project.name)
+    && Number.isInteger(project.commitCount)
+    && (project.commitCount ?? -1) >= 0
+    && Array.isArray(project.evidenceIds)
+    && project.evidenceIds.length <= 20
+    && project.evidenceIds.every(isNonEmptyString)
   );
 }
 

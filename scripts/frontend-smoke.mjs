@@ -74,6 +74,25 @@ const checks = [
       includes(files.app, "formatReportExportLabel");
     },
   },
+  {
+    name: "blank day fill stays concrete and follows commit item prefix mode",
+    run: () => {
+      includes(files.model, "export function buildCommitItemPrefix");
+      includes(files.model, "export function buildBlankDayEvidenceText");
+      includes(files.model, "resolveCommitMappedProjectName");
+      includes(files.model, "项目前缀");
+      includes(files.model, "具体锚点");
+      includes(files.model, "功能延伸");
+      includes(files.model, "缺陷或回归");
+      includes(files.model, "测试补强");
+      includes(files.model, "不得只写");
+      excludes(files.model, "偏「跟进 / 排查 / 推进 / 整理」");
+      const blankDay = readSource("src/components/BlankDayFillDialog.tsx");
+      includes(blankDay, "settings.commitItemPrefixMode");
+      includes(blankDay, "buildBlankDayEvidenceText");
+      includes(blankDay, "projectNames");
+    },
+  },
 ];
 
 let failed = 0;
@@ -102,6 +121,12 @@ function readSource(relativePath) {
 function includes(source, needle) {
   if (!source.includes(needle)) {
     throw new Error(`missing source marker: ${needle}`);
+  }
+}
+
+function excludes(source, needle) {
+  if (source.includes(needle)) {
+    throw new Error(`unexpected source marker: ${needle}`);
   }
 }
 

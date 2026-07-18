@@ -29,6 +29,9 @@ import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialo
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
 import { DiagnosticsSection } from "./DiagnosticsSection";
+import { ConfigProfileSection } from "./ConfigProfileSection";
+import { CodexOAuthExperimentalNotice } from "./CodexOAuthExperimentalNotice";
+import type { ConfigProfileSettings } from "../configProfile";
 import {
   buildProxyConfig,
   buildMappingKeys,
@@ -50,6 +53,7 @@ import {
   type UpdateSummary,
 } from "../model";
 import { useDiagnosticsPanel } from "../hooks/useDiagnosticsPanel";
+import { useModalDialog, usePopover } from "../hooks/useOverlayFocus";
 import { Field, PathInput, RootDirField, Toggle } from "./Primitives";
 import { ReportFormatSettings } from "./ReportFormatSettings";
 import { UpdateSection } from "./UpdateSection";
@@ -64,6 +68,7 @@ type Props = {
   updateProgress: string;
   updateBusy: "checking" | "installing" | null;
   updateSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
+  onApplyConfigProfile: (settings: ConfigProfileSettings) => void;
   onAddRootDirs: () => void;
   onRemoveRootDir: (dir: string) => void;
   onChooseOutputDir: () => void;
@@ -108,6 +113,7 @@ export function SettingsDialog({
   updateProgress,
   updateBusy,
   updateSetting,
+  onApplyConfigProfile,
   onAddRootDirs,
   onRemoveRootDir,
   onChooseOutputDir,
@@ -134,7 +140,20 @@ export function SettingsDialog({
   const [savedPulse, setSavedPulse] = useState(false);
   const lastSettingsRef = useRef(settings);
   const modelPickerRef = useRef<HTMLDivElement | null>(null);
+  const modelInputRef = useRef<HTMLInputElement | null>(null);
   const [promptEditTarget, setPromptEditTarget] = useState<"daily" | "monthly">("daily");
+  const settingsDialogRef = useModalDialog({ open, onClose });
+  const confirmDialogRef = useModalDialog({
+    open: open && pendingDeleteIndex !== null,
+    onClose: () => setPendingDeleteIndex(null),
+  });
+  const modelOptionsRef = usePopover({
+    open: open && modelMenuOpen,
+    onClose: () => setModelMenuOpen(false),
+    anchorRef: modelPickerRef,
+    restoreFocusRef: modelInputRef,
+    itemSelector: "[role='option']:not([aria-disabled='true'])",
+  });
   const diagnostics = useDiagnosticsPanel({
     open,
     active: activeTab === "diagnostics",
@@ -177,15 +196,6 @@ export function SettingsDialog({
     if (open && settings.aiProvider === "codex-oauth") void refreshCodexStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, settings.aiProvider]);
-  useEffect(() => {
-    if (!modelMenuOpen) return;
-    function closeOnOutsideClick(event: MouseEvent) {
-      if (modelPickerRef.current?.contains(event.target as Node)) return;
-      setModelMenuOpen(false);
-    }
-    document.addEventListener("mousedown", closeOnOutsideClick);
-    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
-  }, [modelMenuOpen]);
   if (!open) return null;
 
   const mappingRows = parseMappingText(settings.projectNamesText);
@@ -490,11 +500,19 @@ export function SettingsDialog({
   return (
     <>
     <div className="dialog-backdrop" role="presentation" onMouseDown={onClose}>
-      <section className="settings-dialog" role="dialog" aria-modal="true" aria-label="应用设置" onMouseDown={(event) => event.stopPropagation()}>
+      <section
+        ref={settingsDialogRef}
+        className="settings-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-dialog-title"
+        tabIndex={-1}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
         <header className="dialog-header">
           <div>
             <p className="kicker">Preferences</p>
-            <h2>设置</h2>
+            <h2 id="settings-dialog-title">设置</h2>
           </div>
           <button type="button" className="icon-button" onClick={onClose} aria-label="关闭设置">
             <X size={18} />
@@ -527,11 +545,11 @@ export function SettingsDialog({
                     dirs={settings.rootDirs}
                     onAdd={onAddRootDirs}
                     onRemove={onRemoveRootDir}
-                    hint="可添加多个分散在不同位置的目录，全部一起扫描"
+                    hint="可添加多个目录并统一扫描"
                   />
                   <Field
                     label="Git 作者"
-                    hint="留空 = 不过滤作者（适合团队周报）；多人用逗号分隔，任一命中即纳入"
+                    hint="留空统计全部作者；多人用逗号分隔"
                   >
                     <input
                       value={settings.author}
@@ -541,7 +559,7 @@ export function SettingsDialog({
                   </Field>
                   <Toggle label="输出到文件" checked={settings.outputEnabled} onChange={(value) => updateSetting("outputEnabled", value)} />
                   {settings.outputEnabled && <PathInput label="输出目录" value={settings.outputDir} onBrowse={onChooseOutputDir} />}
-                  <p className="mapping-hint">日报默认使用今天；周报取本周；月报可在首页选择月份。其他日期范围请切换到「自定义」。</p>
+                  <p className="mapping-hint">日报用当天，周报用本周；其他周期在首页选择。</p>
                 </section>
 
                 <details className="settings-section advanced-settings-section">
@@ -558,7 +576,7 @@ export function SettingsDialog({
                   <div className="advanced-settings-content">
                     <Field
                       label="作者身份别名"
-                      hint="每行一组：展示姓名 -> Git name 或 email；多个别名用逗号分隔。提取时会自动合并匹配，报告中显示展示姓名。"
+                      hint="每行：展示姓名 -> Git name/email；多个别名用逗号分隔"
                     >
                       <textarea
                         className="refinement-input author-alias-input"
@@ -578,7 +596,7 @@ export function SettingsDialog({
                     </div>
                     <Field
                       label="日报条目前缀"
-                      hint="控制 {commitItems} 的每条输出。推荐使用映射项目名，例如：柏科注安工程师 - 接入题目纠错反馈模块。"
+                      hint="控制每条 {commitItems} 的前缀，例如：项目名 - 事项"
                     >
                       <select
                         value={settings.commitItemPrefixMode}
@@ -592,7 +610,7 @@ export function SettingsDialog({
                     </Field>
                     <Field
                       label="证据链接前缀"
-                      hint="可选。每行一条：前缀 -> 链接模板；支持 {id}、{key}、{prefix}，用于 #123、PR #123、JIRA-123 等编号。"
+                      hint="每行：前缀 -> 链接模板；支持 {id}、{key}、{prefix}"
                     >
                       <textarea
                         className="refinement-input evidence-link-input"
@@ -603,7 +621,7 @@ export function SettingsDialog({
                     </Field>
                     <Field
                       label="脱敏替换规则"
-                      hint="可选。每行一条：敏感词 -> 替换文本；只写敏感词时默认替换为 ***。启用报告脱敏后生效。"
+                      hint="每行：敏感词 -> 替换文本；省略替换文本时使用 ***"
                     >
                       <textarea
                         className="refinement-input redaction-rules-input"
@@ -624,7 +642,7 @@ export function SettingsDialog({
                 <SectionTitle icon={<Bot size={16} />} title="AI 润色" />
                 <Field
                   label="应用出站代理"
-                  hint="仅代理 GitPulse 访问外部 API 的请求，不修改系统代理，也不影响本地 Git 扫描。"
+                  hint="仅用于外部 API，不修改系统代理或本地 Git"
                 >
                   <div className="proxy-panel">
                     <Toggle label="启用代理" checked={settings.proxyMode === "custom"} onChange={updateProxyMode} />
@@ -707,40 +725,48 @@ export function SettingsDialog({
                   <select value={settings.aiProvider} onChange={(event) => updateAiProvider(event.target.value as AppSettings["aiProvider"])}>
                     <option value="openai-compatible">OpenAI Compatible</option>
                     <option value="anthropic-native">Anthropic Native</option>
-                    <option value="codex-oauth">ChatGPT (Codex OAuth)</option>
+                    <option value="codex-oauth">ChatGPT (Codex OAuth) · 实验</option>
                   </select>
                 </Field>
+                <p className="ai-provider-experimental-note">
+                  <span className="experimental-badge">实验</span>
+                  Codex OAuth 可能随协议变化失效，建议优先使用 OpenAI Compatible 或 Anthropic Native。
+                </p>
                 {settings.aiProvider === "codex-oauth" ? (
-                  <Field label="ChatGPT 账号" hint="使用 ChatGPT Plus/Pro 订阅额度润色，无需 API Key。属非官方接入，可能随时失效。">
-                    <div className="codex-auth">
-                      {codexAuth.authenticated ? (
-                        <div className="codex-auth-row">
-                          <span className="codex-auth-ok">
-                            <CheckCircle2 size={15} /> 已登录{codexAuth.email ? ` · ${codexAuth.email}` : ""}
-                          </span>
-                          <button type="button" className="mapping-import" onClick={() => void codexLogout()}>
-                            <LogOut size={15} /> 登出
+                  <>
+                    <CodexOAuthExperimentalNotice onSwitchProvider={updateAiProvider} />
+                    <Field label="ChatGPT 账号（实验）" hint="无需 API Key；可随时切回稳定协议，已有凭据不会被删除">
+                      <div className="codex-auth">
+                        {codexAuth.authenticated ? (
+                          <div className="codex-auth-row">
+                            <span className="codex-auth-ok">
+                              <span className="experimental-badge">实验</span>
+                              <CheckCircle2 size={15} /> 已登录{codexAuth.email ? ` · ${codexAuth.email}` : ""}
+                            </span>
+                            <button type="button" className="mapping-import" onClick={() => void codexLogout()}>
+                              <LogOut size={15} /> 登出
+                            </button>
+                          </div>
+                        ) : codexFlow ? (
+                          <div className="codex-flow">
+                            <p>请在打开的页面输入验证码完成授权：</p>
+                            <code className="codex-user-code">{codexFlow.userCode}</code>
+                            <a className="codex-link" href={codexFlow.verificationUri} target="_blank" rel="noreferrer">
+                              <ExternalLink size={13} /> {codexFlow.verificationUri}
+                            </a>
+                            <p className="codex-waiting">
+                              <Loader2 className="spin" size={14} /> 等待授权...
+                            </p>
+                          </div>
+                        ) : (
+                          <button type="button" className="mapping-add" onClick={() => void startCodexLogin()} disabled={codexBusy}>
+                            <Bot size={16} /> 使用 ChatGPT 登录（实验）
                           </button>
-                        </div>
-                      ) : codexFlow ? (
-                        <div className="codex-flow">
-                          <p>请在打开的页面输入验证码完成授权：</p>
-                          <code className="codex-user-code">{codexFlow.userCode}</code>
-                          <a className="codex-link" href={codexFlow.verificationUri} target="_blank" rel="noreferrer">
-                            <ExternalLink size={13} /> {codexFlow.verificationUri}
-                          </a>
-                          <p className="codex-waiting">
-                            <Loader2 className="spin" size={14} /> 等待授权...
-                          </p>
-                        </div>
-                      ) : (
-                        <button type="button" className="mapping-add" onClick={() => void startCodexLogin()} disabled={codexBusy}>
-                          <Bot size={16} /> 使用 ChatGPT 登录
-                        </button>
-                      )}
-                      {codexMessage && <p className="mapping-note">{codexMessage}</p>}
-                    </div>
-                  </Field>
+                        )}
+                        {codexMessage && <p className="mapping-note">{codexMessage}</p>}
+                      </div>
+                    </Field>
+                  </>
                 ) : (
                   <>
                     <Field label="Base URL">
@@ -773,18 +799,26 @@ export function SettingsDialog({
                     </Field>
                   </>
                 )}
-                <Field label="模型" hint="可手动输入；也可以根据当前 Base URL 与 API Key 获取模型列表后选择。">
+                <Field label="模型" hint="可手动输入，或从当前服务获取">
                   <div className="model-picker" ref={modelPickerRef}>
                     <div className={`model-combobox ${modelMenuOpen ? "open" : ""}`}>
                       <input
+                        ref={modelInputRef}
                         value={settings.aiModel}
                         onChange={(event) => updateAiModel(event.target.value)}
-                        onFocus={() => setModelMenuOpen(true)}
+                        onClick={() => setModelMenuOpen(true)}
+                        onKeyDown={(event) => {
+                          if (!modelMenuOpen && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+                            event.preventDefault();
+                            setModelMenuOpen(true);
+                          }
+                        }}
                         placeholder="例如：gpt-4.1-mini"
                         role="combobox"
                         aria-controls="ai-model-options"
                         aria-expanded={modelMenuOpen}
                         aria-haspopup="listbox"
+                        aria-autocomplete="list"
                         autoComplete="off"
                         spellCheck={false}
                       />
@@ -794,11 +828,19 @@ export function SettingsDialog({
                         onClick={() => setModelMenuOpen((current) => !current)}
                         aria-label={modelMenuOpen ? "收起模型列表" : "展开模型列表"}
                         aria-expanded={modelMenuOpen}
+                        aria-controls="ai-model-options"
+                        aria-haspopup="listbox"
                       >
                         <ChevronDown size={16} />
                       </button>
                       {modelMenuOpen && (
-                        <div className="model-options" id="ai-model-options" role="listbox">
+                        <div
+                          ref={modelOptionsRef}
+                          className="model-options"
+                          id="ai-model-options"
+                          role="listbox"
+                          aria-label="可用模型"
+                        >
                           {aiModelOptions.length > 0 ? (
                             aiModelOptions.map((model) => (
                               <button
@@ -814,7 +856,7 @@ export function SettingsDialog({
                               </button>
                             ))
                           ) : (
-                            <div className="model-options-empty" role="status">
+                            <div className="model-options-empty" role="option" aria-disabled="true">
                               先点击右侧获取模型，或直接输入模型名
                             </div>
                           )}
@@ -841,7 +883,7 @@ export function SettingsDialog({
                     </p>
                   )}
                 </Field>
-                <Field label="生成温度" hint="越低越稳健保守，越高越灵活多样；默认 0.2">
+                <Field label="生成温度" hint="低值更稳定，高值更多样；默认 0.2">
                   <div className="temperature-control">
                     <input
                       type="range"
@@ -854,7 +896,7 @@ export function SettingsDialog({
                     <span className="temperature-value">{settings.aiTemperature.toFixed(1)}</span>
                   </div>
                 </Field>
-                <Field label="润色指令" hint="常驻的快速微调，追加在系统提示词之上；留空则不追加。临时性的本次要求可在首页润色按钮处填写。">
+                <Field label="润色指令" hint="常驻润色要求；临时要求请在首页填写">
                   <textarea
                     className="refinement-input"
                     value={settings.refinementInstruction}
@@ -864,7 +906,7 @@ export function SettingsDialog({
                 </Field>
                 <Field
                   label="系统提示词模板（高级）"
-                  hint="决定报告的整体结构与角色（如月报的分段方式）。留空则回退内置默认。"
+                  hint="控制报告结构；留空使用内置模板"
                 >
                   <div className="prompt-template-editor">
                     <div className="mapping-scope-control" role="radiogroup" aria-label="选择编辑的报告类型">
@@ -999,6 +1041,8 @@ export function SettingsDialog({
 
             {activeTab === "general" && (
               <>
+                <ConfigProfileSection settings={settings} onApply={onApplyConfigProfile} />
+
                 <section className="settings-section">
                   <SectionTitle icon={<FileText size={16} />} title="报告历史" />
                   <Field label="保留最近报告">
@@ -1013,7 +1057,7 @@ export function SettingsDialog({
                       ))}
                     </select>
                   </Field>
-                  <p className="mapping-hint">仅存本机。超出后自动去掉更早的记录，不影响 Git 仓库。</p>
+                  <p className="mapping-hint">仅存本机，超出上限自动删除最早记录。</p>
                   <button
                     type="button"
                     className="mapping-import"
@@ -1080,10 +1124,12 @@ export function SettingsDialog({
         onMouseDown={() => setPendingDeleteIndex(null)}
       >
         <section
+          ref={confirmDialogRef}
           className="range-dialog confirm-dialog"
           role="alertdialog"
           aria-modal="true"
           aria-labelledby="mapping-delete-title"
+          tabIndex={-1}
           onMouseDown={(event) => event.stopPropagation()}
         >
           <header className="range-dialog-header">
@@ -1097,7 +1143,12 @@ export function SettingsDialog({
           </header>
           <p className="confirm-dialog-text">删除后该项目映射将立即移除，此操作不可撤销。</p>
           <footer className="range-dialog-actions">
-            <button type="button" className="mapping-import" onClick={() => setPendingDeleteIndex(null)}>
+            <button
+              data-dialog-initial-focus
+              type="button"
+              className="mapping-import"
+              onClick={() => setPendingDeleteIndex(null)}
+            >
               取消
             </button>
             <button type="button" className="danger-button" onClick={confirmRemoveMapping}>
