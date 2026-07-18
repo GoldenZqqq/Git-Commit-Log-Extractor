@@ -33,7 +33,7 @@ GitHub Actions 在每个 `pull_request` 和 `main` 推送上运行 frontend smok
 
 首次本地运行需要：
 
-- 安装与当前 Microsoft Edge 版本一致的 `msedgedriver.exe` 并加入 `PATH`。
+- 安装与当前 Microsoft Edge **WebView2 Runtime** 版本一致的 `msedgedriver.exe` 并加入 `PATH`。桌面 Edge 浏览器与 WebView2 Runtime 可能版本不同，必须以 `Microsoft\EdgeWebView\Application` 下的 Runtime 版本为准。
 - 执行 `cargo install tauri-driver --locked`。
 
 ```powershell

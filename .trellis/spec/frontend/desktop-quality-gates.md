@@ -32,7 +32,7 @@ DELETE /session/{id}
 - Manual update behavior and all normal/release builds keep their existing updater behavior.
 - `TAURI_SMOKE_ARTIFACT_DIR` optionally overrides `artifacts/tauri-smoke`.
 - `TAURI_SMOKE_PORT`, `TAURI_SMOKE_TIMEOUT_MS`, and `TAURI_DRIVER_PATH` are optional local overrides.
-- Windows requires `tauri-driver` and a matching `msedgedriver` on `PATH`. Non-Windows execution prints an explicit skip and exits successfully.
+- Windows requires `tauri-driver` and an `msedgedriver` matching the installed **WebView2 Runtime** on `PATH`. Do not derive the driver version from the desktop Edge browser: the browser and `EdgeWebView` runtime can be on different release lines. Non-Windows execution prints an explicit skip and exits successfully.
 - A passing smoke proves the `工作报告工作台` heading and an object response from `window.__TAURI_INTERNALS__.invoke("get_git_identity")`.
 - Failure output contains `summary.json`, `app.log`, driver stdout/stderr, and `failure.png` when a session exists.
 

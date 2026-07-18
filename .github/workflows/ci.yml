@@ -141,21 +141,26 @@ jobs:
       - name: Install tauri-driver
         run: cargo install tauri-driver --locked
 
-      - name: Prepare matching EdgeDriver
+      - name: Prepare matching WebView2 driver
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
-          $edgeCandidates = @(
-            "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe",
-            "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe"
+          $webViewRoots = @(
+            "${env:ProgramFiles(x86)}\Microsoft\EdgeWebView\Application",
+            "$env:ProgramFiles\Microsoft\EdgeWebView\Application"
           )
-          $edgePath = $edgeCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-          if (-not $edgePath) { throw 'Microsoft Edge is not installed on the runner' }
-          $edgeVersion = (Get-Item -LiteralPath $edgePath).VersionInfo.ProductVersion
+          $webView = $webViewRoots |
+            Where-Object { Test-Path -LiteralPath $_ } |
+            ForEach-Object { Get-ChildItem -LiteralPath $_ -Filter msedgewebview2.exe -Recurse -ErrorAction SilentlyContinue } |
+            Sort-Object { [version]$_.VersionInfo.ProductVersion } -Descending |
+            Select-Object -First 1
+          if (-not $webView) { throw 'Microsoft Edge WebView2 Runtime is not installed on the runner' }
+          $webViewVersion = $webView.VersionInfo.ProductVersion
+          Write-Host "WebView2 Runtime: $webViewVersion ($($webView.FullName))"
           $driverRoot = Join-Path $env:RUNNER_TEMP 'msedgedriver'
           $archive = Join-Path $env:RUNNER_TEMP 'msedgedriver.zip'
-          Invoke-WebRequest -Uri "https://msedgedriver.microsoft.com/$edgeVersion/edgedriver_win64.zip" -OutFile $archive
+          Invoke-WebRequest -Uri "https://msedgedriver.microsoft.com/$webViewVersion/edgedriver_win64.zip" -OutFile $archive
           Expand-Archive -LiteralPath $archive -DestinationPath $driverRoot -Force
           $driver = Get-ChildItem -LiteralPath $driverRoot -Filter msedgedriver.exe -Recurse | Select-Object -First 1
           if (-not $driver) { throw 'msedgedriver.exe was not found after extraction' }
