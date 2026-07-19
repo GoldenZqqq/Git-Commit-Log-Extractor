@@ -245,3 +245,36 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 8: 拆分 Rust 超大模块
+
+**Date**: 2026-07-19
+**Task**: 拆分 Rust 超大模块
+**Branch**: `main`
+
+### Summary
+
+将 report 与 git_ops 拆分为稳定 facade 和职责模块，保持报告、Git、CLI 与 Windows 行为兼容，并通过完整跨平台门禁
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b9866ab` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
