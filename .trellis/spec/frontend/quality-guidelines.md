@@ -27,6 +27,7 @@ Frontend changes should preserve a reliable local desktop workflow: scan reposit
 - AI failures must fall back to the current local report draft or local template.
 - Report history and repository cache writes should be bounded and recover from malformed localStorage.
 - Commit evidence detail must preserve repository, branch, date, hash, and original message context.
+- Keep application, component, hook, and model files at or below the repository's 600-line limit. Use explicit props and focused domain modules instead of disabling checks or compressing unrelated logic.
 
 ---
 

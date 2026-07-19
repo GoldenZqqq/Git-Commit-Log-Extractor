@@ -15,6 +15,9 @@ Hooks are used sparingly. Most app state lives in `App.tsx`; custom hooks are re
 - Use `use*` names and return named values/functions in an object when a hook exposes multiple capabilities.
 - Keep side effects inside `useEffect` with cleanup functions for event listeners.
 - Keep Tauri runtime details inside hooks only when the hook owns a coherent runtime concern, as `useAppRuntime` owns theme, version, and updater state.
+- Keep report generation/polish/export/history transitions together in `useReportWorkflow`; keep localStorage and secure-store synchronization together in `useAppSettingsState`.
+- Initialize source state before constructing hooks that depend on it. For example, load settings and create report-history storage before passing either into the settings synchronization hook; do not close over a later `const` during hook initialization.
+- Hook actions should receive a typed status/task callback from the root so task activity and support events remain single-source-of-truth.
 
 ## Overlay Focus Contract
 

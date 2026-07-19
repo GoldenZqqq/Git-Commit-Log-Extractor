@@ -3,7 +3,7 @@
   "name": "frontend-module-decomposition",
   "title": "拆分前端超大模块",
   "description": "拆分 App、Workbench、SettingsDialog 与 model，保持行为和跨层契约",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,

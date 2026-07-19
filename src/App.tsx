@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { open } from "@tauri-apps/plugin-dialog";
 import { AppMessageHost, type AppMessage, type AppMessageTone } from "./components/AppMessageHost";
 import { BatchDialog } from "./components/BatchDialog";
 import { BlankDayFillDialog } from "./components/BlankDayFillDialog";
@@ -10,72 +9,35 @@ import { RepoMappingDialog } from "./components/RepoMappingDialog";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { Workbench } from "./components/Workbench";
-import type { ConfigProfileSettings } from "./configProfile";
 import { useAppRuntime } from "./hooks/useAppRuntime";
+import { useAppSettingsState } from "./hooks/useAppSettingsState";
 import { useReportHistoryStorage } from "./hooks/useReportHistoryStorage";
+import { useReportWorkflow } from "./hooks/useReportWorkflow";
 import { useSupportEvents } from "./hooks/useSupportEvents";
 import { useWorkspaceHealth } from "./hooks/useWorkspaceHealth";
+import { useWorkspaceDirectoryActions } from "./hooks/useWorkspaceDirectoryActions";
 import {
   taskIsActive,
   type AppTaskKind,
   useTaskActivity,
 } from "./hooks/useTaskActivity";
 import {
-  type AppSettings,
   type CommitExtractProgress,
-  type DateRange,
-  type ExtractResult,
   type GitIdentity,
-  type LoadedSettingsState,
-  type PeriodReportResult,
-  type ReportEnhanceResult,
-  type ReportExportFormat,
-  type PreviewMode,
-  type ReportHistoryEntry,
-  type ReportHistoryProject,
-  type ReportPolishReview,
   type RepoInfo,
   type RepoScanProgress,
   type RepoScanResult,
   type MappingScope,
-  STORAGE_KEY,
-  buildExtractOptions,
-  buildPeriodReportOptions,
-  buildReportEnhanceOptions,
   clearRepoIndexCache,
-  isBlankDayHistoryEntry,
-  formatMonthLabel,
-  finalizeSettingsMigration,
-  getMonthRange,
-  getPreviousMonthInput,
-  getSingleDayRange,
-  getToday,
-  getTodayRange,
-  getWeekLabel,
-  getWeekRange,
-  isAiKeyReference,
   loadRepoIndexCache,
-  normalizeReportHistoryLimit,
   loadSettingsState,
   parseProjectNames,
   persistRepoIndexCache,
   saveRepoIndexCache,
-  settingsForPersistence,
   upsertRepoMapping,
-  validateAiConnectionSettings,
-  validateExtractSettings,
-  validateOutputSettings,
-  validatePeriodReportSettings,
   validateRequiredSettings,
   validateWorkspaceSettings,
 } from "./model";
-import {
-  buildSupplementalDraftKey,
-  formatSupplementalItemsText,
-  parseSupplementalItems,
-  supplementalItemsFromHistory,
-  validateSupplementalItems,
-} from "./supplementalItems";
 import "./styles/tokens.css";
 import "./styles/layout.css";
 import "./styles/components.css";
@@ -84,7 +46,6 @@ import "./styles/dialogs.css";
 import "./styles/support-bundle.css";
 import "./styles/onboarding.css";
 import "./styles/theme.css";
-
 type RunTaskInput = {
   kind: AppTaskKind;
   label: string;
@@ -92,35 +53,11 @@ type RunTaskInput = {
   validate?: () => void;
   allowDuringPolishReview?: boolean;
 };
-
-type HistoryEntryInput = {
-  mode: PreviewMode;
-  range: DateRange;
-  periodLabel: string;
-  reportText: string;
-  commitCount: number;
-  projectCount: number;
-  aiEnhanced: boolean;
-  outputFile?: string;
-  supplementalItems?: string[];
-  projects?: ReportHistoryProject[];
-};
-
 function App() {
-  const [loadedSettings] = useState<LoadedSettingsState>(loadSettingsState);
-  const [settings, setSettings] = useState<AppSettings>(loadedSettings.settings);
+  const [loadedSettings] = useState(loadSettingsState);
   const [initialRepoCache] = useState(() => loadRepoIndexCache(loadedSettings.settings.rootDirs));
   const [repos, setRepos] = useState<RepoInfo[]>(() => initialRepoCache?.repos ?? []);
   const [repoScannedAt, setRepoScannedAt] = useState(() => initialRepoCache?.scannedAt ?? "");
-  const [summaryText, setSummaryText] = useState("");
-  const [dailyDate, setDailyDate] = useState(getToday);
-  const [customReport, setCustomReport] = useState("");
-  const [customRange, setCustomRange] = useState<DateRange>(getTodayRange);
-  const [weeklyReport, setWeeklyReport] = useState("");
-  const [weeklyWeek, setWeeklyWeek] = useState(getWeekLabel);
-  const [monthlyReport, setMonthlyReport] = useState("");
-  const [monthlyMonth, setMonthlyMonth] = useState(getPreviousMonthInput);
-  const [monthlyLabel, setMonthlyLabel] = useState("");
   const [warnings, setWarnings] = useState<string[]>([]);
   const reportHistoryStorage = useReportHistoryStorage(
     loadedSettings.settings.reportHistoryLimit,
@@ -129,11 +66,6 @@ function App() {
       setStatus(message, { tone: "warning", notify: true, duration: 0 });
     },
   );
-  const reportHistory = reportHistoryStorage.entries;
-  const [supplementalDrafts, setSupplementalDrafts] = useState<Record<string, string>>({});
-  const [activeHistoryId, setActiveHistoryId] = useState("");
-  const [activePreview, setActivePreview] = useState<PreviewMode>("summary");
-  const [polishReview, setPolishReview] = useState<ReportPolishReview | null>(null);
   const [status, setStatusText] = useState(
     loadedSettings.recoveredCorruptedSettings
       ? "本地设置损坏，已保留原文并使用可恢复配置"
@@ -142,6 +74,11 @@ function App() {
         : "就绪",
   );
   const [appMessage, setAppMessage] = useState<AppMessage | null>(null);
+  const { settings, setSettings, updateSetting, applyConfigProfileSettings } = useAppSettingsState({
+    loadedSettings,
+    onResizeHistory: reportHistoryStorage.resize,
+    setStatus,
+  });
   const supportEvents = useSupportEvents();
   const workspaceHealth = useWorkspaceHealth({
     rootDirs: settings.rootDirs,
@@ -157,12 +94,6 @@ function App() {
   const [blankDayOpen, setBlankDayOpen] = useState(false);
   const [updateBannerDismissed, setUpdateBannerDismissed] = useState(false);
   const [editingRepo, setEditingRepo] = useState<RepoInfo | null>(null);
-  const [lastOutputFile, setLastOutputFile] = useState("");
-  const [commitCount, setCommitCount] = useState(0);
-  const [blankDayDraftActive, setBlankDayDraftActive] = useState(false);
-  const [projectCount, setProjectCount] = useState(0);
-  const aiApiKeySaveTimer = useRef<number | null>(null);
-  const proxyPasswordSaveTimer = useRef<number | null>(null);
   const {
     appVersion,
     updateSummary,
@@ -173,19 +104,12 @@ function App() {
     checkForUpdates,
     installUpdate,
   } = useAppRuntime({ themeMode: settings.themeMode });
-
   const projectNames = useMemo(() => parseProjectNames(settings.projectNamesText), [settings.projectNamesText]);
-  const dailyRange = useMemo(() => getSingleDayRange(dailyDate), [dailyDate]);
-  const weeklyRange = useMemo(() => getWeekRange(weeklyWeek), [weeklyWeek]);
-  const monthlyRange = useMemo(() => getMonthRange(monthlyMonth), [monthlyMonth]);
-  const previewText = activePreview === "monthly" ? monthlyReport : activePreview === "weekly" ? weeklyReport : activePreview === "custom" ? customReport : summaryText;
-  const currentReportRange = activePreviewRange(activePreview, dailyRange, weeklyRange, monthlyRange, customRange);
-  const currentSupplementalDraftKey = buildSupplementalDraftKey(activePreview, currentReportRange);
-  const supplementalItemsText = supplementalDrafts[currentSupplementalDraftKey] ?? "";
   const aiConfigured =
     settings.aiProvider === "codex-oauth"
       ? Boolean(settings.aiModel.trim())
       : Boolean(settings.aiBaseUrl.trim() && settings.aiModel.trim() && settings.aiApiKey.trim());
+  const { chooseOutputDir, addRootDirs, removeRootDir } = useWorkspaceDirectoryActions({ setSettings, updateSetting });
   const dismissAppMessage = useCallback(() => setAppMessage(null), []);
 
   function showMessage(message: string, tone: AppMessageTone = inferMessageTone(message), duration?: number) {
@@ -197,21 +121,73 @@ function App() {
       duration: duration ?? (tone === "loading" ? 1800 : 2800),
     });
   }
-
   function setStatus(message: string, options: { notify?: boolean; tone?: AppMessageTone; duration?: number } = {}) {
     setStatusText(message);
     const shouldNotify = options.notify ?? shouldNotifyStatus(message);
     if (shouldNotify) showMessage(message, options.tone ?? inferMessageTone(message), options.duration);
   }
 
+  const reportWorkflow = useReportWorkflow({
+    settings,
+    repos,
+    projectNames,
+    reportHistoryStorage,
+    runTask,
+    setStatus,
+    setWarnings,
+    setExtractProgress,
+    onOpenSettings: () => setSettingsOpen(true),
+    onOpenBlankDay: () => setBlankDayOpen(true),
+    onCloseBlankDay: () => setBlankDayOpen(false),
+  });
+  const {
+    reportHistory,
+    summaryText,
+    dailyDate,
+    customReport,
+    customRange,
+    weeklyReport,
+    weeklyWeek,
+    monthlyMonth,
+    activeHistoryId,
+    activePreview,
+    polishReview,
+    lastOutputFile,
+    commitCount,
+    projectCount,
+    blankDayDraftActive,
+    weeklyRange,
+    monthlyRange,
+    previewText,
+    supplementalItemsText,
+    changePreview,
+    changeDailyDate,
+    changeWeeklyWeek,
+    changeMonthlyMonth,
+    changeSupplementalItems,
+    extractCommits,
+    generateCustomReport,
+    generateWeeklyReport,
+    generateMonthlyReport,
+    polishReport,
+    acceptPolishReview,
+    rejectPolishReview,
+    copyPreview,
+    saveReport,
+    openReportHistory,
+    copyReportHistory,
+    regenerateReportHistory,
+    clearHistoryRecords,
+    handleGenerateDailyFromCalendar,
+    handleOpenBlankDayFillFromCalendar,
+    handleBlankDayGenerated,
+    handleBlankDayApply,
+  } = reportWorkflow;
+
   useEffect(() => {
     if (!startupUpdateNotice) return;
     setUpdateBannerDismissed(false);
   }, [startupUpdateNotice]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settingsForPersistence(settings)));
-  }, [settings]);
 
   useEffect(() => {
     function handleDateInputClick(e: MouseEvent) {
@@ -222,55 +198,6 @@ function App() {
     }
     document.addEventListener("click", handleDateInputClick);
     return () => document.removeEventListener("click", handleDateInputClick);
-  }, []);
-
-  useEffect(() => {
-    const currentApiKey = settings.aiApiKey.trim();
-    if (currentApiKey) {
-      if (!isAiKeyReference(currentApiKey)) {
-        void persistSecureAiApiKey(currentApiKey).then((saved) => {
-          if (saved && loadedSettings.settingsMigrationPending) finalizeSettingsMigration();
-        });
-      } else if (loadedSettings.settingsMigrationPending) {
-        finalizeSettingsMigration();
-      }
-      return;
-    }
-
-    if (loadedSettings.settingsMigrationPending) finalizeSettingsMigration();
-
-    invoke<string | null>("get_secure_ai_api_key")
-      .then((apiKey) => {
-        if (!apiKey) return;
-        setSettings((current) => {
-          if (current.aiApiKey.trim()) return current;
-          return { ...current, aiApiKey: apiKey, aiApiKeySaved: true };
-        });
-        setStatus("已从系统凭据库读取 AI API Key");
-      })
-      .catch(() => undefined);
-    // Only run on startup; later key edits are handled by updateSetting.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    const currentPassword = settings.proxyPassword.trim();
-    if (currentPassword) {
-      void persistSecureProxyPassword(currentPassword);
-      return;
-    }
-
-    invoke<string | null>("get_secure_proxy_password")
-      .then((password) => {
-        if (!password) return;
-        setSettings((current) => {
-          if (current.proxyPassword.trim()) return current;
-          return { ...current, proxyPassword: password, proxyPasswordSaved: true };
-        });
-      })
-      .catch(() => undefined);
-    // Only run on startup; later proxy password edits are handled by updateSetting.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -349,39 +276,6 @@ function App() {
     scanWorkspace();
   }, [settings.rootDirs, settings.onboardingDone]);
 
-  useEffect(() => {
-    return () => {
-      if (aiApiKeySaveTimer.current !== null) {
-        window.clearTimeout(aiApiKeySaveTimer.current);
-      }
-    };
-  }, []);
-
-  async function chooseOutputDir() {
-    const selected = await open({ directory: true, multiple: false });
-    if (typeof selected === "string") updateSetting("outputDir", selected);
-  }
-
-  async function addRootDirs() {
-    const selected = await open({ directory: true, multiple: true });
-    const picked = Array.isArray(selected) ? selected : typeof selected === "string" ? [selected] : [];
-    if (picked.length === 0) return;
-    setSettings((current) => {
-      const merged = [...current.rootDirs];
-      for (const dir of picked) {
-        if (!merged.includes(dir)) merged.push(dir);
-      }
-      return { ...current, rootDirs: merged };
-    });
-  }
-
-  function removeRootDir(dir: string) {
-    setSettings((current) => ({
-      ...current,
-      rootDirs: current.rootDirs.filter((item) => item !== dir),
-    }));
-  }
-
   async function scanWorkspace() {
     await runTask({
       kind: "scan",
@@ -427,469 +321,6 @@ function App() {
     }
   }
 
-  function changePreview(preview: PreviewMode) {
-    setActivePreview(preview);
-    setActiveHistoryId("");
-  }
-
-  function changeDailyDate(date: string) {
-    setDailyDate(date);
-    setActiveHistoryId("");
-    setBlankDayDraftActive(false);
-  }
-
-  function changeWeeklyWeek(week: string) {
-    setWeeklyWeek(week);
-    setActiveHistoryId("");
-  }
-
-  function changeMonthlyMonth(month: string) {
-    setMonthlyMonth(month);
-    setActiveHistoryId("");
-  }
-
-  function changeSupplementalItems(value: string) {
-    setSupplementalDrafts((current) => ({ ...current, [currentSupplementalDraftKey]: value }));
-  }
-
-  function supplementalItemsFor(mode: PreviewMode, range: DateRange, override?: string[]) {
-    if (override) return validateSupplementalItems(override);
-    const key = buildSupplementalDraftKey(mode, range);
-    return parseSupplementalItems(supplementalDrafts[key] ?? "");
-  }
-
-  function rememberHistory(entry: ReportHistoryEntry) {
-    reportHistoryStorage.remember(entry);
-    setActiveHistoryId(entry.id);
-  }
-
-  function updateActiveHistory(patch: Partial<Pick<ReportHistoryEntry, "outputFile" | "reportText" | "commitCount" | "generatedAt">>) {
-    if (!activeHistoryId) return;
-    reportHistoryStorage.update(activeHistoryId, patch);
-  }
-
-  function buildHistoryEntry(input: HistoryEntryInput): ReportHistoryEntry {
-    return {
-      id: createHistoryId(),
-      mode: input.mode,
-      title: formatHistoryTitle(input.mode, input.periodLabel, input.range),
-      range: input.range,
-      periodLabel: input.periodLabel,
-      generatedAt: new Date().toISOString(),
-      repoCount: getEnabledRepoCount(),
-      projectCount: input.projectCount,
-      commitCount: input.commitCount,
-      aiEnhanced: input.aiEnhanced,
-      outputFile: input.outputFile ?? "",
-      reportText: input.reportText,
-      supplementalItems: input.supplementalItems ?? [],
-      projects: input.projects,
-    };
-  }
-
-  function getEnabledRepoCount() {
-    return repos.filter((repo) => !settings.disabledRepos.includes(repo.path)).length;
-  }
-
-  async function extractCommits(dateValue = dailyDate, supplementalOverride?: string[]) {
-    const range = getSingleDayRange(dateValue);
-    setExtractProgress(null);
-    await runTask({
-      kind: "generate",
-      label: "提取提交",
-      task: async () => {
-        const supplementalItems = supplementalItemsFor("summary", range, supplementalOverride);
-        const result = await invoke<ExtractResult>("extract_commits", {
-          options: buildExtractOptions(settings, projectNames, range, false, "", repos, "daily", supplementalItems),
-        });
-        const reportText = result.detailedText || result.summaryText;
-        const projectTotal = result.projects.length;
-        setDailyDate(dateValue);
-        setSummaryText(reportText);
-        setWarnings(result.warnings);
-        setLastOutputFile("");
-        setCommitCount(result.commits.length);
-        setProjectCount(projectTotal);
-        setBlankDayDraftActive(false);
-        setActivePreview("summary");
-        rememberHistory(buildHistoryEntry({
-          mode: "summary",
-          range,
-          periodLabel: dateValue,
-          reportText,
-          commitCount: result.commits.length,
-          projectCount: projectTotal,
-          aiEnhanced: false,
-          supplementalItems,
-          projects: result.projects,
-        }));
-        setStatus(`${dateValue} 日报已生成`);
-      },
-      validate: () => {
-        validateExtractSettings(settings, range);
-        supplementalItemsFor("summary", range, supplementalOverride);
-      },
-    });
-  }
-
-  async function generateCustomReport(range: DateRange, supplementalOverride?: string[]) {
-    setExtractProgress(null);
-    await runTask({
-      kind: "generate",
-      label: "正在生成自定义报告",
-      task: async () => {
-        const supplementalItems = supplementalItemsFor("custom", range, supplementalOverride);
-        const result = await invoke<ExtractResult>("extract_commits", {
-          options: buildExtractOptions(settings, projectNames, range, false, "", repos, "custom", supplementalItems),
-        });
-        const reportText = result.detailedText || result.summaryText;
-        const periodLabel = `${range.startDate} ~ ${range.endDate}`;
-        const projectTotal = result.projects.length;
-        setCustomRange(range);
-        setCustomReport(reportText);
-        setWarnings(result.warnings);
-        setLastOutputFile("");
-        setCommitCount(result.commits.length);
-        setProjectCount(projectTotal);
-        setBlankDayDraftActive(false);
-        setActivePreview("custom");
-        rememberHistory(buildHistoryEntry({
-          mode: "custom",
-          range,
-          periodLabel,
-          reportText,
-          commitCount: result.commits.length,
-          projectCount: projectTotal,
-          aiEnhanced: false,
-          supplementalItems,
-          projects: result.projects,
-        }));
-        setStatus("自定义报告已生成");
-      },
-      validate: () => {
-        validateExtractSettings(settings, range);
-        supplementalItemsFor("custom", range, supplementalOverride);
-      },
-    });
-  }
-
-  async function generateWeeklyReport(weekValue = weeklyWeek, supplementalOverride?: string[]) {
-    const range = getWeekRange(weekValue);
-    const label = weekValue;
-    setExtractProgress(null);
-    await runTask({
-      kind: "generate",
-      label: "正在生成周报",
-      task: async () => {
-        const supplementalItems = supplementalItemsFor("weekly", range, supplementalOverride);
-        const result = await invoke<PeriodReportResult>("generate_period_report", {
-          options: buildPeriodReportOptions(settings, projectNames, "weekly", range, label, false, "", repos, supplementalItems),
-        });
-        setWeeklyWeek(result.periodLabel);
-        setWeeklyReport(result.reportText);
-        setWarnings(result.warnings);
-        setLastOutputFile(result.outputFile);
-        setCommitCount(result.commitCount);
-        setProjectCount(result.projectCount);
-        setBlankDayDraftActive(false);
-        setActivePreview("weekly");
-        rememberHistory(buildHistoryEntry({
-          mode: "weekly",
-          range,
-          periodLabel: result.periodLabel,
-          reportText: result.reportText,
-          commitCount: result.commitCount,
-          projectCount: result.projectCount,
-          aiEnhanced: false,
-          outputFile: result.outputFile,
-          supplementalItems,
-          projects: result.projects,
-        }));
-        setStatus(result.outputFile ? `${result.periodLabel} 周报已生成` : `${result.periodLabel} 周报已生成，未写入文件`);
-      },
-      validate: () => {
-        validatePeriodReportSettings(settings, range);
-        supplementalItemsFor("weekly", range, supplementalOverride);
-      },
-    });
-  }
-
-  async function generateMonthlyReport(monthValue = monthlyMonth, supplementalOverride?: string[]) {
-    setExtractProgress(null);
-    await runTask({
-      kind: "generate",
-      label: "正在生成月报",
-      task: async () => {
-        const range = getMonthRange(monthValue);
-        const label = formatMonthLabel(monthValue);
-        const supplementalItems = supplementalItemsFor("monthly", range, supplementalOverride);
-        const result = await invoke<PeriodReportResult>("generate_period_report", {
-          options: buildPeriodReportOptions(settings, projectNames, "monthly", range, label, false, "", repos, supplementalItems),
-        });
-        setMonthlyMonth(result.periodLabel);
-        setMonthlyReport(result.reportText);
-        setMonthlyLabel(result.periodLabel);
-        setWarnings(result.warnings);
-        setLastOutputFile(result.outputFile);
-        setCommitCount(result.commitCount);
-        setProjectCount(result.projectCount);
-        setBlankDayDraftActive(false);
-        setActivePreview("monthly");
-        rememberHistory(buildHistoryEntry({
-          mode: "monthly",
-          range,
-          periodLabel: result.periodLabel,
-          reportText: result.reportText,
-          commitCount: result.commitCount,
-          projectCount: result.projectCount,
-          aiEnhanced: false,
-          outputFile: result.outputFile,
-          supplementalItems,
-          projects: result.projects,
-        }));
-        setStatus(result.outputFile ? `${result.periodLabel} 月报已生成` : `${result.periodLabel} 月报已生成，未写入文件`);
-      },
-      validate: () => {
-        validatePeriodReportSettings(settings, getMonthRange(monthValue));
-        supplementalItemsFor("monthly", getMonthRange(monthValue), supplementalOverride);
-      },
-    });
-  }
-
-  function setActivePreviewText(mode: PreviewMode, text: string) {
-    if (mode === "monthly") {
-      setMonthlyReport(text);
-    } else if (mode === "weekly") {
-      setWeeklyReport(text);
-    } else if (mode === "custom") {
-      setCustomReport(text);
-    } else {
-      setSummaryText(text);
-    }
-  }
-
-  async function saveActivePreviewText(mode: PreviewMode, range: DateRange, periodLabel: string, content: string) {
-    if (!settings.outputEnabled) return "";
-    const baseName = activePreviewBaseName(mode, range, periodLabel);
-    return invoke<string>("save_report_file", {
-      outputDir: settings.outputDir,
-      baseName,
-      format: "markdown",
-      content,
-    });
-  }
-
-  async function polishReport(extraInstruction = "") {
-    if (polishReview) {
-      setStatus("请先接受或放弃当前 AI 润色结果", { tone: "warning", notify: true });
-      return;
-    }
-    const range = activePreviewRange(activePreview, dailyRange, weeklyRange, monthlyRange, customRange);
-    const periodLabel = activePreviewPeriodLabel(activePreview, dailyDate, weeklyWeek, monthlyLabel || monthlyMonth, customRange);
-    const baseReport = previewText;
-    const sourceHistory = reportHistory.find((entry) => entry.id === activeHistoryId);
-    const sourceRepoCount = sourceHistory?.repoCount ?? getEnabledRepoCount();
-    setExtractProgress(null);
-    await runTask({
-      kind: "polish",
-      label: "AI 正在润色当前报告",
-      task: async () => {
-        const supplementalItems = supplementalItemsFor(activePreview, range);
-        const result = await invoke<ReportEnhanceResult>("enhance_report", {
-          options: buildReportEnhanceOptions(settings, activePreview, range, baseReport, extraInstruction, supplementalItems),
-        });
-        setWarnings(result.warnings);
-        if (hasAiWarning(result.warnings)) {
-          setStatus("AI 润色失败，已保留当前报告");
-          return;
-        }
-        setPolishReview({
-          mode: activePreview,
-          range,
-          periodLabel,
-          originalText: baseReport,
-          polishedText: result.reportText,
-          warnings: result.warnings,
-          repoCount: sourceRepoCount,
-          commitCount,
-          projectCount,
-          supplementalItems,
-          projects: sourceHistory?.projects,
-        });
-        setStatus("AI 润色完成，请对照确认");
-      },
-      validate: () => {
-        if (!baseReport.trim()) throw new Error("当前报告为空，请先生成报告再润色");
-        validateAiConnectionSettings(settings);
-        validateOutputSettings(settings);
-        supplementalItemsFor(activePreview, range);
-      },
-    });
-  }
-
-  async function acceptPolishReview() {
-    if (!polishReview) return;
-    const review = polishReview;
-    await runTask({
-      kind: "export",
-      label: "正在接受 AI 润色结果",
-      task: async () => {
-        const outputFile = await saveActivePreviewText(review.mode, review.range, review.periodLabel, review.polishedText);
-        setActivePreviewText(review.mode, review.polishedText);
-        setActivePreview(review.mode);
-        setWarnings(review.warnings);
-        setLastOutputFile(outputFile);
-        const historyEntry = buildHistoryEntry({
-          mode: review.mode,
-          range: review.range,
-          periodLabel: review.periodLabel,
-          reportText: review.polishedText,
-          commitCount: review.commitCount,
-          projectCount: review.projectCount,
-          aiEnhanced: true,
-          outputFile,
-          supplementalItems: review.supplementalItems,
-          projects: review.projects,
-        });
-        rememberHistory({ ...historyEntry, repoCount: review.repoCount });
-        setPolishReview(null);
-        setStatus("已接受 AI 润色结果");
-      },
-      validate: () => {
-        if (settings.outputEnabled) validateOutputSettings(settings);
-      },
-      allowDuringPolishReview: true,
-    });
-  }
-
-  function rejectPolishReview() {
-    if (!polishReview) return;
-    setPolishReview(null);
-    setStatus("已保留原稿");
-  }
-
-  async function copyPreview() {
-    if (!previewText) return;
-    await runTask({
-      kind: "interaction",
-      label: "正在复制当前报告",
-      task: async () => {
-        await copyText(previewText, "复制失败，请重试");
-        setStatus("内容已复制到剪贴板", { tone: "success", notify: true });
-      },
-      validate: () => undefined,
-    });
-  }
-
-  async function saveReport(format: ReportExportFormat = "markdown") {
-    if (!previewText) return;
-    if (!settings.outputEnabled || !settings.outputDir.trim()) {
-      setSettingsOpen(true);
-      setStatus(
-        settings.outputEnabled
-          ? "请选择输出目录后再导出报告"
-          : "请先开启输出到文件并选择输出目录",
-        { tone: "warning", notify: true, duration: 4200 },
-      );
-      return;
-    }
-    let baseName: string;
-    if (activePreview === "monthly") {
-      baseName = `monthly_report_${monthlyLabel || formatMonthLabel(monthlyMonth)}`;
-    } else if (activePreview === "weekly") {
-      baseName = `weekly_report_${weeklyWeek}`;
-    } else {
-      const range = activePreview === "custom" ? customRange : dailyRange;
-      baseName = `git_commits_${range.startDate}_to_${range.endDate}`;
-    }
-    await runTask({
-      kind: "export",
-      label: "正在导出报告",
-      task: async () => {
-        const outputFile = await invoke<string>("save_report_file", {
-          outputDir: settings.outputDir,
-          baseName,
-          format,
-          content: previewText,
-        });
-        setLastOutputFile(outputFile);
-        updateActiveHistory({ outputFile });
-        setStatus(`报告已导出为 ${formatReportExportLabel(format)}`);
-      },
-      validate: () => validateOutputSettings(settings),
-    });
-  }
-
-  function openReportHistory(entry: ReportHistoryEntry) {
-    if (polishReview) {
-      setStatus("请先接受或放弃当前 AI 润色结果", { tone: "warning", notify: true });
-      return;
-    }
-    setActiveHistoryId(entry.id);
-    setWarnings([]);
-    setLastOutputFile(entry.outputFile);
-    setCommitCount(entry.commitCount);
-    setProjectCount(entry.projectCount ?? entry.repoCount);
-    setBlankDayDraftActive(isBlankDayHistoryEntry(entry));
-    const supplementalItems = supplementalItemsFromHistory(entry.supplementalItems);
-    const supplementalKey = buildSupplementalDraftKey(entry.mode, entry.range);
-    setSupplementalDrafts((current) => ({
-      ...current,
-      [supplementalKey]: formatSupplementalItemsText(supplementalItems),
-    }));
-
-    if (entry.mode === "monthly") {
-      setMonthlyMonth(entry.periodLabel);
-      setMonthlyLabel(entry.periodLabel);
-      setMonthlyReport(entry.reportText);
-    } else if (entry.mode === "weekly") {
-      setWeeklyWeek(entry.periodLabel);
-      setWeeklyReport(entry.reportText);
-    } else if (entry.mode === "custom") {
-      setCustomRange(entry.range);
-      setCustomReport(entry.reportText);
-    } else {
-      setDailyDate(entry.range.startDate);
-      setSummaryText(entry.reportText);
-    }
-
-    setActivePreview(entry.mode);
-    setStatus(`已打开历史报告：${entry.title}`);
-  }
-
-  async function copyReportHistory(entry: ReportHistoryEntry) {
-    await runTask({
-      kind: "interaction",
-      label: "正在复制历史报告",
-      task: async () => {
-        await copyText(entry.reportText, "复制历史报告失败，请重试");
-        setStatus(`已复制历史报告：${entry.title}`, { tone: "success", notify: true });
-      },
-      validate: () => undefined,
-    });
-  }
-
-  async function regenerateReportHistory(entry: ReportHistoryEntry) {
-    const supplementalItems = supplementalItemsFromHistory(entry.supplementalItems);
-    if (entry.mode === "monthly") {
-      await generateMonthlyReport(entry.periodLabel, supplementalItems);
-    } else if (entry.mode === "weekly") {
-      await generateWeeklyReport(entry.periodLabel, supplementalItems);
-    } else if (entry.mode === "custom") {
-      await generateCustomReport(entry.range, supplementalItems);
-    } else {
-      await extractCommits(entry.range.startDate, supplementalItems);
-    }
-  }
-
-  async function clearHistoryRecords() {
-    if (!window.confirm("清空最近报告记录？已导出的 Markdown 文件不会被删除。")) return;
-    const cleared = await reportHistoryStorage.clear();
-    if (!cleared) return;
-    setActiveHistoryId("");
-    setStatus("最近报告记录已清空");
-  }
-
   async function runTask({
     kind,
     label,
@@ -921,47 +352,6 @@ function App() {
     } finally {
       finishTask(kind);
     }
-  }
-
-  function updateSetting<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
-    if (key === "reportHistoryLimit") {
-      const limit = normalizeReportHistoryLimit(value);
-      setSettings((current) => ({ ...current, reportHistoryLimit: limit }));
-      reportHistoryStorage.resize(limit);
-      return;
-    }
-    if (key === "aiApiKey") {
-      const aiApiKey = String(value);
-      setSettings((current) => ({
-        ...current,
-        aiApiKey,
-        aiApiKeySaved:
-          current.aiApiKeySaved
-          && current.aiApiKey === aiApiKey
-          && Boolean(aiApiKey.trim())
-          && !isAiKeyReference(aiApiKey.trim()),
-      }));
-      scheduleSecureAiApiKeySync(aiApiKey);
-      return;
-    }
-    if (key === "proxyPassword") {
-      const proxyPassword = String(value);
-      setSettings((current) => ({
-        ...current,
-        proxyPassword,
-        proxyPasswordSaved:
-          current.proxyPasswordSaved
-          && current.proxyPassword === proxyPassword
-          && Boolean(proxyPassword.trim()),
-      }));
-      scheduleSecureProxyPasswordSync(proxyPassword);
-      return;
-    }
-    setSettings((current) => ({ ...current, [key]: value }));
-  }
-
-  function applyConfigProfileSettings(profileSettings: ConfigProfileSettings) {
-    setSettings((current) => ({ ...current, ...profileSettings }));
   }
 
   function toggleRepo(repoPath: string, enabled: boolean) {
@@ -1020,66 +410,6 @@ function App() {
     setEditingRepo(null);
   }
 
-  function scheduleSecureAiApiKeySync(value: string) {
-    if (aiApiKeySaveTimer.current !== null) {
-      window.clearTimeout(aiApiKeySaveTimer.current);
-    }
-    aiApiKeySaveTimer.current = window.setTimeout(() => {
-      aiApiKeySaveTimer.current = null;
-      void persistSecureAiApiKey(value);
-    }, 500);
-  }
-
-  async function persistSecureAiApiKey(value: string): Promise<boolean> {
-    const apiKey = value.trim();
-    try {
-      if (!apiKey || isAiKeyReference(apiKey)) {
-        await invoke("clear_secure_ai_api_key");
-        setSettings((current) => ({ ...current, aiApiKeySaved: false }));
-        return true;
-      }
-
-      await invoke("set_secure_ai_api_key", { apiKey });
-      setSettings((current) => {
-        if (current.aiApiKey.trim() !== apiKey) return current;
-        return { ...current, aiApiKeySaved: true };
-      });
-      return true;
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error), { tone: "error", notify: true, duration: 4200 });
-      return false;
-    }
-  }
-
-  function scheduleSecureProxyPasswordSync(value: string) {
-    if (proxyPasswordSaveTimer.current !== null) {
-      window.clearTimeout(proxyPasswordSaveTimer.current);
-    }
-    proxyPasswordSaveTimer.current = window.setTimeout(() => {
-      proxyPasswordSaveTimer.current = null;
-      void persistSecureProxyPassword(value);
-    }, 500);
-  }
-
-  async function persistSecureProxyPassword(value: string) {
-    const password = value.trim();
-    try {
-      if (!password) {
-        await invoke("clear_secure_proxy_password");
-        setSettings((current) => ({ ...current, proxyPasswordSaved: false }));
-        return;
-      }
-
-      await invoke("set_secure_proxy_password", { password });
-      setSettings((current) => {
-        if (current.proxyPassword.trim() !== password) return current;
-        return { ...current, proxyPasswordSaved: true };
-      });
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error), { tone: "error", notify: true, duration: 4200 });
-    }
-  }
-
   if (!settings.onboardingDone) {
     return (
       <OnboardingWizard
@@ -1098,57 +428,6 @@ function App() {
 
 
 
-  function handleGenerateDailyFromCalendar(date: string) {
-    setBlankDayDraftActive(false);
-    setActivePreview("summary");
-    void extractCommits(date);
-  }
-
-  function handleOpenBlankDayFillFromCalendar(date: string) {
-    setDailyDate(date);
-    setActivePreview("summary");
-    setBlankDayOpen(true);
-  }
-function handleBlankDayGenerated(payload: {
-    draftText: string;
-    targetDate: string;
-    sourceRange: DateRange;
-    commitCount: number;
-    repoCount: number;
-  }) {
-    const entry: ReportHistoryEntry = {
-      id: createHistoryId(),
-      mode: "summary",
-      title: `空白日补写 · ${payload.targetDate}`,
-      range: getSingleDayRange(payload.targetDate),
-      periodLabel: `补写草稿 · ${payload.targetDate}`,
-      generatedAt: new Date().toISOString(),
-      repoCount: payload.repoCount,
-      projectCount: payload.repoCount,
-      commitCount: payload.commitCount,
-      aiEnhanced: true,
-      outputFile: "",
-      reportText: payload.draftText,
-    };
-    rememberHistory(entry);
-    setStatus(`空白日补写草稿已生成：${payload.targetDate}`);
-  }
-
-  function handleBlankDayApply(draftText: string, targetDate: string) {
-    if (summaryText.trim() && !window.confirm("将用补写草稿替换当前预览内容？")) {
-      return;
-    }
-    setDailyDate(targetDate);
-    setSummaryText(draftText);
-    setWarnings([]);
-    setLastOutputFile("");
-    setCommitCount(0);
-    setProjectCount(0);
-    setBlankDayDraftActive(true);
-    setActivePreview("summary");
-    setBlankDayOpen(false);
-    setStatus(`已应用空白日补写草稿：${targetDate}`);
-  }
   return (
     <main className="app-root">
       <AppMessageHost message={appMessage} onDismiss={dismissAppMessage} />
@@ -1292,46 +571,6 @@ function handleBlankDayGenerated(payload: {
   );
 }
 
-function activePreviewRange(
-  mode: PreviewMode,
-  dailyRange: DateRange,
-  weeklyRange: DateRange,
-  monthlyRange: DateRange,
-  customRange: DateRange,
-) {
-  if (mode === "weekly") return weeklyRange;
-  if (mode === "monthly") return monthlyRange;
-  if (mode === "custom") return customRange;
-  return dailyRange;
-}
-
-function activePreviewPeriodLabel(
-  mode: PreviewMode,
-  dailyDate: string,
-  weeklyWeek: string,
-  monthlyMonth: string,
-  customRange: DateRange,
-) {
-  if (mode === "weekly") return weeklyWeek;
-  if (mode === "monthly") return formatMonthLabel(monthlyMonth);
-  if (mode === "custom") return `${customRange.startDate} ~ ${customRange.endDate}`;
-  return dailyDate;
-}
-
-function activePreviewBaseName(mode: PreviewMode, range: DateRange, periodLabel: string) {
-  if (mode === "monthly") return `monthly_report_${periodLabel}`;
-  if (mode === "weekly") return `weekly_report_${periodLabel}`;
-  return `git_commits_${range.startDate}_to_${range.endDate}`;
-}
-
-async function copyText(text: string, errorMessage: string) {
-  try {
-    await navigator.clipboard.writeText(text);
-  } catch {
-    throw new Error(errorMessage);
-  }
-}
-
 function shouldNotifyStatus(message: string) {
   const trimmed = message.trim();
   if (!trimmed || trimmed === "就绪") return false;
@@ -1350,31 +589,6 @@ function inferMessageTone(message: string): AppMessageTone {
   if (message.startsWith("正在") || message.startsWith("提取中：")) return "loading";
   if (message.includes("已") || message.includes("完成") || message.includes("生成")) return "success";
   return "info";
-}
-
-function hasAiWarning(warnings: string[]) {
-  return warnings.some((warning) => warning.includes("AI 润色失败"));
-}
-
-
-function createHistoryId() {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
-function formatHistoryTitle(mode: PreviewMode, periodLabel: string, range: DateRange) {
-  if (mode === "monthly") return `月报 · ${periodLabel}`;
-  if (mode === "weekly") return `周报 · ${periodLabel}`;
-  if (mode === "custom") return `自定义 · ${range.startDate} ~ ${range.endDate}`;
-  return `日报 · ${range.startDate}`;
-}
-
-function formatReportExportLabel(format: ReportExportFormat) {
-  if (format === "docx") return "Word 文档";
-  if (format === "pdf") return "PDF";
-  return "Markdown";
 }
 
 function formatExtractProgress(progress: CommitExtractProgress) {

@@ -16,6 +16,7 @@ src/
 ├── App.tsx
 ├── main.tsx
 ├── model.ts
+├── model/
 ├── reportFormat.ts
 ├── components/
 ├── hooks/
@@ -28,7 +29,8 @@ src/
 
 - Put reusable UI surfaces in `src/components/` using PascalCase file names, as in `Workbench.tsx`, `SettingsDialog.tsx`, and `ReportQualityPanel.tsx`.
 - Put browser/Tauri runtime hooks in `src/hooks/`; `useAppRuntime.ts` is the current example for app version, theme, and updater integration.
-- Put app-wide frontend data shapes, persistence helpers, validators, and Tauri option builders in `src/model.ts`.
+- Keep `src/model.ts` as a compatibility barrel. Put shared types in `src/model/types.ts`, then group dates, settings migration/cache, repository mappings, report/history options, and support-bundle builders in focused `src/model/*.ts` modules.
+- Keep App orchestration in focused hooks such as `useReportWorkflow`, `useAppSettingsState`, and `useWorkspaceDirectoryActions`; the root component should compose them and wire dialogs, not own every async operation.
 - Put report template presets and template-specific helpers in `src/reportFormat.ts`.
 - Put global CSS in `src/styles/` by concern: tokens, layout, components, preview, dialogs, onboarding, and theme.
 - Do not add Python runtime code to `main`; this product is a React + Rust Tauri app.
@@ -46,7 +48,7 @@ src/
 
 ## Examples
 
-- `src/App.tsx`: central state orchestration, Tauri command calls, and report workflow handlers.
+- `src/App.tsx`: root layout, task coordination, listeners, and dialog composition; report and secure-settings side effects belong in hooks.
 - `src/components/Workbench.tsx`: dense desktop workbench layout with scoped helper components.
 - `src/components/SettingsDialog.tsx`: settings surface wired through typed update callbacks.
-- `src/model.ts`: settings migration, validation, mapping parsing, date helpers, and command option builders.
+- `src/model.ts`: stable barrel for settings migration, validation, mapping parsing, date helpers, history, and command option builders.

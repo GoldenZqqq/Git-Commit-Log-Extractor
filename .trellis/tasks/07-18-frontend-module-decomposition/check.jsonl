@@ -1,1 +1,3 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file":".trellis/spec/frontend/desktop-quality-gates.md","reason":"Playwright, responsive, accessibility and Tauri smoke evidence"}
+{"file":".trellis/spec/frontend/settings-migration.md","reason":"Secure credential and localStorage migration contract"}
+{"file":".trellis/spec/tauri-rust/config-profile-io.md","reason":"Cross-layer settings profile payload compatibility"}
