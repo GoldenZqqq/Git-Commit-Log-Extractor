@@ -9,8 +9,8 @@
 - [x] 拆分 SettingsDialog 的 tab navigation、workspace、AI、mapping、general、diagnostics；保留 modal/popover focus contract 并运行 settings/config/diagnostics/support E2E。
 - [x] 提取 App 的设置状态、报告生成、导出、secure settings sync 和 dialog orchestration hooks；确认 task activity 和 support event 只记录一次。
 - [x] 执行跨层审查：旧 import、IPC builder、localStorage key、secure-store calls、错误文案、循环依赖和文件行数。
-- [ ] 运行完整门禁：`npm run build`、a11y、responsive、全量 E2E、`cargo fmt --all -- --check`、`cargo check`、`cargo test`、真实 Tauri smoke 和 `git diff --check`。本机 cargo 不可用，前端门禁和 `git diff --check` 已通过，Rust/Windows smoke 交由 exact-SHA CI。
-9. [ ] 提交独立功能 commit，push 并等待 exact-SHA CI；若 CI 暴露跨环境布局/启动问题，单独修复并重新验证。
+- [x] 运行完整门禁：`npm run build`、a11y、responsive、全量 E2E、`cargo fmt --all -- --check`、`cargo check`、`cargo test`、真实 Tauri smoke 和 `git diff --check`。本地前端门禁与 `git diff --check` 已通过；exact-SHA `c6a74ee2423eee31b2d00488d93cdaa479de74e9` 的 GitHub Actions run `29679387865` 已补齐 Linux/Windows Rust 与 Windows WebView 证据。
+9. [x] 提交独立功能 commit，push 并等待 exact-SHA CI；功能提交为 `b5d0a75`，smoke 路径修复提交为 `c6a74ee`，两者已 push，最终 exact-SHA CI 全绿。
 10. [ ] 勾选 AC、记录 journal、归档任务、push 归档提交，并将父路线推进至 6/8。
 
 ## Validation Commands

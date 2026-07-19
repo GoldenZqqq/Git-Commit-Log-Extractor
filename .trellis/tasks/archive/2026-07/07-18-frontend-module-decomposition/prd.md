@@ -23,7 +23,7 @@
 ## Acceptance Criteria
 
 - [x] AC1：上述目标文件均不超过 600 行，新增文件职责单一且无循环依赖。
-- [ ] AC2：全量 TypeScript build、E2E、a11y、responsive 与 Tauri smoke 通过。前端与 Playwright 已通过；本机 cargo/Tauri smoke 待 exact-SHA CI 提供 Windows WebView 证据。
+- [x] AC2：全量 TypeScript build、E2E、a11y、responsive 与 Tauri smoke 通过。exact-SHA `c6a74ee2423eee31b2d00488d93cdaa479de74e9` 已通过 GitHub Actions run `29679387865`，包括 Linux/Windows Rust fmt/check/test、全量 Playwright、frontend build 与 Windows WebView smoke。
 - [x] AC3：IPC payload、localStorage key、报告历史和设置迁移行为无回归。
 
 ## Technical Notes
