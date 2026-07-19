@@ -29,6 +29,7 @@ import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialo
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
 import { DiagnosticsSection } from "./DiagnosticsSection";
+import { SupportBundleSection } from "./SupportBundleSection";
 import { ConfigProfileSection } from "./ConfigProfileSection";
 import { CodexOAuthExperimentalNotice } from "./CodexOAuthExperimentalNotice";
 import type { ConfigProfileSettings } from "../configProfile";
@@ -50,6 +51,7 @@ import {
   type ProxyCandidate,
   type ProxyTestResult,
   type RepoInfo,
+  type SupportBundleEventInput,
   type UpdateSummary,
 } from "../model";
 import { useDiagnosticsPanel } from "../hooks/useDiagnosticsPanel";
@@ -62,6 +64,7 @@ type Props = {
   open: boolean;
   settings: AppSettings;
   repos: RepoInfo[];
+  recentEvents: SupportBundleEventInput[];
   currentVersion: string;
   updateSummary: UpdateSummary | null;
   updateMessage: string;
@@ -107,6 +110,7 @@ export function SettingsDialog({
   open,
   settings,
   repos,
+  recentEvents,
   currentVersion,
   updateSummary,
   updateMessage,
@@ -1035,6 +1039,14 @@ export function SettingsDialog({
                   message={diagnostics.message}
                   ranAt={diagnostics.ranAt}
                   onRefresh={diagnostics.refresh}
+                />
+                <SupportBundleSection
+                  settings={settings}
+                  repos={repos}
+                  diagnostics={diagnostics.result}
+                  diagnosticError={diagnostics.message}
+                  diagnosticsBusy={diagnostics.busy}
+                  recentEvents={recentEvents}
                 />
               </>
             )}

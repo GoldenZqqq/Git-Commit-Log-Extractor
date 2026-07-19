@@ -71,6 +71,10 @@ type MockScenario = {
     monthly?: Record<string, unknown>;
   };
   diagnosticsResult?: Record<string, unknown>;
+  supportBundlePreview?: Record<string, unknown>;
+  supportBundlePreviewError?: string;
+  supportBundleExportResult?: Record<string, unknown>;
+  supportBundleExportError?: string;
   batchResult?: Record<string, unknown>;
   enhanceResult?: Record<string, unknown>;
   aiModels?: Array<{ id: string; ownedBy?: string }>;
@@ -139,6 +143,42 @@ export function createRepoCache(rootDirs: string[], repos: RepoInfo[]) {
   };
 }
 
+export function createSupportBundlePreview(overrides: Record<string, unknown> = {}) {
+  return {
+    schemaVersion: 1,
+    generatedAt: "2026-07-18T12:00:00Z",
+    suggestedFileName: "gitpulse-support-20260718-120000.zip",
+    entries: [
+      {
+        name: "summary.md",
+        description: "版本、平台、聚合状态与失败摘要",
+        content: "# GitPulse 支持摘要\n\n- GitPulse：v0.5.3\n- 诊断：1 异常 / 1 提醒 / 7 正常\n",
+        bytes: 96,
+      },
+      {
+        name: "diagnostics.json",
+        description: "机器可读的脱敏诊断与健康计数",
+        content: '{\n  "schemaVersion": 1,\n  "workspace": { "repositoryCount": 1 }\n}',
+        bytes: 72,
+      },
+      {
+        name: "recent-events.log",
+        description: "当前会话最近的脱敏应用事件",
+        content: "[2026-07-18T12:00:00Z] [ERROR] <redacted>\n",
+        bytes: 55,
+      },
+    ],
+    excludedData: [
+      "API Key、OAuth token 与代理密码",
+      "绝对路径、仓库名称与分支名称",
+      "原始 commit 内容与 Git 历史",
+    ],
+    issueTitle: "GitPulse 支持请求 · v0.5.3 · windows",
+    issueBody: "## Safe summary\n- Diagnostics: 1 errors, 1 warnings, 7 ok\n- Workspace directories: 1\n",
+    ...overrides,
+  };
+}
+
 export function createHistoryEntry(
   overrides: Partial<ReportHistoryEntry> & Pick<ReportHistoryEntry, "id" | "mode" | "title" | "periodLabel" | "reportText">,
 ): ReportHistoryEntry {
@@ -195,6 +235,13 @@ export async function launchApp(page: Page, scenario: MockScenario) {
       warningCount: 0,
       errorCount: 0,
     },
+    supportBundlePreview: scenario.supportBundlePreview ?? createSupportBundlePreview(),
+    supportBundlePreviewError: scenario.supportBundlePreviewError,
+    supportBundleExportResult: scenario.supportBundleExportResult ?? {
+      outputFile: "C:/exports/gitpulse-support.zip",
+      bytes: 4096,
+    },
+    supportBundleExportError: scenario.supportBundleExportError,
     batchResult: scenario.batchResult ?? null,
     enhanceResult: scenario.enhanceResult ?? null,
     aiModels: scenario.aiModels ?? [],
@@ -422,6 +469,8 @@ export async function launchApp(page: Page, scenario: MockScenario) {
               return "light";
             case "plugin:window|set_theme":
               return null;
+            case "plugin:opener|open_url":
+              return null;
             case "plugin:updater|check":
               return state.updateMetadata;
             case "get_secure_ai_api_key":
@@ -492,6 +541,12 @@ export async function launchApp(page: Page, scenario: MockScenario) {
               return state.enhanceResult ?? { reportText: args.options?.baseReport ?? "", warnings: [] };
             case "run_diagnostics":
               return state.diagnosticsResult;
+            case "preview_support_bundle":
+              if (state.supportBundlePreviewError) throw new Error(state.supportBundlePreviewError);
+              return state.supportBundlePreview;
+            case "export_support_bundle":
+              if (state.supportBundleExportError) throw new Error(state.supportBundleExportError);
+              return state.supportBundleExportResult;
             case "save_report_file":
               return saveReportFile(args);
             default:

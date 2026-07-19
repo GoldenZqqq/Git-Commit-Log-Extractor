@@ -12,6 +12,7 @@ mod project_retrospective;
 pub mod report;
 mod report_history;
 mod secure_store;
+mod support_bundle;
 mod workspace_health;
 mod zip_store;
 
@@ -21,7 +22,8 @@ use crate::models::{
     GitIdentity, HeatmapOptions, HeatmapResult, MappingEntry, MonthlyReportOptions,
     MonthlyReportResult, PeriodReportOptions, PeriodReportResult, ProxyCandidate, ProxyConfig,
     ProxyTestResult, RepoScanProgress, RepoScanResult, ReportEnhanceOptions, ReportEnhanceResult,
-    TrendOptions, TrendResult, WorkRhythmOptions, WorkRhythmResult, WorkspaceHealthOptions,
+    SupportBundleExportResult, SupportBundleOptions, SupportBundlePreview, TrendOptions,
+    TrendResult, WorkRhythmOptions, WorkRhythmResult, WorkspaceHealthOptions,
     WorkspaceHealthResult,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -218,6 +220,27 @@ async fn run_diagnostics(options: DiagnosticOptions) -> Result<DiagnosticResult,
     async_runtime::spawn_blocking(move || diagnostics::run(options))
         .await
         .map_err(|err| format!("诊断任务中断：{}", err))
+}
+
+#[tauri::command]
+async fn preview_support_bundle(
+    options: SupportBundleOptions,
+) -> Result<SupportBundlePreview, String> {
+    async_runtime::spawn_blocking(move || support_bundle::preview(options))
+        .await
+        .map_err(|error| format!("准备支持包预览任务中断：{error}"))?
+}
+
+#[tauri::command]
+async fn export_support_bundle(
+    path: String,
+    options: SupportBundleOptions,
+) -> Result<SupportBundleExportResult, String> {
+    async_runtime::spawn_blocking(move || {
+        support_bundle::export(std::path::Path::new(&path), options)
+    })
+    .await
+    .map_err(|error| format!("导出支持包任务中断：{error}"))?
 }
 
 #[tauri::command]
@@ -447,6 +470,8 @@ pub fn run() {
             fill_blank_day_report,
             list_ai_models,
             run_diagnostics,
+            preview_support_bundle,
+            export_support_bundle,
             get_heatmap_data,
             get_work_rhythm,
             get_trend_data,

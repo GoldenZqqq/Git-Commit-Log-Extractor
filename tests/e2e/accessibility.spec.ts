@@ -113,6 +113,7 @@ async function verifySettingsDialogKeyboard(page: Page) {
   await assertNoSeriousAxeViolations(page, ".settings-dialog");
   await verifyModelListKeyboard(page);
   await verifyNestedConfirmKeyboard(page);
+  await verifySupportBundleDialogKeyboard(page);
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
   await expect(trigger).toBeFocused();
@@ -142,6 +143,19 @@ async function verifyNestedConfirmKeyboard(page: Page) {
   await page.keyboard.press("Escape");
   await expect(confirm).toBeHidden();
   await expect(settings).toBeVisible();
+  await expect(trigger).toBeFocused();
+}
+
+async function verifySupportBundleDialogKeyboard(page: Page) {
+  const settings = page.getByRole("dialog", { name: "设置" });
+  await settings.getByRole("button", { name: "诊断" }).click();
+  const trigger = settings.getByRole("button", { name: "准备支持包" });
+  await trigger.click();
+  const dialog = page.getByRole("dialog", { name: "检查支持包内容" });
+  await expect(dialog.getByRole("tab", { name: /summary\.md/ })).toBeFocused();
+  await assertNoSeriousAxeViolations(page, ".support-bundle-dialog");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
   await expect(trigger).toBeFocused();
 }
 

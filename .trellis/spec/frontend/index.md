@@ -23,6 +23,7 @@ The frontend owns state, layout, validation prompts, preview interactions, and T
 | [Desktop Quality Gates](./desktop-quality-gates.md) | Browser, responsive, accessibility, and real WebView smoke contract | Filled |
 | [Type Safety](./type-safety.md) | Type patterns and validation | Filled |
 | [Configuration Profiles](../tauri-rust/config-profile-io.md) | Versioned shareable config whitelist, preview, and import semantics | Filled |
+| [Privacy-Safe Support Bundle](../tauri-rust/support-bundle.md) | In-memory events, explicit preview confirmation, safe Issue actions, and local ZIP export | Filled |
 | [Project Retrospective Attribution](../tauri-rust/project-retrospective.md) | Cross-layer project history and insights projection contract | Filled |
 
 ---
@@ -35,6 +36,7 @@ The frontend owns state, layout, validation prompts, preview interactions, and T
 - [ ] Preserve local-first privacy language and never put raw API keys in plain persisted settings.
 - [ ] For persisted-settings or startup credential changes, follow `settings-migration.md`; never delete the only legacy credential copy before secure-store success.
 - [ ] For configuration-profile work, use the explicit versioned whitelist; never export `AppSettings` by spreading it.
+- [ ] For support-bundle work, keep events memory-only and use only Rust-returned safe summary text for copy and Issue actions.
 - [ ] For desktop startup, responsive, overlay, or CI changes, follow `desktop-quality-gates.md`.
 
 ## Quality Check

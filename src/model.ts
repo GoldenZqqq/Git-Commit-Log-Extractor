@@ -320,6 +320,56 @@ export type DiagnosticResult = {
   errorCount: number;
 };
 
+export type SupportBundleEventLevel = "info" | "success" | "warning" | "error";
+
+export type SupportBundleEventInput = {
+  occurredAt: string;
+  level: SupportBundleEventLevel;
+  message: string;
+};
+
+export type SupportBundlePrivacyContext = {
+  author: string;
+  outputDir: string;
+  aiBaseUrl: string;
+  proxyUrl: string;
+  proxyUsername: string;
+};
+
+export type SupportBundleOptions = {
+  diagnostics: DiagnosticResult | null;
+  diagnosticError: string;
+  workspace: {
+    rootDirs: string[];
+    indexedRepos: RepoInfo[];
+    disabledRepos: string[];
+  };
+  recentEvents: SupportBundleEventInput[];
+  privacy: SupportBundlePrivacyContext;
+};
+
+export type SupportBundleEntryPreview = {
+  name: string;
+  description: string;
+  content: string;
+  bytes: number;
+};
+
+export type SupportBundlePreview = {
+  schemaVersion: number;
+  generatedAt: string;
+  suggestedFileName: string;
+  entries: SupportBundleEntryPreview[];
+  excludedData: string[];
+  issueTitle: string;
+  issueBody: string;
+};
+
+export type SupportBundleExportResult = {
+  outputFile: string;
+  bytes: number;
+};
+
 export type ThemeMode = "system" | "light" | "dark";
 export type CommitItemPrefixMode = "mapped-project" | "repo-branch-and-mapped" | "repo-branch" | "none";
 
@@ -1496,6 +1546,33 @@ export function buildProxyConfig(settings: AppSettings): ProxyConfig {
     username: settings.proxyUsername.trim(),
     password: settings.proxyPassword.trim(),
     passwordSaved: settings.proxyPasswordSaved,
+  };
+}
+
+export function buildSupportBundleOptions(input: {
+  settings: AppSettings;
+  repos: RepoInfo[];
+  diagnostics: DiagnosticResult | null;
+  diagnosticError: string;
+  recentEvents: SupportBundleEventInput[];
+}): SupportBundleOptions {
+  const { settings, repos, diagnostics, diagnosticError, recentEvents } = input;
+  return {
+    diagnostics,
+    diagnosticError,
+    workspace: {
+      rootDirs: [...settings.rootDirs],
+      indexedRepos: repos.map((repo) => ({ ...repo })),
+      disabledRepos: [...settings.disabledRepos],
+    },
+    recentEvents: recentEvents.slice(-50).map((event) => ({ ...event })),
+    privacy: {
+      author: settings.author,
+      outputDir: settings.outputDir,
+      aiBaseUrl: settings.aiBaseUrl,
+      proxyUrl: settings.proxyUrl,
+      proxyUsername: settings.proxyUsername,
+    },
   };
 }
 

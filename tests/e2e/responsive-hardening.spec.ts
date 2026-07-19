@@ -26,6 +26,13 @@ test("keeps the 320px workbench and dialogs inside the viewport", async ({ page 
   const settingsTrigger = page.getByRole("button", { name: "打开设置" });
   await settingsTrigger.click();
   await assertDialogInsideViewport(page, page.getByRole("dialog", { name: "设置" }), "关闭设置");
+  await page.getByRole("button", { name: "诊断" }).click();
+  await page.getByRole("button", { name: "准备支持包" }).click();
+  const supportDialog = page.getByRole("dialog", { name: "检查支持包内容" });
+  await assertDialogInsideViewport(page, supportDialog, "关闭支持包预览");
+  await assertNoHorizontalOverflow(page, [".support-bundle-dialog", ".support-bundle-entry-panel"]);
+  await page.screenshot({ path: testInfo.outputPath("support-bundle-320.png"), fullPage: true });
+  await page.getByRole("button", { name: "关闭支持包预览" }).click();
   await page.screenshot({ path: testInfo.outputPath("workbench-320.png"), fullPage: true });
   await page.getByRole("button", { name: "关闭设置" }).click();
 
@@ -64,6 +71,14 @@ test("keeps long dialogs bounded in a short desktop window", async ({ page }, te
   const dialog = page.getByRole("dialog", { name: "批量生成报告" });
   await assertDialogInsideViewport(page, dialog, "关闭批量生成");
   await expect.poll(() => dialog.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+  await page.getByRole("button", { name: "关闭批量生成" }).click();
+  await page.getByRole("button", { name: "打开设置" }).click();
+  await page.getByRole("button", { name: "诊断" }).click();
+  await page.getByRole("button", { name: "准备支持包" }).click();
+  const supportDialog = page.getByRole("dialog", { name: "检查支持包内容" });
+  await assertDialogInsideViewport(page, supportDialog, "关闭支持包预览");
+  await expect.poll(() => supportDialog.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+  await assertNoHorizontalOverflow(page, [".support-bundle-dialog", ".support-bundle-entry-panel"]);
   await page.screenshot({ path: testInfo.outputPath("workbench-short-height.png") });
 });
 

@@ -38,7 +38,7 @@ pub struct WorkspaceHealthOptions {
     pub disabled_repos: Vec<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WorkspaceRootStatus {
     Healthy,
@@ -47,7 +47,7 @@ pub enum WorkspaceRootStatus {
     NotDirectory,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WorkspaceRepoStatus {
     Healthy,
@@ -58,7 +58,7 @@ pub enum WorkspaceRepoStatus {
     BranchChanged,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceRootHealth {
     pub path: String,
@@ -66,7 +66,7 @@ pub struct WorkspaceRootHealth {
     pub detail: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceRepoHealth {
     pub path: String,
@@ -78,7 +78,7 @@ pub struct WorkspaceRepoHealth {
     pub disabled: bool,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceHealthResult {
     pub roots: Vec<WorkspaceRootHealth>,
@@ -336,7 +336,7 @@ pub struct DiagnosticOptions {
     pub indexed_repos: Vec<RepoInfo>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum DiagnosticSeverity {
     Ok,
@@ -344,7 +344,7 @@ pub enum DiagnosticSeverity {
     Error,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DiagnosticItem {
     pub id: String,
@@ -354,13 +354,77 @@ pub struct DiagnosticItem {
     pub action: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DiagnosticResult {
     pub items: Vec<DiagnosticItem>,
     pub ok_count: usize,
     pub warning_count: usize,
     pub error_count: usize,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SupportBundleEventInput {
+    pub occurred_at: String,
+    pub level: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SupportBundlePrivacyContext {
+    #[serde(default)]
+    pub author: String,
+    #[serde(default)]
+    pub output_dir: String,
+    #[serde(default)]
+    pub ai_base_url: String,
+    #[serde(default)]
+    pub proxy_url: String,
+    #[serde(default)]
+    pub proxy_username: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SupportBundleOptions {
+    pub diagnostics: Option<DiagnosticResult>,
+    #[serde(default)]
+    pub diagnostic_error: String,
+    pub workspace: WorkspaceHealthOptions,
+    #[serde(default)]
+    pub recent_events: Vec<SupportBundleEventInput>,
+    #[serde(default)]
+    pub privacy: SupportBundlePrivacyContext,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SupportBundleEntryPreview {
+    pub name: String,
+    pub description: String,
+    pub content: String,
+    pub bytes: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SupportBundlePreview {
+    pub schema_version: u32,
+    pub generated_at: String,
+    pub suggested_file_name: String,
+    pub entries: Vec<SupportBundleEntryPreview>,
+    pub excluded_data: Vec<String>,
+    pub issue_title: String,
+    pub issue_body: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SupportBundleExportResult {
+    pub output_file: String,
+    pub bytes: usize,
 }
 
 #[derive(Debug, Clone, Deserialize)]

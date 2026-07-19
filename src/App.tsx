@@ -13,6 +13,7 @@ import { Workbench } from "./components/Workbench";
 import type { ConfigProfileSettings } from "./configProfile";
 import { useAppRuntime } from "./hooks/useAppRuntime";
 import { useReportHistoryStorage } from "./hooks/useReportHistoryStorage";
+import { useSupportEvents } from "./hooks/useSupportEvents";
 import { useWorkspaceHealth } from "./hooks/useWorkspaceHealth";
 import {
   taskIsActive,
@@ -80,6 +81,7 @@ import "./styles/layout.css";
 import "./styles/components.css";
 import "./styles/preview.css";
 import "./styles/dialogs.css";
+import "./styles/support-bundle.css";
 import "./styles/onboarding.css";
 import "./styles/theme.css";
 
@@ -140,6 +142,7 @@ function App() {
         : "就绪",
   );
   const [appMessage, setAppMessage] = useState<AppMessage | null>(null);
+  const supportEvents = useSupportEvents();
   const workspaceHealth = useWorkspaceHealth({
     rootDirs: settings.rootDirs,
     indexedRepos: repos,
@@ -186,6 +189,7 @@ function App() {
   const dismissAppMessage = useCallback(() => setAppMessage(null), []);
 
   function showMessage(message: string, tone: AppMessageTone = inferMessageTone(message), duration?: number) {
+    supportEvents.record(message, tone);
     setAppMessage({
       id: Date.now(),
       message,
@@ -1239,6 +1243,7 @@ function handleBlankDayGenerated(payload: {
         open={settingsOpen}
         settings={settings}
         repos={repos}
+        recentEvents={supportEvents.events}
         currentVersion={appVersion}
         updateSummary={updateSummary}
         updateMessage={updateMessage}
