@@ -7,10 +7,15 @@ const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const files = {
   app: readSource("src/App.tsx"),
   settings: readSource("src/components/SettingsDialog.tsx"),
+  settingsTabs: readSource("src/components/SettingsTabNav.tsx"),
   diagnosticsSection: readSource("src/components/DiagnosticsSection.tsx"),
   diagnosticsHook: readSource("src/hooks/useDiagnosticsPanel.ts"),
   workbench: readSource("src/components/Workbench.tsx"),
+  reportCanvas: readSource("src/components/ReportCanvas.tsx"),
+  reportWorkflow: readSource("src/hooks/useReportWorkflow.ts"),
   model: readSource("src/model.ts"),
+  modelTypes: readSource("src/model/types.ts"),
+  reportOptions: readSource("src/model/report-options.ts"),
   diagnostics: readSource("src-tauri/src/diagnostics.rs"),
   networkDiagnostics: readSource("src-tauri/src/diagnostics/network_checks.rs"),
 };
@@ -19,8 +24,8 @@ const checks = [
   {
     name: "settings diagnostics tab is reachable",
     run: () => {
-      matches(files.settings, /type SettingsTab = [^;]*"diagnostics"[^;]*;/);
-      includes(files.settings, '{ id: "diagnostics", label: "诊断"');
+      matches(files.settingsTabs, /type SettingsTab = [^;]*"diagnostics"[^;]*;/);
+      includes(files.settingsTabs, '{ id: "diagnostics", label: "诊断"');
       includes(files.settings, 'activeTab === "diagnostics"');
     },
   },
@@ -32,7 +37,7 @@ const checks = [
       includes(files.diagnosticsHook, "rootDirs: settings.rootDirs");
       includes(files.diagnosticsHook, "indexedRepos: repos");
       includes(files.diagnosticsHook, "proxy: buildProxyConfig(settings)");
-      includes(files.model, "export type DiagnosticResult");
+      includes(files.modelTypes, "export type DiagnosticResult");
     },
   },
   {
@@ -58,35 +63,34 @@ const checks = [
   {
     name: "export menu exposes markdown docx and pdf formats",
     run: () => {
-      includes(files.workbench, 'handleExport("markdown")');
-      includes(files.workbench, 'handleExport("docx")');
-      includes(files.workbench, 'handleExport("pdf")');
-      includes(files.workbench, 'aria-label="导出格式"');
+      includes(files.reportCanvas, '["markdown", "docx", "pdf"] as ReportExportFormat[]');
+      includes(files.reportCanvas, "onClick={() => onExport(format)}");
+      includes(files.reportCanvas, 'aria-label="导出格式"');
     },
   },
   {
     name: "export action reaches save_report_file command",
     run: () => {
-      includes(files.app, 'invoke<string>("save_report_file"');
-      includes(files.app, "baseName,");
-      includes(files.app, "format,");
-      includes(files.app, "content: previewText");
-      includes(files.app, "formatReportExportLabel");
+      includes(files.reportWorkflow, 'invoke<string>("save_report_file"');
+      includes(files.reportWorkflow, "baseName,");
+      includes(files.reportWorkflow, "format,");
+      includes(files.reportWorkflow, "content: previewText");
+      includes(files.reportWorkflow, "formatReportExportLabel");
     },
   },
   {
     name: "blank day fill stays concrete and follows commit item prefix mode",
     run: () => {
-      includes(files.model, "export function buildCommitItemPrefix");
-      includes(files.model, "export function buildBlankDayEvidenceText");
-      includes(files.model, "resolveCommitMappedProjectName");
-      includes(files.model, "项目前缀");
-      includes(files.model, "具体锚点");
-      includes(files.model, "功能延伸");
-      includes(files.model, "缺陷或回归");
-      includes(files.model, "测试补强");
-      includes(files.model, "不得只写");
-      excludes(files.model, "偏「跟进 / 排查 / 推进 / 整理」");
+      includes(files.reportOptions, "export function buildCommitItemPrefix");
+      includes(files.reportOptions, "export function buildBlankDayEvidenceText");
+      includes(files.reportOptions, "resolveCommitMappedProjectName");
+      includes(files.reportOptions, "项目前缀");
+      includes(files.reportOptions, "具体锚点");
+      includes(files.reportOptions, "功能延伸");
+      includes(files.reportOptions, "缺陷或回归");
+      includes(files.reportOptions, "测试补强");
+      includes(files.reportOptions, "不得只写");
+      excludes(files.reportOptions, "偏「跟进 / 排查 / 推进 / 整理」");
       const blankDay = readSource("src/components/BlankDayFillDialog.tsx");
       includes(blankDay, "settings.commitItemPrefixMode");
       includes(blankDay, "buildBlankDayEvidenceText");
