@@ -25,12 +25,12 @@
 
 ## Acceptance Criteria
 
-- [ ] AC1：Rust 测试注入 Windows/Unix 路径、仓库名、分支、作者、邮箱、API Key、Bearer token 和代理密码后，三个文件与 Issue 摘要均不包含原值。
-- [ ] AC2：Rust 测试覆盖 schema、固定 ZIP 条目、健康/诊断计数、事件数量/长度上限、输出扩展名、写入失败和完全离线生成。
-- [ ] AC3：用户能在诊断页打开支持包预览，逐项查看脱敏内容；未勾选确认时导出不可用，关闭后焦点回到触发按钮。
-- [ ] AC4：用户确认后可通过系统保存对话框导出 `.zip`；取消不报错，失败显示中文提示，成功显示保存结果。
-- [ ] AC5：复制内容和 GitHub Issue URL 只包含安全摘要；E2E 断言链接不含本机路径、日志详情或附件参数。
-- [ ] AC6：支持包弹层通过键盘焦点、Escape、axe 严重/致命问题和窄屏/小高度检查；现有 build、E2E、Rust 测试、真实 Tauri smoke 与 `git diff --check` 保持通过。
+- [x] AC1：Rust 测试注入 Windows/Unix 路径、仓库名、分支、作者、邮箱、API Key、Bearer token 和代理密码后，三个文件与 Issue 摘要均不包含原值。
+- [x] AC2：Rust 测试覆盖 schema、固定 ZIP 条目、健康/诊断计数、事件数量/长度上限、输出扩展名、写入失败和完全离线生成。
+- [x] AC3：用户能在诊断页打开支持包预览，逐项查看脱敏内容；未勾选确认时导出不可用，关闭后焦点回到触发按钮。
+- [x] AC4：用户确认后可通过系统保存对话框导出 `.zip`；取消不报错，失败显示中文提示，成功显示保存结果。
+- [x] AC5：复制内容和 GitHub Issue URL 只包含安全摘要；E2E 断言链接不含本机路径、日志详情或附件参数。
+- [x] AC6：支持包弹层通过键盘焦点、Escape、axe 严重/致命问题和窄屏/小高度检查；现有 build、E2E、Rust 测试、真实 Tauri smoke 与 `git diff --check` 保持通过。
 
 ## Out Of Scope
 

@@ -8,8 +8,8 @@
 6. [x] 扩展 Tauri Playwright mock 与 E2E，覆盖预览确认、保存/取消/失败、剪贴板、Issue URL 无敏感值和离线行为。
 7. [x] 补弹层焦点/Escape/axe 断言与 320px、小高度响应式检查，验证 light/dark 内容不溢出。
 8. [x] 新增支持包 code-spec 并更新 Rust/frontend 索引，记录强制脱敏与禁止自动上传契约。
-9. [ ] 运行定向测试、全量 Rust/build/E2E、三个现有 benchmark profile、真实 WebView CI 与 `git diff --check`。
-10. [ ] 勾选 AC，记录功能提交与 exact-SHA CI，归档任务、journal、push 并更新父路线到 5/8。
+9. [x] 运行定向测试、全量 Rust/build/E2E、三个现有 benchmark profile、真实 WebView CI 与 `git diff --check`。
+10. [x] 勾选 AC，记录功能提交与 exact-SHA CI，归档任务、journal、push 并更新父路线到 5/8。
 
 ## Validation Commands
 
