@@ -1,0 +1,99 @@
+name: 产品反馈
+description: 提交结构化、可脱敏的报告工作流与产品方向反馈。
+title: "[Product feedback] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。请只填写脱敏信息，不要粘贴提交全文、报告全文、工作区路径、凭据、API Key 或未审查的日志。
+        如需排查已知问题，请先在 GitPulse 设置 -> 诊断中预览支持包；只粘贴其中的 Safe Issue Summary，不要自动附加 ZIP。
+  - type: dropdown
+    id: user_role
+    attributes:
+      label: 你的使用角色
+      options:
+        - 个人开发者
+        - 团队负责人或管理者
+        - 企业交付人员
+        - 其他
+    validations:
+      required: true
+  - type: dropdown
+    id: candidate_direction
+    attributes:
+      label: 这条反馈最接近哪个方向
+      options:
+        - 定时自动生成
+        - 企业交付集成
+        - 团队配置协作
+        - 批量或历史补报
+        - 其他
+    validations:
+      required: true
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: 这个问题多久发生一次
+      options:
+        - 每天
+        - 每周
+        - 每月
+        - 偶发
+        - 只遇到过一次
+    validations:
+      required: true
+  - type: dropdown
+    id: impact
+    attributes:
+      label: 对你的影响
+      options:
+        - 阻塞交付
+        - 高：需要反复绕过
+        - 中：明显增加操作成本
+        - 低：希望优化但可接受
+    validations:
+      required: true
+  - type: input
+    id: version_platform
+    attributes:
+      label: GitPulse 版本与操作系统
+      placeholder: "例如：v0.5.3 / Windows 11"
+    validations:
+      required: true
+  - type: textarea
+    id: current_workflow
+    attributes:
+      label: 当前工作流与替代方案
+      description: 请描述从准备数据到提交/归档报告的关键步骤，以及目前用什么人工步骤或脚本绕过。
+      placeholder: "我现在会先……然后……最后……"
+    validations:
+      required: true
+  - type: textarea
+    id: desired_outcome
+    attributes:
+      label: 期望结果
+      description: 请描述完成后你希望减少哪一步判断或重复操作。
+    validations:
+      required: true
+  - type: textarea
+    id: safe_example
+    attributes:
+      label: 可选的脱敏样例或支持摘要
+      description: 只粘贴虚构/脱敏的输入输出、错误摘要或 Safe Issue Summary；不要上传完整支持包或任何本地文件。
+  - type: dropdown
+    id: trial_willingness
+    attributes:
+      label: 是否愿意提供样例或参加试用
+      options:
+        - 可以提供脱敏样例
+        - 可以参加一次试用
+        - 先反馈，不方便参与
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy_confirmation
+    attributes:
+      label: 隐私确认
+      options:
+        - label: 我确认没有提交凭据、API Key、私人路径、原始提交内容、完整报告或未审查日志。
+          required: true

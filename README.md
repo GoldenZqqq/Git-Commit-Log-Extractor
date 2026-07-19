@@ -166,7 +166,7 @@ cd src-tauri && cargo check && cargo test
 
 ## 🤝 贡献
 
-欢迎 Issue 与 PR！开发规范、验证步骤与发布流程请见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+欢迎 Issue 与 PR！可通过[产品反馈表](https://github.com/GoldenZqqq/GitPulse/issues/new?template=product-feedback.yml)提交脱敏的使用场景；当前方向与进入实现门槛见[产品验证计划](docs/product-validation-plan.md)。开发规范、验证步骤与发布流程请见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## 📄 许可证
 

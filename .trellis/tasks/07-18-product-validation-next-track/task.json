@@ -3,7 +3,7 @@
   "name": "product-validation-next-track",
   "title": "建立用户验证并选择下一产品主线",
   "description": "建立无默认遥测的验证闭环，并基于证据选择一个下一阶段产品方向",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,
