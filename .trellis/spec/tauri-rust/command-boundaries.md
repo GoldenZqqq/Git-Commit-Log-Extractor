@@ -653,3 +653,10 @@ export const DEFAULT_BLANK_DAY_USER_PROMPT: string;
 ```text
 每条必须从历史线索提取具体锚点，并写明功能延伸、缺陷/回归修复、边界兼容或测试补强等代码级动作；不得只写过程性表态。
 ```
+
+## Rust Facade And Split-Module Convention
+
+- `src-tauri/src/report.rs` and `src-tauri/src/git_ops.rs` are stable facades. Existing callers must continue using `crate::report::*` / `crate::git_ops::*`; only the facade re-exports public symbols.
+- Report responsibilities live in `report/date_range.rs`, `report/export.rs`, `report/batch_naming.rs`, `report/render_api.rs`, `report/render_core.rs`, `report/commit_items.rs`, `report/evidence.rs` and `report/period_content.rs`. Git responsibilities live in `git_ops/scan.rs`, `git_ops/commits.rs` and `git_ops/command.rs`.
+- The render namespace is split with item fragments so private helpers remain private; do not move a helper across fragments without checking visibility and report golden tests.
+- Module moves must preserve Git argument order, `CREATE_NO_WINDOW` on Windows, scan cancellation/warning bounds, report templates, export errors and batch naming.

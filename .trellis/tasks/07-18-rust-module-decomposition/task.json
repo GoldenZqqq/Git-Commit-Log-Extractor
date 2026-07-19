@@ -3,7 +3,7 @@
   "name": "rust-module-decomposition",
   "title": "拆分 Rust 超大模块",
   "description": "拆分 report 与 git_ops，保持命令 API、输出和性能行为",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,
