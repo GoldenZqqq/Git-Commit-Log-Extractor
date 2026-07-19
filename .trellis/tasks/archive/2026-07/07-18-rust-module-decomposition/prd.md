@@ -23,7 +23,7 @@
 ## Acceptance Criteria
 
 - [x] AC1：`report.rs`、`git_ops.rs` 及新增核心模块均不超过 600 行；最大核心文件为 `report/render_core.rs` 546 行，最大测试文件为 `git_ops/tests.rs` 532 行。
-- [ ] AC2：Rust fmt/check/test、CLI smoke、前端 build/E2E 与真实 Tauri smoke 通过。
+- [x] AC2：Rust fmt/check/test、CLI smoke、前端 build/E2E 与真实 Tauri smoke 通过。exact-SHA `b9866ab5bbd6c6f27041d7d3c657d146228d2ae4` 的 GitHub Actions run `29691242678` 已通过 Linux/Windows Desktop checks、Windows WebView smoke 与 Release governance。
 - [x] AC3：关键报告 golden/snapshot 与 Git fixture 输出保持一致；Rust lib `138/138`、benchmark binary `11/11` 与 release smoke benchmark 均通过。
 
 ## Technical Notes

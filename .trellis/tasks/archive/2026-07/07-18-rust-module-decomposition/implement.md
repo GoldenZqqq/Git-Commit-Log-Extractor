@@ -8,8 +8,8 @@
 - [x] 拆分 report 的提取结果、模板核心、提交条目、证据和周期内容模块，收窄内部可见性。
 - [x] 将原模块测试迁到独立测试模块，确认生产模块与新增核心文件均不超过 600 行。
 - [x] 审查 command/API、serde、用户文案、报告快照、Git args、Windows flags、扫描取消/循环保护和依赖方向。
-- [ ] 运行 Rust fmt/check/test、benchmark smoke、frontend build/E2E、真实 Windows Tauri smoke 与 `git diff --check`。本地 Rust/CLI/benchmark、frontend build/E2E、frontend smoke、release governance 与 diff check 已通过；真实 Windows Tauri smoke 待 exact-SHA CI。
-- [ ] 提交、push 并等待 exact-SHA CI；失败只修复本任务引入的问题并重新取证。
+- [x] 运行 Rust fmt/check/test、benchmark smoke、frontend build/E2E、真实 Windows Tauri smoke 与 `git diff --check`。本地 Rust fmt/check/lib test `138/138`、benchmark `11/11`、CLI smoke、release benchmark `passed: true`、frontend build、Playwright `77/77`、frontend smoke `7/7`、release governance `12/12` 与 diff check 已通过；exact-SHA CI 补齐 Windows WebView 证据。
+- [x] 提交、push 并等待 exact-SHA CI；提交为 `b9866ab5bbd6c6f27041d7d3c657d146228d2ae4`，已 push，GitHub Actions run `29691242678` 全绿。
 - [ ] 勾选 AC、更新 Rust spec、记录 journal、归档任务并将父路线推进至 7/8。
 
 ## Validation Commands
