@@ -33,3 +33,7 @@
 - GitHub Actions 的 `actions/checkout@v4` / `actions/setup-node@v4` 仍有 Node 20 runtime 弃用提示，这是非阻断依赖治理事项。
 - `commit_pipeline.rs`、`models.rs`、`reportFormat.ts` 等非本轮拆分目标仍超过 600 行；后续重构必须单独规划、先补回归保护并保持公共 contract。
 - 产品反馈样本仍少，GitHub clone、页面流量和 Release 下载只能作为代理指标，不能解释为桌面活跃或留存。
+
+## Integration Fix
+
+父审计提交 `cbd80d9f` 的 CI `29693416614` 在 Linux 短窗口响应式用例中稳定复现支持包弹层底部溢出；Windows Desktop/WebView 和其他 job 通过。截图显示 480px 高窗口中的导出按钮被裁切。整合修复将短窗口弹层设为可收缩 grid item，并用 `100dvh` 明确可用高度；现有 `responsive-hardening.spec.ts` 负责回归保护。

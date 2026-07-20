@@ -35,6 +35,7 @@ DELETE /session/{id}
 - Windows requires `tauri-driver` and an `msedgedriver` matching the installed **WebView2 Runtime** on `PATH`. Do not derive the driver version from the desktop Edge browser: the browser and `EdgeWebView` runtime can be on different release lines. Non-Windows execution prints an explicit skip and exits successfully.
 - A passing smoke proves the `工作报告工作台` heading and an object response from `window.__TAURI_INTERNALS__.invoke("get_git_identity")`.
 - Failure output contains `summary.json`, `app.log`, driver stdout/stderr, and `failure.png` when a session exists.
+- A dialog that is a grid or flex item must set `min-height: 0` before relying on `height`, `max-height`, or `overflow-y`. Short-window bounds use `100dvh`; `overflow-y: auto` alone does not override an automatic min-content size.
 
 ### 4. Validation & Error Matrix
 
@@ -46,12 +47,14 @@ DELETE /session/{id}
 | Workbench never appears | Fail after the bounded timeout and capture a screenshot. |
 | `get_git_identity` rejects or returns a non-object | Fail the smoke and record the IPC error. |
 | Session cleanup fails | Keep the original result, record cleanup failure in `app.log`, and stop the driver. |
+| Short-window dialog bottom exceeds the viewport | Fail the responsive test, preserve screenshot/trace, and fix the dialog's shrink/scroll contract rather than loosening the assertion. |
 
 ### 5. Good / Base / Bad Cases
 
 - Good: a fresh Windows profile opens onboarding, skips it, renders the workbench, completes local IPC, and cleans up all processes.
 - Base: an existing profile opens directly to the workbench and completes the same IPC check.
 - Bad: browser-only Playwright passes while the Tauri binary cannot start or the Rust command is not registered; the Windows smoke must fail.
+- Bad: a grid dialog has `max-height` and `overflow-y: auto` but keeps the default automatic minimum height, allowing min-content to push its border box below a short viewport.
 
 ### 6. Tests Required
 
@@ -80,3 +83,21 @@ DELETE /session/{id}
 ```
 
 The real WebView step remains Windows-only; Linux/macOS do not claim equivalent coverage without a stable platform driver.
+
+For a short-window grid dialog, keep the border box shrinkable:
+
+```css
+/* Wrong: min-content can still win over the intended scroll container. */
+.dialog {
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+}
+
+/* Correct: dynamic viewport bounds and an explicit shrink contract. */
+.dialog {
+  min-height: 0;
+  height: min(560px, calc(100dvh - 64px));
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
+}
+```
