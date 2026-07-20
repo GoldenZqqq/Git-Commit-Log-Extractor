@@ -26,7 +26,7 @@
 - **AC4**：升级恢复、32 MiB 历史边界、三个 synthetic benchmark profile、Support Bundle 脱敏矩阵和真实 Windows WebView smoke 均有测试/规格证据。
 - **AC5**：拆分目标当前行数为 `App.tsx` 600、`Workbench.tsx` 191、`SettingsDialog.tsx` 303、`model.ts` 9、`report.rs` 20、`git_ops.rs` 21；新增 report/git_ops 核心文件最大 546 行。`commit_pipeline.rs` 等其他超限模块在 Rust 子任务中明确列为非目标，后续必须独立治理，不能借此扩大已完成任务范围。
 - **AC6**：`docs/product-validation-plan.md` 记录三条候选方向、反证、非目标、评分和 `7/10` 门槛；当前决策为继续验证，至少收集 5 份结构化反馈后复评。
-- **AC7**：本地 build、串行 E2E `77/77`、Release governance `12/12`、YAML/链接和 diff check 已通过；功能提交 `f058b31f` 的 CI `29692623445` 已通过 Linux/Windows frontend、Rust、diff check 和真实 Windows WebView smoke。父任务审计提交仍需通过自己的 exact-SHA CI 后完成本项。
+- **AC7**：本地 build、串行 E2E `77/77`、Release governance `12/12`、YAML/链接和 diff check 已通过；功能提交 `f058b31f` 的 CI `29692623445` 已通过 Linux/Windows frontend、Rust、diff check 和真实 Windows WebView smoke。整合修复提交 `1447ea2c` 的 CI `29755711339` 进一步通过 Linux/Windows Desktop checks、Rust fmt/check/test、全量 E2E、diff check 和 Windows WebView smoke。
 
 ## Remaining Risks
 
@@ -36,4 +36,4 @@
 
 ## Integration Fix
 
-父审计提交 `cbd80d9f` 的 CI `29693416614` 在 Linux 短窗口响应式用例中稳定复现支持包弹层底部溢出；Windows Desktop/WebView 和其他 job 通过。截图显示 480px 高窗口中的导出按钮被裁切。整合修复将短窗口弹层设为可收缩 grid item，并用 `100dvh` 明确可用高度；现有 `responsive-hardening.spec.ts` 负责回归保护。
+父审计提交 `cbd80d9f` 的 CI `29693416614` 在 Linux 短窗口响应式用例中稳定复现支持包弹层底部溢出；Windows Desktop/WebView 和其他 job 通过。截图显示 480px 高窗口中的导出按钮被裁切。整合修复提交 `1447ea2c` 将短窗口弹层设为可收缩 grid item，并用 `100dvh` 明确可用高度；CI `29755711339` 已全绿，现有 `responsive-hardening.spec.ts` 负责回归保护。

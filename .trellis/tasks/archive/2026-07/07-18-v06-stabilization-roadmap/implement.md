@@ -5,7 +5,7 @@
 - [x] 串行执行 8 个子任务，任一时刻只激活一个实现任务。
 - [x] 每个子任务通过 `trellis-check` 后归档，形成独立提交并 push。
 - [x] 每个任务完成后更新父任务进度和下一任务依赖判断。
-- [ ] 路线完成前执行跨任务集成验证与完成审计。
+- [x] 路线完成前执行跨任务集成验证与完成审计。
 
 ## Dependency Notes
 
@@ -20,4 +20,4 @@
 - [x] 逐个验证 8 个功能提交均为 `origin/main` 祖先，且对应 exact-SHA CI run 为 `success`。
 - [x] 复核 v0.5.3 主线祖先、发布治理、升级恢复、性能基准、支持包隐私、模块边界和产品暂缓决策。
 - [x] 本地 `npm run build`、串行 Playwright `77/77`、Release governance `12/12` 和 `git diff --check` 通过。
-- [ ] 父任务审计提交通过 exact-SHA CI 后勾选 AC7、归档并 push。
+- [x] 父任务审计修复提交 `1447ea2ccf0b983daa7d346730d59c8992f30b4a` 的 exact-SHA CI run `29755711339` 全绿；已勾选 AC7，待归档并 push。

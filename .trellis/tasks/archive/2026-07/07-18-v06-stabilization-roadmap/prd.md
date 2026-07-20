@@ -31,11 +31,11 @@
 - [x] AC4：升级、规模、支持与桌面质量门禁覆盖关键失败路径。
 - [x] AC5：前端与 Rust 超大模块完成边界拆分，范围内核心源码文件满足项目 600 行上限；其他超限模块仍按子任务明确的非目标单独治理。
 - [x] AC6：下一产品主线有证据、范围、非目标和进入实现的明确门槛；当前结论为继续验证。
-- [ ] AC7：最终全量构建、E2E、Rust 测试、Tauri smoke 和 `git diff --check` 通过，工作区与远端同步。
+- [x] AC7：最终全量构建、E2E、Rust 测试、Tauri smoke 和 `git diff --check` 通过，工作区与远端同步。
 
 ## Final Audit
 
-完整的子任务提交/CI 映射、范围内行数、质量门禁和剩余风险见 `final-audit.md`。AC7 在父任务审计提交通过 exact-SHA CI 并同步远端后勾选。
+完整的子任务提交/CI 映射、范围内行数、质量门禁和剩余风险见 `final-audit.md`；父审计修复提交 `1447ea2ccf0b983daa7d346730d59c8992f30b4a` 的 exact-SHA CI `29755711339` 已全绿。
 
 ## Out of Scope
 
