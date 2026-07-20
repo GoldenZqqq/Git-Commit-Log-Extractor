@@ -278,3 +278,38 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 9: 完成 v0.6 稳定化路线与产品验证收口
+
+**Date**: 2026-07-20
+**Task**: 完成 v0.6 稳定化路线与产品验证收口
+**Branch**: `main`
+
+### Summary
+
+完成产品验证闭环与结构化反馈入口，基于公开证据暂缓三条候选主线并设定 7/10、5 份反馈的复评门槛；完成父路线 8/8 审计。修复 Linux 短窗口支持包弹层的 grid 自动最小高度与 100vh 边界问题，补齐响应式规范、复盘和 exact-SHA CI 证据。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f058b31` | (see git log) |
+| `cbd80d9` | (see git log) |
+| `1447ea2` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

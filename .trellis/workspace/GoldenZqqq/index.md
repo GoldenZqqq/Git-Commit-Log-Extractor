@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 8
-- **Last Active**: 2026-07-19
+- **Total Sessions**: 9
+- **Last Active**: 2026-07-20
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~280 | Active |
+| `journal-1.md` | ~315 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 9 | 2026-07-20 | 完成 v0.6 稳定化路线与产品验证收口 | `f058b31`, `cbd80d9`, `1447ea2` | `main` |
 | 8 | 2026-07-19 | 拆分 Rust 超大模块 | `b9866ab` | `main` |
 | 7 | 2026-07-19 | 拆分前端超大模块 | `b5d0a75`, `c6a74ee` | `main` |
 | 6 | 2026-07-19 | 交付隐私安全支持诊断包 | `f82d0e2`, `1b15d6b` | `main` |
