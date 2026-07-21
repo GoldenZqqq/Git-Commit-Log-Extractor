@@ -351,3 +351,38 @@
 
 - 补齐 v0.6.0 CHANGELOG / Release Notes，执行真实 v0.5.3 -> v0.6.0 安装升级冒烟。
 - 推送 `main` 并等待 exact-SHA CI 后，使用 minor release dry-run 和正式发布流程。
+
+
+## Session 11: 发布 GitPulse v0.6.0
+
+**Date**: 2026-07-21
+**Task**: 发布 GitPulse v0.6.0
+**Branch**: `main`
+
+### Summary
+
+完成 v0.6.0 发布准备、版本提交、exact-SHA CI、Windows 签名发布和远端资产校验；Linux AppImage 已上传，记录 macOS universal bundle benchmark binary 失败作为后续风险。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9cde36c` | (see git log) |
+| `e951545` | (see git log) |
+| `d5c4274` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
