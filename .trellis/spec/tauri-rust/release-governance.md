@@ -87,13 +87,15 @@ clean latest main -> version commit/push -> exact-SHA CI success -> build
 
 No normal new-release path moves an existing tag or publishes a partially uploaded draft.
 
-## Common Mistake: Desktop Bundle Discovers Benchmark Binaries
+## Developer Binary Bundle Isolation
 
 **Symptom**: The macOS universal release build compiles the main app but fails while bundling because it tries to copy `gitpulse-workspace-benchmark` from the universal target directory, where that auxiliary binary was not built.
 
 **Cause**: Cargo auto-discovers `src-tauri/src/bin/*` targets. Tauri's bundle step can treat those targets as desktop binaries even when they are only release-engineering tools; cross-target universal builds do not necessarily produce each auxiliary binary.
 
-**Prevention**: Before the next tagged release, isolate benchmark tooling from the desktop bundle (for example with an explicit opt-in Cargo feature/target or a separate workspace package), update benchmark commands/tests accordingly, and verify the macOS job produces at least one `.app.zip` or `.dmg` before declaring the cross-platform release complete.
+**Contract**: Every developer-only Cargo binary must use an explicit opt-in feature through `required-features` and keep its entry file plus support modules outside Cargo's auto-discovered `src/bin` directory. `gitpulse-workspace-benchmark` uses `workspace-benchmark` with `src/workspace_benchmark_cli.rs` and `src/workspace_benchmark/`; default `tauri build` must therefore see only production desktop binaries. CI and `verify:release` must separately run the feature-gated benchmark tests so bundle isolation cannot reduce test coverage silently.
+
+**Release rule**: A fix made after a tag is published must not be backfilled into that immutable tag. Publish a new patch version and require its macOS job to upload at least one `.app.zip` or `.dmg` before declaring cross-platform packaging complete.
 
 **Validation**:
 

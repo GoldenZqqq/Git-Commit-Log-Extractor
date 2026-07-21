@@ -24,9 +24,10 @@ cd src-tauri
 cargo fmt -- --check
 cargo check
 cargo test
+cargo test --features workspace-benchmark --bin gitpulse-workspace-benchmark
 ```
 
-GitHub Actions 在每个 `pull_request` 和 `main` 推送上运行 frontend smoke、browser mocked Playwright、a11y/响应式专项、生产构建、Rust `fmt/check/test` 与 `git diff --check`。Windows 还会运行真实 Tauri WebView smoke；Linux 不伪装桌面 WebView，只执行 browser mocked + Rust 门禁。macOS 安装包由 release workflow 在 tag 发布后构建，不参与当前 CI smoke。
+GitHub Actions 在每个 `pull_request` 和 `main` 推送上运行 frontend smoke、browser mocked Playwright、a11y/响应式专项、生产构建、Rust `fmt/check/test`、workspace benchmark 专项测试与 `git diff --check`。Windows 还会运行真实 Tauri WebView smoke；Linux 不伪装桌面 WebView，只执行 browser mocked + Rust 门禁。macOS 安装包由 release workflow 在 tag 发布后构建，不参与当前 CI smoke。
 
 ### Windows Tauri WebView smoke
 

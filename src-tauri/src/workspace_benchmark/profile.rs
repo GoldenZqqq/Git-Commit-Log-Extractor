@@ -135,7 +135,7 @@ pub fn print_help() {
         "\
 GitPulse large workspace benchmark
 
-用法：cargo run --release --bin gitpulse-workspace-benchmark -- [OPTIONS]
+用法：cargo run --release --features workspace-benchmark --bin gitpulse-workspace-benchmark -- [OPTIONS]
 
 OPTIONS:
   --profile <NAME>       smoke | standard | large（默认 smoke）

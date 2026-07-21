@@ -48,8 +48,14 @@ keyring = { version = "3.6.3", default-features = false, features = ["linux-nati
 
 [features]
 cli = []
+workspace-benchmark = []
 
 [[bin]]
 name = "gitpulse-cli"
 path = "src/cli.rs"
 required-features = ["cli"]
+
+[[bin]]
+name = "gitpulse-workspace-benchmark"
+path = "src/workspace_benchmark_cli.rs"
+required-features = ["workspace-benchmark"]

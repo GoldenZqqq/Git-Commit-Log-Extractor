@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   assertSuccessfulCiRun,
@@ -16,6 +17,9 @@ import {
 } from "../../scripts/github-release.mjs";
 
 const tempDirs = [];
+const rootDir = path.dirname(
+  path.dirname(path.dirname(fileURLToPath(import.meta.url))),
+);
 
 test.afterEach(() => {
   while (tempDirs.length > 0) {
@@ -210,6 +214,41 @@ test("finds and cleans the draft when the create response is lost", async () => 
   assert.equal(calls.some((call) => call.kind === "find-draft"), true);
   assert.equal(calls.some((call) => call.kind === "delete-draft"), true);
   assert.equal(calls.at(-1).kind, "delete-tag");
+});
+
+test("keeps the workspace benchmark out of default bundles without losing tests", () => {
+  const metadata = JSON.parse(execFileSync(
+    "cargo",
+    ["metadata", "--format-version", "1", "--no-deps"],
+    { cwd: path.join(rootDir, "src-tauri"), encoding: "utf8" },
+  ));
+  const packageTargets = metadata.packages
+    .find((item) => item.name === "gitpulse")?.targets || [];
+  const benchmark = packageTargets
+    .find((target) => target.name === "gitpulse-workspace-benchmark");
+
+  assert.deepEqual(benchmark?.["required-features"], ["workspace-benchmark"]);
+  assert.equal(
+    path.relative(path.join(rootDir, "src-tauri"), benchmark?.src_path),
+    path.join("src", "workspace_benchmark_cli.rs"),
+  );
+  assert.equal(
+    fs.existsSync(path.join(rootDir, "src-tauri", "src", "bin", "workspace_benchmark")),
+    false,
+  );
+
+  const benchmarkTestCommand = [
+    "cargo test --features workspace-benchmark",
+    "--bin gitpulse-workspace-benchmark",
+  ].join(" ");
+  assert.match(
+    fs.readFileSync(path.join(rootDir, ".github", "workflows", "ci.yml"), "utf8"),
+    new RegExp(benchmarkTestCommand),
+  );
+  assert.match(
+    fs.readFileSync(path.join(rootDir, "scripts", "verify-release.mjs"), "utf8"),
+    /"test",\s*"--features",\s*"workspace-benchmark",\s*"--bin",\s*"gitpulse-workspace-benchmark"/,
+  );
 });
 
 function createRepositoryFixture() {

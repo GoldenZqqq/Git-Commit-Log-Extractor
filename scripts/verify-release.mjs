@@ -23,6 +23,7 @@ Default checks:
   - TypeScript and Vite production build
   - Rust cargo check
   - Rust cargo test
+  - Rust workspace benchmark tests
   - Git whitespace diff check
   - release plan dry-run
 
@@ -39,6 +40,18 @@ const steps = [
   ["前端生产构建", "npm", ["run", "build"], rootDir],
   ["Rust cargo check", "cargo", ["check"], join(rootDir, "src-tauri")],
   ["Rust cargo test", "cargo", ["test"], join(rootDir, "src-tauri")],
+  [
+    "Rust workspace benchmark tests",
+    "cargo",
+    [
+      "test",
+      "--features",
+      "workspace-benchmark",
+      "--bin",
+      "gitpulse-workspace-benchmark",
+    ],
+    join(rootDir, "src-tauri"),
+  ],
   ["Git diff 空白检查", "git", ["diff", "--check"], rootDir],
   ["发布计划 dry-run", "npm", ["run", "release:win", "--", "--dry-run"], rootDir],
 ];

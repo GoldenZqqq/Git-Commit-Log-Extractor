@@ -19,7 +19,7 @@ Canonical invocation:
 
 ```bash
 cd src-tauri
-cargo run --release --bin gitpulse-workspace-benchmark -- \
+cargo run --release --features workspace-benchmark --bin gitpulse-workspace-benchmark -- \
   --profile standard \
   --output ../artifacts/benchmarks/standard.json
 ```
@@ -37,14 +37,18 @@ Supported options:
 
 Ownership:
 
-- `src/bin/gitpulse-workspace-benchmark.rs`: orchestration and result evaluation.
-- `src/bin/workspace_benchmark/profile.rs`: profiles, thresholds, and CLI parsing.
-- `src/bin/workspace_benchmark/fixture.rs`: controlled fixture lifecycle and
+- `src/workspace_benchmark_cli.rs`: feature-gated orchestration and result evaluation.
+- `src/workspace_benchmark/profile.rs`: profiles, thresholds, and CLI parsing.
+- `src/workspace_benchmark/fixture.rs`: controlled fixture lifecycle and
   deterministic `git fast-import` generation.
-- `src/bin/workspace_benchmark/metrics.rs`: duration, nearest-rank percentile,
+- `src/workspace_benchmark/metrics.rs`: duration, nearest-rank percentile,
   and platform RSS collection.
 - Production behavior must be measured through public `git_ops` and
   `commit_pipeline` APIs rather than duplicated benchmark-only logic.
+- The binary is opt-in through the `workspace-benchmark` Cargo feature. Default
+  `tauri build` must not include this developer tool in desktop bundles. Keep
+  its entry file and support modules outside Cargo's auto-discovered `src/bin`
+  directory; use the explicit `[[bin]]` target in `Cargo.toml`.
 
 ## 3. Profiles And Result Contract
 
@@ -144,10 +148,10 @@ Run these checks for benchmark or measured hot-path changes:
 ```bash
 cd src-tauri
 cargo fmt --all -- --check
-cargo test --bin gitpulse-workspace-benchmark
+cargo test --features workspace-benchmark --bin gitpulse-workspace-benchmark
 cargo check
 cargo test
-cargo run --release --bin gitpulse-workspace-benchmark -- \
+cargo run --release --features workspace-benchmark --bin gitpulse-workspace-benchmark -- \
   --profile smoke --output ../artifacts/benchmarks/smoke.json
 ```
 

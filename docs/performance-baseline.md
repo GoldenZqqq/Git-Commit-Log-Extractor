@@ -82,13 +82,13 @@ failed cancellation are correctness failures rather than threshold tolerances.
 
 ```bash
 cd src-tauri
-cargo run --release --bin gitpulse-workspace-benchmark -- \
+cargo run --release --features workspace-benchmark --bin gitpulse-workspace-benchmark -- \
   --profile smoke \
   --output ../artifacts/benchmarks/smoke.json
-cargo run --release --bin gitpulse-workspace-benchmark -- \
+cargo run --release --features workspace-benchmark --bin gitpulse-workspace-benchmark -- \
   --profile standard \
   --output ../artifacts/benchmarks/standard.json
-cargo run --release --bin gitpulse-workspace-benchmark -- \
+cargo run --release --features workspace-benchmark --bin gitpulse-workspace-benchmark -- \
   --profile large \
   --output ../artifacts/benchmarks/large.json
 ```

@@ -119,6 +119,10 @@ jobs:
         working-directory: src-tauri
         run: cargo test
 
+      - name: Rust workspace benchmark tests
+        working-directory: src-tauri
+        run: cargo test --features workspace-benchmark --bin gitpulse-workspace-benchmark
+
       - name: Git diff check
         run: git diff --check
 
