@@ -313,3 +313,41 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 10: 升级 Trellis 并完成 v0.6 发布前审查
+
+**Date**: 2026-07-21
+**Task**: 升级 Trellis 并完成 v0.6 发布前审查
+**Branch**: `main`
+
+### Summary
+
+将项目级 Trellis 升级到 0.6.7，完成全量本地验证、发布缺口审查和已合并分支清理。
+
+### Main Changes
+
+- 使用官方迁移流程将项目模板从 Trellis 0.6.5 升级到 0.6.7，保留项目自定义配置和规格。
+- 审查 v0.6 发布阻断项，并补充 minor release dry-run 的发布治理约束。
+- 删除已合并的本地/远程 `codex/roadmap-completion`，保留未合并的 legacy 分支。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b73dec0` | (see git log) |
+
+### Testing
+
+- [OK] Trellis 0.6.7 二次 dry-run、Python 语法、上下文和任务脚本。
+- [OK] Frontend build、release governance 12/12、Playwright 77/77。
+- [OK] Rust fmt/check，Rust tests 149 项，git diff checks。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 补齐 v0.6.0 CHANGELOG / Release Notes，执行真实 v0.5.3 -> v0.6.0 安装升级冒烟。
+- 推送 `main` 并等待 exact-SHA CI 后，使用 minor release dry-run 和正式发布流程。
