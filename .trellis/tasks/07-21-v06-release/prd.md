@@ -17,18 +17,18 @@
 - R2：`CHANGELOG.md` 增加 v0.6.0 面向用户的中文变更摘要；`release-notes/v0.6.0.md` 作为本地发布正文，不纳入 Git，除非发布脚本要求。
 - R3：发布前工作区必须为 clean `main` 且 `HEAD === origin/main`；版本提交必须等待该 SHA 的主线 CI 成功。
 - R4：发布前运行发布治理、前端构建、Rust fmt/check/test、完整 Playwright 和 minor dry-run；失败即停止发布。
-- R5：正式流程必须使用 `npm run release:win:minor`，不得手工创建/移动 tag 或绕过 draft Release 事务。
+- R5：正式流程使用 `npm run release:win:minor`；若版本提交已推送但 CI/发布中断，只能使用 `npm run release:win:current` 恢复，不得手工创建/移动 tag 或绕过 draft Release 事务。
 - R6：发布成功后验证 GitHub Release URL、`v0.6.0` tag、Windows `.exe`、`.exe.sig` 和 `gitpulse-latest.json`，并确认 latest manifest 版本为 0.6.0。
 - R7：不泄露签名密钥、密码或 GitHub token；不删除/重写已有 tag 或 Release。
 
 ## Acceptance Criteria
 
 - [x] AC1：`CHANGELOG.md` 和本地 `release-notes/v0.6.0.md` 已审阅，内容包含亮点、主要改进、修复和安装更新说明。
-- [ ] AC2：发布前所有质量门禁通过，且 `main` 与 `origin/main` exact-SHA 对齐。
-- [ ] AC3：发布脚本完成版本同步、版本提交、CI 等待、签名构建和 draft 资产上传。
-- [ ] AC4：GitHub Release `v0.6.0` 正式发布，包含 `.exe`、`.exe.sig`、`gitpulse-latest.json`。
-- [ ] AC5：发布后远程 tag、Release 资产和 latest manifest 可读取且版本一致。
-- [ ] AC6：任务、发布结果、无法验证的项目和后续风险均已记录。
+- [x] AC2：发布前所有质量门禁通过，且 `main` 与 `origin/main` exact-SHA 对齐；版本提交 `e951545` 的 CI 在重跑后通过。
+- [x] AC3：发布脚本完成版本同步、版本提交、CI 等待、签名构建和 draft 资产上传；首次 CI smoke 瞬时失败后按治理流程使用 `current` 恢复。
+- [x] AC4：GitHub Release `v0.6.0` 正式发布，包含 `.exe`、`.exe.sig`、`gitpulse-latest.json`，并追加 Linux AppImage。
+- [x] AC5：发布后远程 tag、Release 资产和 latest manifest 可读取且版本一致；tag 指向 `e9515453c8a85e365a5d8ed9dd3db907c0c75cc5`。
+- [x] AC6：任务、发布结果、无法验证的项目和后续风险均已记录；macOS universal 因 benchmark 辅助 binary bundle 问题未上传，已写入 release governance spec 作为后续修复项。
 
 ## Out Of Scope
 
