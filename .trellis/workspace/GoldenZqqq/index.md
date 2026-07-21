@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 12
-- **Last Active**: 2026-07-21
+- **Total Sessions**: 13
+- **Last Active**: 2026-07-22
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~423 | Active |
+| `journal-1.md` | ~456 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 13 | 2026-07-22 | 重构首页报告工作台 | `ed2ecdd` | `main` |
 | 12 | 2026-07-21 | 修复 macOS universal 打包并发布 v0.6.1 | `89af61a`, `981c199`, `7f2479f` | `main` |
 | 11 | 2026-07-21 | 发布 GitPulse v0.6.0 | `9cde36c`, `e951545`, `d5c4274` | `main` |
 | 10 | 2026-07-21 | 升级 Trellis 并完成 v0.6 发布前审查 | `b73dec0` | `main` |

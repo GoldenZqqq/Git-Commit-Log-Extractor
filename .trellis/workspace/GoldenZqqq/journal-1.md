@@ -421,3 +421,36 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 13: 重构首页报告工作台
+
+**Date**: 2026-07-22
+**Task**: 重构首页报告工作台
+**Branch**: `main`
+
+### Summary
+
+完成首页与右侧仓库范围栏的专业工作台重构：收敛报告生成主路径、按结果存在性披露动作、常驻本次范围侧栏、拆分仓库选择与映射编辑，并补充键盘导航、响应式和可访问性回归测试。npm run build 与 80/80 E2E 通过；真实 Windows WebView smoke 因 WebDriver session 超时仍待关闭正式版后复跑。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ed2ecdd` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
