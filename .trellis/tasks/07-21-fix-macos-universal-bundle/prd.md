@@ -28,10 +28,18 @@
 - [x] AC4：Tauri 默认桌面构建不再尝试复制 benchmark binary；macOS release workflow 的 bundle 配置保持可执行并具备资产存在性检查。
 - [x] AC5：Rust fmt/check、前端必要构建、发布治理测试和 `git diff --check` 通过。
 - [x] AC6：发布治理 spec 记录该 binary 隔离约束和后续版本补发策略。
-- [ ] AC7：`v0.6.1` Release 正式发布，Windows、Linux 和 macOS universal 资产完整，tag 指向通过 exact-SHA CI 的 `main` 提交。
+- [x] AC7：`v0.6.1` Release 正式发布，Windows、Linux 和 macOS universal 资产完整，tag 指向通过 exact-SHA CI 的 `main` 提交。
 
 ## Out Of Scope
 
 - 不修改 `v0.6.0` tag 或已发布资产；缺失的 macOS 包通过 `v0.6.1` 提供。
 - 不在本任务中新增产品功能或重构 benchmark 内部实现。
 - 不把 macOS 签名、公证或 updater 支持扩展到本任务。
+
+## Release Evidence
+
+- 发布提交与 tag：`981c199d1bf38f44cb6070165a511dde802f8fb1` / `v0.6.1`。
+- exact-SHA 主线 CI：`29809882184`，结论 `success`。
+- macOS/Linux workflow：`29810386771`，结论 `success`。
+- GitHub Release：https://github.com/GoldenZqqq/GitPulse/releases/tag/v0.6.1
+- 已核验资产：`GitPulse_0.6.1_x64-setup.exe`、`.exe.sig`、`gitpulse-latest.json`、`GitPulse_0.6.1_amd64.AppImage`、`GitPulse_0.6.1_universal.app.zip`、`GitPulse_0.6.1_universal.dmg`。

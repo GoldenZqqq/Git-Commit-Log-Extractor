@@ -19,16 +19,16 @@
 
 ## Publish v0.6.1
 
-- [ ] 提交并推送修复，等待该 SHA 主线 CI 成功。
-- [ ] 更新 CHANGELOG，生成并审阅 v0.6.1 Release Notes。
-- [ ] 运行 `npm run verify:release` 和 `npm run release:win:patch -- --dry-run`。
-- [ ] 运行 `npm run release:win:patch`；若版本提交已存在但 tag 尚未创建，使用 `release:win:current` 恢复。
-- [ ] 等待 v0.6.1 macOS/Linux workflow 完成，验证 Windows、Linux、macOS 资产和 latest manifest。
+- [x] 提交并推送修复，等待该 SHA 主线 CI 成功。
+- [x] 更新 CHANGELOG，生成并审阅 v0.6.1 Release Notes。
+- [x] 运行 `npm run verify:release` 和 `npm run release:win:patch -- --dry-run`。
+- [x] 运行 `npm run release:win:patch`；若版本提交已存在但 tag 尚未创建，使用 `release:win:current` 恢复。
+- [x] 等待 v0.6.1 macOS/Linux workflow 完成，验证 Windows、Linux、macOS 资产和 latest manifest。
 
 ## Closeout
 
-- [ ] 记录发布 SHA、CI、Release URL、资产与任何残余风险。
-- [ ] 更新 specs，提交任务记录，归档 Trellis 任务并记录会话日志。
+- [x] 记录发布 SHA、CI、Release URL、资产与任何残余风险。
+- [x] 更新 specs，提交任务记录，归档 Trellis 任务并记录会话日志。
 
 ## Rollback Points
 
