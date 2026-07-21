@@ -9,6 +9,7 @@ Apply this contract when changing version files, `release:win:*`, updater manife
 ```text
 npm run test:release-governance
 npm run release:win -- --dry-run
+npm run release:win:minor -- --dry-run
 npm run release:win[:patch|:minor|:major]
 npm run release:win:set -- X.Y.Z
 npm run release:win:current
@@ -27,6 +28,7 @@ stageAndPublishGitHubRelease({ filePaths, githubConfig, releasePayload }) -> rel
 ## 3. Contracts
 
 - Local release source is a clean, named `main` with `HEAD === origin/main` after fetch. Dry-run performs this check before showing success.
+- `npm run verify:release` 当前执行默认 patch dry-run；minor、major 或显式版本发布还必须运行对应的 `release:win:minor|major|set -- --dry-run`，确认目标版本而不是只验证发布源。
 - Bump/set mode updates the five version files, commits and pushes `main`, waits for a successful `CI` push run on that exact SHA, then fetches again before building.
 - `current` mode is only the recovery path after a version commit was pushed but release did not finish: the current-version tag must still be absent, then the normal new draft transaction resumes. Published Windows assets are immutable and the command refuses an existing tag.
 - New release tags use `vX.Y.Z`, must not already exist, and target the verified main SHA.

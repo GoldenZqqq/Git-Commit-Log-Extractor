@@ -26,8 +26,8 @@
 - [x] AC1：`trellis update` 完成，项目模板版本不再提示 0.6.5 -> 0.6.7。
 - [x] AC2：生成文件差异已逐类审查，没有覆盖项目自定义规格或引入 `.new` 冲突文件遗漏。
 - [x] AC3：`get_context.py`、任务脚本、`git diff --check` 和按改动风险选择的项目验证均成功。
-- [ ] AC4：升级改动在 `main` 形成一个可追溯提交，工作区无意外残留。
-- [ ] AC5：已合并 roadmap 分支从本地和 `origin` 删除，legacy 分支仍存在。
+- [x] AC4：升级改动已在 `main` 形成提交 `b73dec0`，提交范围仅包含 Trellis 生成文件与本任务记录。
+- [x] AC5：已合并 roadmap 分支已从本地和 `origin` 删除，未合并的 legacy 分支仍存在。
 - [x] AC6：v0.6 发布前审查明确版本一致性、发布说明、构建/签名/更新清单、剩余风险和功能范围建议，详见 `release-readiness.md`。
 
 ## Out Of Scope

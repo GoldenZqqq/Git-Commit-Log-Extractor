@@ -17,8 +17,8 @@
 ## Delivery
 
 - [x] 更新任务验收状态并完成 Trellis 质量检查。
-- [ ] 暂存经过审查的升级和任务文件，创建中文 Conventional Commit。
-- [ ] 再次确认 `codex/roadmap-completion` 是 `main` 祖先后删除本地及远程分支。
+- [x] 暂存经过审查的升级和任务文件，创建中文 Conventional Commit `b73dec0`。
+- [x] 再次确认 `codex/roadmap-completion` 是 `main` 祖先后删除本地及远程分支。
 - [x] 确认 `codex/legacy-python-desktop` 未合并，必须保留并在交付中报告。
 
 ## Rollback Points
