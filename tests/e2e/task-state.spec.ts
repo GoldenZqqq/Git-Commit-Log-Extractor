@@ -103,7 +103,8 @@ test("keeps the preview readable and copyable while exporting", async ({ page })
 test("keeps scan progress and cancellation local to the repository panel", async ({ page }) => {
   await launchTaskStateApp(page, { deferredCommands: ["scan_repos"] });
 
-  await page.getByRole("tab", { name: /仓库/ }).click();
+  await page.getByRole("tab", { name: /范围/ }).click();
+  await page.getByRole("button", { name: "仓库管理" }).click();
   await page.getByRole("button", { name: "重新扫描仓库索引" }).click();
   await expectCommandPending(page, "scan_repos");
 

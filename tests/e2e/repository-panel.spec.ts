@@ -25,6 +25,7 @@ test("searches repository identity fields and combines status filters", async ({
   await launchRepositoryPanel(page);
   const panel = repositoryPanel(page);
   const search = panel.getByRole("searchbox", { name: "搜索仓库" });
+  await openRepositoryManagement(panel);
 
   await expect(panel.getByRole("button", { name: "全部 5" })).toBeVisible();
   await expect(panel.getByRole("button", { name: "已启用 4" })).toBeVisible();
@@ -56,6 +57,7 @@ test("disables and restores only the current repository results", async ({ page 
   await expect(page.getByRole("region", { name: "工作区健康" }).getByText("启用 4 / 禁用 1")).toBeVisible();
   await page.getByRole("tab", { name: "报告" }).click();
   const panel = repositoryPanel(page);
+  await openRepositoryManagement(panel);
   await panel.getByRole("searchbox", { name: "搜索仓库" }).fill("api");
   await expect(panel.getByText("命中 2 / 总计 5")).toBeVisible();
 
@@ -73,6 +75,7 @@ test("disables and restores only the current repository results", async ({ page 
   await expect(page.getByRole("region", { name: "工作区健康" }).getByText("启用 2 / 禁用 3")).toBeVisible();
   await page.getByRole("tab", { name: "报告" }).click();
 
+  await openRepositoryManagement(panel);
   await panel.getByRole("searchbox", { name: "搜索仓库" }).fill("api");
   await panel.getByRole("button", { name: "已禁用 3" }).click();
   await expectVisibleRepos(panel, ["核心平台", "账单平台"]);
@@ -98,6 +101,17 @@ test("guides recovery when every indexed repository is disabled", async ({ page 
   await expect.poll(() => storedDisabledRepos(page)).toEqual([staleDisabledPath]);
 });
 
+test("separates repository selection from mapping edits", async ({ page }) => {
+  await launchRepositoryPanel(page);
+  const panel = repositoryPanel(page);
+  const editMapping = panel.getByRole("button", { name: "编辑核心平台的项目映射" });
+
+  await expect(editMapping).toBeVisible();
+  await expect(panel.getByRole("checkbox").first()).toBeChecked();
+  await editMapping.click();
+  await expect(page.getByRole("dialog", { name: "编辑项目映射" })).toBeVisible();
+});
+
 async function launchRepositoryPanel(page: Page, disabledRepos = [repos[4].path], themeMode = "light") {
   const disabledPaths = new Set(disabledRepos);
   await launchApp(page, {
@@ -121,6 +135,11 @@ async function launchRepositoryPanel(page: Page, disabledRepos = [repos[4].path]
 
 function repositoryPanel(page: Page) {
   return page.getByRole("region", { name: "仓库索引" });
+}
+
+async function openRepositoryManagement(panel: ReturnType<typeof repositoryPanel>) {
+  const trigger = panel.getByRole("button", { name: "仓库管理" });
+  if (await trigger.getAttribute("aria-expanded") !== "true") await trigger.click();
 }
 
 async function expectVisibleRepos(panel: ReturnType<typeof repositoryPanel>, names: string[]) {

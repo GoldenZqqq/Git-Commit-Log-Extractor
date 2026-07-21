@@ -27,6 +27,30 @@ test("traps dialog focus, closes the top layer, and restores the trigger", async
   await verifyCustomRangeDialogKeyboard(page);
 });
 
+test("moves through workbench and scope views with arrow keys", async ({ page }) => {
+  await launchApp(page, {
+    settings: createSettings(),
+    repoCache: createRepoCache(["C:/workspace"], [repo]),
+  });
+  await expectWorkbench(page);
+
+  const reportTab = page.getByRole("tab", { name: "报告" });
+  await reportTab.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("tab", { name: "洞察" })).toBeFocused();
+  await expect(page.getByRole("tab", { name: "洞察" })).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("End");
+  await expect(page.getByRole("tab", { name: "健康" })).toBeFocused();
+  await page.keyboard.press("Home");
+  await expect(reportTab).toBeFocused();
+
+  const recentTab = page.getByRole("tab", { name: /最近/ });
+  await recentTab.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("tab", { name: /范围/ })).toBeFocused();
+  await expect(page.getByRole("tab", { name: /范围/ })).toHaveAttribute("aria-selected", "true");
+});
+
 test("supports keyboard navigation and focus return for split popovers", async ({ page }) => {
   await launchApp(page, {
     settings: createSettings({
@@ -69,12 +93,13 @@ test("applies the shared focus contract to batch, blank-day, and mapping dialogs
     secureApiKey: "sk-playwright",
     repoCache: createRepoCache(["C:/workspace"], [repo]),
     extractResults: [
-      { repos: [repo], summaryText: "", commits: [] },
-      { repos: [repo], summaryText: "", commits: [] },
+      { repos: [repo], summaryText: "- 未检索到提交记录。", commits: [] },
+      { repos: [repo], summaryText: "- 未检索到提交记录。", commits: [] },
     ],
   });
   await expectWorkbench(page);
 
+  await page.getByText("更多生成方式").click();
   const batchTrigger = page.getByRole("button", { name: "批量" });
   await batchTrigger.click();
   const batchDialog = page.getByRole("dialog", { name: "批量生成报告" });
@@ -83,6 +108,7 @@ test("applies the shared focus contract to batch, blank-day, and mapping dialogs
   await expect(batchDialog).toBeHidden();
   await expect(batchTrigger).toBeFocused();
 
+  await page.getByRole("button", { name: "生成日报" }).click();
   const blankDayTrigger = page.getByRole("button", { name: "空白日补写" });
   await blankDayTrigger.click();
   const blankDayDialog = page.getByRole("dialog", { name: "空白日补写" });

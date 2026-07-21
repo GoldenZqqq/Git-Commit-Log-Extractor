@@ -118,10 +118,6 @@ export function Workbench(props: WorkbenchProps) {
       <WorkbenchHeader
         activeTasks={props.activeTasks}
         visibleStatus={visibleStatus}
-        author={props.author}
-        repoCount={props.repoCount}
-        commitCount={props.commitCount}
-        lastOutputFile={props.lastOutputFile}
         activeView={workbenchView}
         reviewPending={reviewPending}
         onOpenSettings={props.onOpenSettings}
@@ -185,6 +181,8 @@ export function Workbench(props: WorkbenchProps) {
         onDismissAdvice={() => setEmptyAdviceDismissedKey(emptyAdviceKey)}
         onOpenSettings={props.onOpenSettings}
         onRefreshRepos={props.onRefreshRepos}
+        canFillBlankDay={props.activePreview === "summary" && props.aiConfigured}
+        onOpenBlankDayFill={props.onOpenBlankDayFill}
       />
     </section>
   );

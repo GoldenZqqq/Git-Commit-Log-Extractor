@@ -20,6 +20,7 @@ test("shows and restores the concrete blank-day default prompt", async ({ page }
     secureApiKey: "sk-test",
     repoCache: createRepoCache(["C:/workspace"], repos),
     extractResults: [
+      { repos, summaryText: "- 未检索到提交记录。", commits: [] },
       {
         repos,
         summaryText: "",
@@ -30,6 +31,7 @@ test("shows and restores the concrete blank-day default prompt", async ({ page }
   });
   await expectWorkbench(page);
 
+  await page.getByRole("button", { name: "生成日报" }).click();
   await page.getByRole("button", { name: "空白日补写" }).click();
   const dialog = page.getByRole("dialog", { name: "空白日补写" });
   await expect(dialog).toBeVisible();

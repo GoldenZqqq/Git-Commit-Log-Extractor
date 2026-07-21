@@ -53,6 +53,60 @@ Components are plain React function components with explicit `Props` types. The 
 - Adding decorative cards or oversized landing-page patterns to the app shell.
 - Moving local filesystem or Git behavior into frontend code instead of Rust commands.
 
+## Report Workbench Disclosure Contract
+
+The report workbench is organized as a progressive flow: choose report type and period, confirm scope, generate, then act on the generated result. The component tree must keep the current stage obvious without showing actions that cannot work yet.
+
+### Scope / Trigger
+
+- Applies to `Workbench`, `ReportCanvas`, `WorkbenchAssistRail`, and `RepositoryPanel` changes that affect the home screen.
+- This is a presentation contract only; report generation, repository scanning, and persistence remain in existing callbacks and Rust commands.
+
+### Contracts
+
+- The empty report state renders one filled primary generation action. Batch generation and blank-day completion remain reachable through secondary controls or the zero-commit suggestion path.
+- Copy, AI polish, and export actions render only when a report exists. Copy is the result-stage primary action; polish and export are secondary actions.
+- The persistent right rail represents the current report scope. It keeps repository search and selection visible; filtering, batch enable/disable, directory addition, and rescanning belong under repository management controls.
+- Repository selection and mapping editing are separate controls. Editing a mapping must not toggle the repository selection.
+- Scope summaries expose period, author, repositories, and branch as the default four items. Risk or empty-state notices are conditional.
+
+### Keyboard Navigation
+
+- Main workbench tabs and repository/sidebar tabs use `role="tablist"` and `role="tab"` semantics with a roving `tabIndex`.
+- Arrow keys move focus and selection within the tab list; `Home` selects the first tab and `End` selects the last tab. The active tab exposes `aria-selected="true"`.
+- The tab contract is covered by Playwright keyboard assertions, not only click assertions.
+
+### Good / Base / Bad Cases
+
+- Good: no report means one obvious generation action; a generated report exposes copy first and optional result actions second.
+- Base: a report can be generated with zero commits and shows the existing blank-day suggestion without adding a second competing primary action.
+- Bad: rendering export or AI actions before a report exists, or placing repository management controls beside every repository row.
+
+### Test Requirements
+
+- Assert the empty-state primary-action count and result-action conditional rendering.
+- Assert the persistent scope rail, independent repository mapping edit control, and repository-management disclosure.
+- Assert arrow/Home/End behavior and selected state for both tab groups at desktop and narrow viewport sizes.
+
+### Wrong vs Correct
+
+```tsx
+// Wrong: result actions are always visible and compete with generation.
+<button onClick={onExport}>导出</button>
+<button onClick={onGenerate}>生成报告</button>
+
+// Correct: result actions are content-dependent and ordered by the current stage.
+{report ? (
+  <ResultActions onCopy={onCopy} onPolish={onPolish} onExport={onExport} />
+) : (
+  <PrimaryGenerateAction onClick={onGenerate} />
+)}
+```
+
+### Design Decision: Persistent Scope Rail
+
+The right rail stays visible as “本次范围” so users can verify what will be included without opening a management surface. Management operations are intentionally secondary because they change the workspace rather than the current report intent.
+
 ## Experimental Provider Disclosure
 
 - Mark an experimental provider in the protocol option itself so users see the status before selecting it.

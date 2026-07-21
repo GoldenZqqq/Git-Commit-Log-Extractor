@@ -95,10 +95,8 @@ type GenerationScopeProps = {
   enabledRepoCount: number;
   totalRepoCount: number;
   extractAllBranches: boolean;
-  showEvidenceDetails: boolean;
   redactionEnabled: boolean;
-  outputEnabled: boolean;
-  outputDir: string;
+  onOpenSettings: () => void;
 };
 
 export function GenerationScopeStrip({
@@ -108,26 +106,16 @@ export function GenerationScopeStrip({
   enabledRepoCount,
   totalRepoCount,
   extractAllBranches,
-  showEvidenceDetails,
   redactionEnabled,
-  outputEnabled,
-  outputDir,
+  onOpenSettings,
 }: GenerationScopeProps) {
-  const exportConfigured = outputEnabled && Boolean(outputDir.trim());
   return (
     <div className="generation-scope-strip" aria-label="当前生成范围">
       <ScopeItem label="周期" value={`${getHistoryKindLabel(activePreview)} · ${rangeLabel}`} />
-      <ScopeItem label="作者" value={formatAuthorValue(author)} />
+      <ScopeItem label="作者" value={formatAuthorValue(author)} onClick={onOpenSettings} title="在设置中修改统计作者" />
       <ScopeItem label="仓库" value={formatRepoScope(enabledRepoCount, totalRepoCount)} tone={enabledRepoCount === 0 ? "attention" : "default"} />
       <ScopeItem label="分支" value={extractAllBranches ? "全部分支" : "当前分支"} />
-      <ScopeItem label="证据" value={showEvidenceDetails ? "显示" : "未显示"} />
-      <ScopeItem label="脱敏" value={redactionEnabled ? "已启用" : "未启用"} tone={redactionEnabled ? "default" : "attention"} />
-      <ScopeItem
-        label="导出"
-        value={formatOutputScope(outputEnabled, outputDir)}
-        tone={exportConfigured ? "default" : "attention"}
-        title={exportConfigured ? outputDir : "需要在设置中开启输出并选择目录"}
-      />
+      {redactionEnabled && <span className="generation-scope-note">导出脱敏已启用</span>}
     </div>
   );
 }
@@ -137,18 +125,21 @@ function ScopeItem({
   value,
   tone = "default",
   title,
+  onClick,
 }: {
   label: string;
   value: string;
   tone?: "default" | "attention";
   title?: string;
+  onClick?: () => void;
 }) {
-  return (
-    <span className={`generation-scope-item ${tone}`} title={title}>
+  const content = <>
       <span className="generation-scope-label">{label}</span>
       <span className="generation-scope-value">{value}</span>
-    </span>
-  );
+    </>;
+  return onClick
+    ? <button type="button" className={`generation-scope-item ${tone}`} title={title} onClick={onClick}>{content}</button>
+    : <span className={`generation-scope-item ${tone}`} title={title}>{content}</span>;
 }
 
 export function getHistoryKindLabel(mode: PreviewMode) {
@@ -193,10 +184,4 @@ function formatRepoScope(enabledRepoCount: number, totalRepoCount: number) {
   if (totalRepoCount === 0) return "未扫描";
   if (enabledRepoCount === totalRepoCount) return `${totalRepoCount} 个仓库`;
   return `${enabledRepoCount}/${totalRepoCount} 个仓库`;
-}
-
-function formatOutputScope(outputEnabled: boolean, outputDir: string) {
-  if (!outputEnabled) return "未开启";
-  if (!outputDir.trim()) return "待选目录";
-  return "已配置";
 }

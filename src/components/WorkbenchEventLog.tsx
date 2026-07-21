@@ -6,9 +6,11 @@ type Props = {
   emptyReportAdvice: { title: string; scope: string; checks: string[] } | null;
   showEmptyReportAdvice: boolean;
   scanBlocked: boolean;
+  canFillBlankDay: boolean;
   onDismissAdvice: () => void;
   onOpenSettings: () => void;
   onRefreshRepos: () => void;
+  onOpenBlankDayFill: () => void;
 };
 
 export function WorkbenchEventLog({
@@ -17,9 +19,11 @@ export function WorkbenchEventLog({
   emptyReportAdvice,
   showEmptyReportAdvice,
   scanBlocked,
+  canFillBlankDay,
   onDismissAdvice,
   onOpenSettings,
   onRefreshRepos,
+  onOpenBlankDayFill,
 }: Props) {
   if (warnings.length === 0 && !lastOutputFile && !showEmptyReportAdvice) return null;
   return (
@@ -37,6 +41,7 @@ export function WorkbenchEventLog({
           <p>{emptyReportAdvice.scope}</p>
           <ul>{emptyReportAdvice.checks.map((check) => <li key={check}>{check}</li>)}</ul>
           <div className="empty-report-actions">
+            {canFillBlankDay && <button type="button" onClick={onOpenBlankDayFill}>空白日补写</button>}
             <button type="button" onClick={onOpenSettings}>检查作者/分支</button>
             <button type="button" onClick={onRefreshRepos} disabled={scanBlocked}>重新扫描仓库</button>
           </div>

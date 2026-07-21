@@ -12,13 +12,11 @@ const repo = createRepo("C:/workspace/gitpulse", "gitpulse", "main");
 test("keeps the 320px workbench and dialogs inside the viewport", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 320, height: 900 });
   await launchResponsiveApp(page);
-  await dismissBlankDayTip(page);
-  await assertNoHorizontalOverflow(page, ["html", "body", ".app-root", ".workbench", ".hero-band", ".report-canvas"]);
+  await assertNoHorizontalOverflow(page, ["html", "body", ".app-root", ".workbench", ".workbench-toolbar", ".report-canvas"]);
 
   const actions = [
     page.getByRole("button", { name: "生成日报" }),
-    page.getByRole("button", { name: "批量" }),
-    page.getByRole("button", { name: "空白日补写" }),
+    page.getByText("更多生成方式"),
   ];
   for (const action of actions) await expectHorizontallyInsideViewport(page, action);
   await expectNoOverlap(actions);
@@ -33,9 +31,11 @@ test("keeps the 320px workbench and dialogs inside the viewport", async ({ page 
   await assertNoHorizontalOverflow(page, [".support-bundle-dialog", ".support-bundle-entry-panel"]);
   await page.screenshot({ path: testInfo.outputPath("support-bundle-320.png"), fullPage: true });
   await page.getByRole("button", { name: "关闭支持包预览" }).click();
-  await page.screenshot({ path: testInfo.outputPath("workbench-320.png"), fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath("settings-320.png"), fullPage: true });
   await page.getByRole("button", { name: "关闭设置" }).click();
+  await page.screenshot({ path: testInfo.outputPath("workbench-320.png"), fullPage: true });
 
+  await openMoreGenerationWays(page);
   await page.getByRole("button", { name: "批量" }).click();
   await assertDialogInsideViewport(page, page.getByRole("dialog", { name: "批量生成报告" }), "关闭批量生成");
 });
@@ -43,7 +43,6 @@ test("keeps the 320px workbench and dialogs inside the viewport", async ({ page 
 test("completes the main path in a 200-percent equivalent viewport", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 640, height: 450 });
   await launchResponsiveApp(page, true);
-  await dismissBlankDayTip(page);
   await page.getByRole("button", { name: "生成日报" }).click();
   await expect(page.getByText("验证高缩放主路径")).toBeVisible();
   await page.getByRole("button", { name: "复制", exact: true }).click();
@@ -66,7 +65,9 @@ test("keeps long dialogs bounded in a short desktop window", async ({ page }, te
   await launchResponsiveApp(page);
   await expect(page.getByRole("button", { name: "生成日报" })).toBeVisible();
   await expect(page.locator(".preview-shell")).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("workbench-short-home.png") });
 
+  await openMoreGenerationWays(page);
   await page.getByRole("button", { name: "批量" }).click();
   const dialog = page.getByRole("dialog", { name: "批量生成报告" });
   await assertDialogInsideViewport(page, dialog, "关闭批量生成");
@@ -104,9 +105,9 @@ async function launchResponsiveApp(page: Page, withReport = false) {
   await expectWorkbench(page);
 }
 
-async function dismissBlankDayTip(page: Page) {
-  const close = page.locator(".blank-day-tip-close");
-  if (await close.isVisible()) await close.click();
+async function openMoreGenerationWays(page: Page) {
+  const details = page.locator(".generation-more");
+  if (await details.getAttribute("open") === null) await details.getByText("更多生成方式").click();
 }
 
 async function assertNoHorizontalOverflow(page: Page, selectors: string[]) {

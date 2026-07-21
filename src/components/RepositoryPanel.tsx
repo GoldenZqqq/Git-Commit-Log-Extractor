@@ -2,9 +2,11 @@ import {
   CheckCircle2,
   CircleOff,
   FolderPlus,
+  Pencil,
   RefreshCw,
   Search,
   Settings2,
+  SlidersHorizontal,
   TerminalSquare,
   X,
   XCircle,
@@ -42,6 +44,7 @@ type RepositoryEntry = {
 export function RepositoryPanel(props: Props) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<RepoStatusFilter>("all");
+  const [managementOpen, setManagementOpen] = useState(false);
   const entries = useMemo(
     () => buildRepositoryEntries(props.repos, props.disabledRepos, props.projectNames),
     [props.disabledRepos, props.projectNames, props.repos],
@@ -52,48 +55,30 @@ export function RepositoryPanel(props: Props) {
   return (
     <section className="repo-drawer" aria-label="仓库索引">
       <div className="repo-panel-head">
-        <RepositoryHeader {...props} enabledCount={counts.enabled} />
-        <RepoScanStatus scanning={props.isScanning} progress={props.scanProgress} />
+        {entries.length > 0 && <RepositorySearch query={query} onQueryChange={setQuery} />}
         {entries.length > 0 && (
+          <div className="repo-management-row">
+            <button className="repo-management-toggle" type="button" aria-expanded={managementOpen} onClick={() => setManagementOpen((current) => !current)}>
+              <SlidersHorizontal size={14} />仓库管理
+            </button>
+            <span aria-live="polite">已选 {counts.enabled} / {counts.total}</span>
+          </div>
+        )}
+        <RepoScanStatus scanning={props.isScanning} progress={props.scanProgress} />
+        {entries.length > 0 && managementOpen && (
           <RepositoryControls
-            query={query}
             status={status}
             counts={counts}
             visibleEntries={visibleEntries}
-            onQueryChange={setQuery}
             onStatusChange={setStatus}
             onSetReposEnabled={(enabled) => props.onSetReposEnabled(paths, enabled)}
           />
         )}
-        {entries.length > 0 && counts.enabled === 0 && <AllDisabledNotice onShowDisabled={() => setStatus("disabled")} />}
+        {entries.length > 0 && managementOpen && <RepositoryMaintenance {...props} />}
+        {entries.length > 0 && counts.enabled === 0 && <AllDisabledNotice onShowDisabled={() => { setManagementOpen(true); setStatus("disabled"); }} />}
       </div>
       <RepositoryList {...props} entries={visibleEntries} query={query} status={status} onQueryChange={setQuery} onStatusChange={setStatus} />
     </section>
-  );
-}
-
-function RepositoryHeader(props: Props & { enabledCount: number }) {
-  const meta = props.enabledCount === props.repos.length
-    ? `${props.repos.length} repos`
-    : `${props.enabledCount}/${props.repos.length} repos`;
-  return (
-    <div className="panel-title">
-      <h3><TerminalSquare size={17} />仓库索引</h3>
-      <div className="panel-title-actions">
-        <span>{meta}</span>
-        <button
-          className="repo-refresh-button"
-          type="button"
-          onClick={props.isScanning ? props.onCancelRepoScan : props.onRefreshRepos}
-          disabled={props.scanBlocked && !props.isScanning}
-          aria-label={props.isScanning ? "取消仓库扫描" : "重新扫描仓库索引"}
-          title={props.isScanning ? "取消仓库扫描" : "重新扫描仓库索引"}
-        >
-          {props.isScanning ? <XCircle size={14} /> : <RefreshCw size={14} />}
-          {props.isScanning ? "取消扫描" : "重新扫描"}
-        </button>
-      </div>
-    </div>
   );
 }
 
@@ -108,19 +93,27 @@ function RepoScanStatus({ scanning, progress }: { scanning: boolean; progress: R
 }
 
 function RepositoryControls(props: {
-  query: string;
   status: RepoStatusFilter;
   counts: ReturnType<typeof countRepositoryEntries>;
   visibleEntries: RepositoryEntry[];
-  onQueryChange: (value: string) => void;
   onStatusChange: (value: RepoStatusFilter) => void;
   onSetReposEnabled: (enabled: boolean) => void;
 }) {
   return (
     <div className="repo-manager-controls">
-      <RepositorySearch query={props.query} onQueryChange={props.onQueryChange} />
       <RepositoryFilterBar status={props.status} counts={props.counts} onStatusChange={props.onStatusChange} />
       <RepositoryBulkBar entries={props.visibleEntries} total={props.counts.total} onSetReposEnabled={props.onSetReposEnabled} />
+    </div>
+  );
+}
+
+function RepositoryMaintenance(props: Props) {
+  return (
+    <div className="repo-maintenance-actions" aria-label="仓库维护操作">
+      <button type="button" onClick={props.onAddRootDirs} disabled={props.scanBlocked}><FolderPlus size={14} />添加目录</button>
+      <button type="button" onClick={props.isScanning ? props.onCancelRepoScan : props.onRefreshRepos} disabled={props.scanBlocked && !props.isScanning} aria-label={props.isScanning ? "取消仓库扫描" : "重新扫描仓库索引"}>
+        {props.isScanning ? <XCircle size={14} /> : <RefreshCw size={14} />}{props.isScanning ? "取消扫描" : "重新扫描"}
+      </button>
     </div>
   );
 }
@@ -220,14 +213,15 @@ function RepositoryRow({ entry, onToggleRepo, onEditRepo }: {
         <input type="checkbox" checked={entry.enabled} onChange={(event) => onToggleRepo(entry.repo.path, event.target.checked)} />
         <span aria-hidden="true" />
       </label>
-      <button type="button" className="repo-info" onClick={() => onEditRepo(entry.repo)} title="点击编辑项目映射名称">
+      <div className="repo-info">
         <strong className="repo-display-name">{entry.displayName}</strong>
         <span className="repo-meta">
           {isMapped && <em className="repo-origin">{entry.repo.name}</em>}
           <em className="repo-branch" title={entry.repo.branch}>{entry.repo.branch}</em>
         </span>
         <span className="repo-path">{entry.repo.path}</span>
-      </button>
+      </div>
+      <button type="button" className="repo-edit-button" onClick={() => onEditRepo(entry.repo)} aria-label={`编辑${entry.displayName}的项目映射`} title="点击编辑项目映射名称"><Pencil size={14} /></button>
     </article>
   );
 }

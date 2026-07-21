@@ -9,24 +9,20 @@ import {
   Loader2,
   Maximize2,
   Minimize2,
+  ShieldCheck,
   Sparkles,
-  Wand2,
-  XCircle,
 } from "lucide-react";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { activeTaskLabel, taskCanStart, taskIsActive } from "../hooks/useTaskActivity";
 import { usePopover } from "../hooks/useOverlayFocus";
 import { convertMarkdownTo, REPORT_FORMAT_PRESETS, type IMFormatPresetId } from "../reportFormat";
 import {
-  loadBlankDayTipDismissed,
-  saveBlankDayTipDismissed,
   type DateRange,
   type PreviewMode,
   type ReportExportFormat,
 } from "../model";
 import { CustomRangeDialog } from "./CustomRangeDialog";
-import { GenerationScopeStrip, formatActiveRange, ReportPeriodControl } from "./WorkbenchControls";
-import { PanelTitle } from "./PanelTitle";
+import { GenerationScopeStrip, formatActiveRange, getHistoryKindLabel, ReportPeriodControl } from "./WorkbenchControls";
 import { ReportPolishReviewPanel } from "./ReportPolishReviewPanel";
 import { SupplementalItemsEditor } from "./SupplementalItemsEditor";
 import type { WorkbenchProps } from "./Workbench.types";
@@ -38,7 +34,6 @@ type AssistPanel = "repos" | "history" | "quality";
 
 export function ReportCanvas({ workbench: props }: Props) {
   const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
-  const [blankDayTipOpen, setBlankDayTipOpen] = useState(() => !loadBlankDayTipDismissed());
   const [customDialogOpen, setCustomDialogOpen] = useState(false);
   const [polishMenuOpen, setPolishMenuOpen] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
@@ -62,17 +57,12 @@ export function ReportCanvas({ workbench: props }: Props) {
   const polishBlocked = reviewPending || !taskCanStart(props.activeTasks, "polish");
   const exportBlocked = reviewPending || !taskCanStart(props.activeTasks, "export");
   const interactionBlocked = !taskCanStart(props.activeTasks, "interaction");
+  const hasReport = Boolean(props.previewText);
   const enabledRepoCount = props.repos.filter((repo) => !props.disabledRepos.includes(repo.path)).length;
   const activeRangeLabel = formatActiveRange(props.activePreview, props.dailyDate, props.weeklyRange, props.monthlyRange, props.customRange);
   const exportConfigured = props.canExport;
   const activeTaskStatus = activeTaskLabel(props.activeTasks);
-  const previewEmptyText = props.activePreview === "monthly"
-    ? "暂无月报内容。"
-    : props.activePreview === "weekly"
-      ? "暂无周报内容。"
-      : props.activePreview === "custom"
-        ? "请选择时间段生成自定义报告。"
-        : "暂无日报内容。";
+  const reportKindLabel = getHistoryKindLabel(props.activePreview);
   const generateButtonLabel = isGenerating
     ? "生成中"
     : props.activePreview === "monthly"
@@ -145,93 +135,73 @@ export function ReportCanvas({ workbench: props }: Props) {
     <>
       {isPreviewExpanded && <div className="canvas-fullscreen-backdrop" aria-hidden="true" onClick={() => setIsPreviewExpanded(false)} />}
       <div className="studio-grid">
-        <section className={`report-canvas ${isPreviewExpanded ? "preview-expanded" : ""}`}>
+        <section className={`report-canvas ${isPreviewExpanded ? "preview-expanded" : ""}`} aria-label="报告工作区">
           <div className="canvas-head">
             <div className="canvas-topline">
-              <PanelTitle icon={<Sparkles size={17} />} title="报告预览" meta={props.aiConfigured ? "AI 可润色" : "Markdown 渲染"} />
+              <div className="report-heading">
+                <FileText size={18} />
+                <div>
+                  <h2>生成报告</h2>
+                  <p>选择报告类型与周期，确认范围后生成</p>
+                </div>
+              </div>
               <div className="report-switch" aria-label="报告类型切换">
                 {(["summary", "weekly", "monthly", "custom"] as PreviewMode[]).map((mode) => (
                   <button key={mode} type="button" aria-pressed={props.activePreview === mode} className={props.activePreview === mode ? "active" : ""} disabled={reviewPending} onClick={() => handlePreviewChange(mode)}>
-                    <span>{mode === "summary" ? "Daily" : mode[0].toUpperCase() + mode.slice(1)}</span>
                     {mode === "summary" ? "日报" : mode === "weekly" ? "周报" : mode === "monthly" ? "月报" : "自定义"}
                   </button>
                 ))}
               </div>
             </div>
-            <div className="canvas-actionbar">
-              <div className="canvas-primary-actions">
-                <ReportPeriodControl
-                  activePreview={props.activePreview}
-                  dailyDate={props.dailyDate}
-                  weeklyWeek={props.weeklyWeek}
-                  weeklyRange={props.weeklyRange}
-                  monthlyMonth={props.monthlyMonth}
-                  monthlyRange={props.monthlyRange}
-                  customRange={props.customRange}
-                  periodLocked={isGenerating || reviewPending}
-                  onDailyDateChange={props.onDailyDateChange}
-                  onWeeklyWeekChange={props.onWeeklyWeekChange}
-                  onMonthlyMonthChange={props.onMonthlyMonthChange}
-                  onOpenCustomRange={() => setCustomDialogOpen(true)}
-                />
-                <button className="preview-generate-button" type="button" onClick={handleGenerate} disabled={generateBlocked}>{generateButtonIcon}{generateButtonLabel}</button>
-                <button className="preview-generate-button" type="button" onClick={props.onOpenBatch} disabled={generateBlocked} title="批量生成多份报告"><Layers size={15} />批量</button>
-                {props.activePreview === "summary" && (
-                  <div className="blank-day-entry">
-                    {blankDayTipOpen && <div className="blank-day-tip" role="status"><span>今天无提交？参考近期工作生成草稿</span><button type="button" className="blank-day-tip-close" aria-label="关闭提示" onClick={() => { setBlankDayTipOpen(false); saveBlankDayTipDismissed(true); }}><XCircle size={13} /></button></div>}
-                    <button className={`preview-generate-button blank-day-button ${!props.aiConfigured ? "warning" : ""}`} type="button" onClick={props.onOpenBlankDayFill} disabled={generateBlocked || !props.aiConfigured} title={props.aiConfigured ? "基于近期 Git 线索，生成可编辑的日报延续草稿" : "请先配置 AI"}><Wand2 size={15} />空白日补写</button>
-                  </div>
-                )}
-              </div>
-              <div className="canvas-actions-group">
-                {props.previewText && <PolishActions
-                  props={props}
-                  isPolishing={isPolishing}
-                  polishBlocked={polishBlocked}
-                  polishMenuOpen={polishMenuOpen}
-                  setPolishMenuOpen={setPolishMenuOpen}
-                  setExportMenuOpen={setExportMenuOpen}
-                  setCopyAsMenuOpen={setCopyAsMenuOpen}
-                  polishExtra={polishExtra}
-                  setPolishExtra={setPolishExtra}
-                  polishButtonRef={polishButtonRef}
-                  polishMenuButtonRef={polishMenuButtonRef}
-                  polishPopoverRef={polishPopoverRef}
-                />}
-                {props.previewText && <ExportActions
-                  props={props}
-                  isExporting={isExporting}
-                  exportBlocked={exportBlocked}
-                  exportConfigured={exportConfigured}
-                  exportButtonLabel={exportButtonLabel}
-                  exportButtonTitle={exportButtonTitle}
-                  exportMenuOpen={exportMenuOpen}
-                  exportMenuButtonRef={exportMenuButtonRef}
-                  exportPopoverRef={exportPopoverRef}
-                  setExportMenuOpen={setExportMenuOpen}
-                  setPolishMenuOpen={setPolishMenuOpen}
-                  setCopyAsMenuOpen={setCopyAsMenuOpen}
-                  onExport={handleExport}
-                />}
-                <CopyActions
-                  props={props}
-                  isInteracting={isInteracting}
-                  interactionBlocked={interactionBlocked}
-                  copyAsMenuOpen={copyAsMenuOpen}
-                  copyMenuButtonRef={copyMenuButtonRef}
-                  copyPopoverRef={copyPopoverRef}
-                  setCopyAsMenuOpen={setCopyAsMenuOpen}
-                  setPolishMenuOpen={setPolishMenuOpen}
-                  setExportMenuOpen={setExportMenuOpen}
-                />
-              </div>
-            </div>
+            <ReportPeriodControl
+              activePreview={props.activePreview}
+              dailyDate={props.dailyDate}
+              weeklyWeek={props.weeklyWeek}
+              weeklyRange={props.weeklyRange}
+              monthlyMonth={props.monthlyMonth}
+              monthlyRange={props.monthlyRange}
+              customRange={props.customRange}
+              periodLocked={isGenerating || reviewPending}
+              onDailyDateChange={props.onDailyDateChange}
+              onWeeklyWeekChange={props.onWeeklyWeekChange}
+              onMonthlyMonthChange={props.onMonthlyMonthChange}
+              onOpenCustomRange={() => setCustomDialogOpen(true)}
+            />
+            <GenerationScopeStrip activePreview={props.activePreview} rangeLabel={activeRangeLabel} author={props.author} enabledRepoCount={enabledRepoCount} totalRepoCount={props.repos.length} extractAllBranches={props.extractAllBranches} redactionEnabled={props.redactionEnabled} onOpenSettings={props.onOpenSettings} />
             <SupplementalItemsEditor value={props.supplementalItemsText} disabled={isGenerating || isPolishing || reviewPending} onChange={props.onSupplementalItemsChange} />
-            <GenerationScopeStrip activePreview={props.activePreview} rangeLabel={activeRangeLabel} author={props.author} enabledRepoCount={enabledRepoCount} totalRepoCount={props.repos.length} extractAllBranches={props.extractAllBranches} showEvidenceDetails={props.showEvidenceDetails} redactionEnabled={props.redactionEnabled} outputEnabled={props.outputEnabled} outputDir={props.outputDir} />
           </div>
-          <div className="preview-shell">
-            {props.polishReview ? <ReportPolishReviewPanel review={props.polishReview} accepting={isExporting} onAccept={props.onAcceptPolishReview} onReject={props.onRejectPolishReview} /> : isGenerating ? <div className="preview-loading"><Loader2 className="spin" size={32} /><p>{extractProgressText}</p></div> : <MarkdownPreview markdown={props.previewText} emptyText={previewEmptyText} />}
-            <button className="preview-expand-button" type="button" onClick={() => setIsPreviewExpanded((current) => !current)} aria-label={isPreviewExpanded ? "退出预览全屏" : "全屏查看预览"} title={isPreviewExpanded ? "退出全屏" : "全屏查看"}>{isPreviewExpanded ? <Minimize2 size={18} /> : <Maximize2 size={18} />}</button>
+          <div className={`preview-shell ${hasReport || props.polishReview ? "has-report" : "is-empty"}`}>
+            {!isGenerating && (hasReport || props.polishReview) && <div className="result-toolbar" aria-label="报告结果操作">
+              <div className="result-summary"><strong>{reportKindLabel}{props.polishReview ? "审核中" : "已生成"}</strong><span>{props.commitCount} 个提交 · {props.projectCount} 个项目</span></div>
+              <div className="canvas-actions-group">
+                <CopyActions props={props} isInteracting={isInteracting} interactionBlocked={interactionBlocked} copyAsMenuOpen={copyAsMenuOpen} copyMenuButtonRef={copyMenuButtonRef} copyPopoverRef={copyPopoverRef} setCopyAsMenuOpen={setCopyAsMenuOpen} setPolishMenuOpen={setPolishMenuOpen} setExportMenuOpen={setExportMenuOpen} />
+                <PolishActions props={props} isPolishing={isPolishing} polishBlocked={polishBlocked} polishMenuOpen={polishMenuOpen} setPolishMenuOpen={setPolishMenuOpen} setExportMenuOpen={setExportMenuOpen} setCopyAsMenuOpen={setCopyAsMenuOpen} polishExtra={polishExtra} setPolishExtra={setPolishExtra} polishButtonRef={polishButtonRef} polishMenuButtonRef={polishMenuButtonRef} polishPopoverRef={polishPopoverRef} />
+                <ExportActions props={props} isExporting={isExporting} exportBlocked={exportBlocked} exportConfigured={exportConfigured} exportButtonLabel={exportButtonLabel} exportButtonTitle={exportButtonTitle} exportMenuOpen={exportMenuOpen} exportMenuButtonRef={exportMenuButtonRef} exportPopoverRef={exportPopoverRef} setExportMenuOpen={setExportMenuOpen} setPolishMenuOpen={setPolishMenuOpen} setCopyAsMenuOpen={setCopyAsMenuOpen} onExport={handleExport} />
+                <button className="preview-generate-button regenerate-button" type="button" onClick={handleGenerate} disabled={generateBlocked}>{generateButtonIcon}{generateButtonLabel}</button>
+              </div>
+            </div>}
+            {props.polishReview ? (
+              <ReportPolishReviewPanel review={props.polishReview} accepting={isExporting} onAccept={props.onAcceptPolishReview} onReject={props.onRejectPolishReview} />
+            ) : isGenerating ? (
+              <div className="preview-loading" role="status" aria-live="polite"><Loader2 className="spin" size={30} /><p>{extractProgressText}</p><button className="preview-generate-button" type="button" disabled>{generateButtonIcon}{generateButtonLabel}</button></div>
+            ) : hasReport ? (
+              <MarkdownPreview markdown={props.previewText} emptyText="" />
+            ) : (
+              <div className="report-empty-state" role="region" aria-label="报告尚未生成">
+                <div className="report-empty-icon" aria-hidden="true"><FileText size={24} /></div>
+                <div className="report-empty-copy">
+                  <h3>准备生成{reportKindLabel}</h3>
+                  <p>将为 {props.author.trim() || "全部作者"} 汇总 {enabledRepoCount} 个仓库在{props.extractAllBranches ? "全部分支" : "当前分支"}、{activeRangeLabel} 的提交。</p>
+                  <span><ShieldCheck size={14} />Git 数据仅在本机处理</span>
+                </div>
+                <button className="report-generate-primary" type="button" onClick={handleGenerate} disabled={generateBlocked || enabledRepoCount === 0}>{generateButtonIcon}{generateButtonLabel}</button>
+                <details className="generation-more">
+                  <summary><Layers size={14} />更多生成方式</summary>
+                  <button type="button" onClick={props.onOpenBatch} disabled={generateBlocked}><Layers size={14} />批量</button>
+                </details>
+              </div>
+            )}
+            {(hasReport || props.polishReview) && <button className="preview-expand-button" type="button" onClick={() => setIsPreviewExpanded((current) => !current)} aria-label={isPreviewExpanded ? "退出预览全屏" : "全屏查看预览"} title={isPreviewExpanded ? "退出全屏" : "全屏查看"}>{isPreviewExpanded ? <Minimize2 size={18} /> : <Maximize2 size={18} />}</button>}
           </div>
         </section>
         <WorkbenchAssistRail workbench={props} activePanel={activeAssistPanel} enabledRepoCount={enabledRepoCount} hasQualityPanel={Boolean(props.previewText && props.commitCount > 0)} isRepoScanning={taskIsActive(props.activeTasks, "scan")} scanBlocked={!taskCanStart(props.activeTasks, "scan")} generateBlocked={generateBlocked} reviewPending={reviewPending} onPanelChange={setActiveAssistPanel} />

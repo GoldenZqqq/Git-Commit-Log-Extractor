@@ -113,6 +113,7 @@ test("refreshes a health result loaded while repository scanning is pending", as
   });
 
   await expectWorkbench(page);
+  await page.getByRole("button", { name: "仓库管理" }).click();
   await page.getByRole("button", { name: "重新扫描仓库索引" }).click();
   await expect.poll(() => commandCount(page, "scan_repos")).toBe(1);
   await page.getByRole("tab", { name: "健康" }).click();

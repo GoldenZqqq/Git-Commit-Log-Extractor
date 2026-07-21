@@ -46,6 +46,8 @@ import "./styles/dialogs.css";
 import "./styles/support-bundle.css";
 import "./styles/onboarding.css";
 import "./styles/theme.css";
+import "./styles/workbench.css";
+import "./styles/workbench-responsive.css";
 type RunTaskInput = {
   kind: AppTaskKind;
   label: string;

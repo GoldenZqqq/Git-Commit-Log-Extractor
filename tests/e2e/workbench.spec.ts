@@ -20,6 +20,27 @@ const dailyCommits = [
   createCommit("abc1232", "ci: 接入 GitHub Actions 日常门禁"),
 ];
 
+test("presents one clear report action before a report exists", async ({ page }) => {
+  await launchApp(page, {
+    settings,
+    repoCache: createRepoCache(["C:/workspace"], repos),
+  });
+
+  await expectWorkbench(page);
+  const emptyState = page.getByRole("region", { name: "报告尚未生成" });
+  await expect(emptyState).toBeVisible();
+  await expect(emptyState.getByText("Git 数据仅在本机处理")).toBeVisible();
+  await expect(emptyState.getByRole("button", { name: "生成日报" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "复制", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "AI润色" })).toHaveCount(0);
+  await expect(page.locator(".preview-save-button")).toHaveCount(0);
+
+  const scopeRail = page.getByRole("complementary", { name: "本次范围" });
+  await expect(scopeRail.getByRole("heading", { name: "本次范围" })).toBeVisible();
+  await expect(scopeRail.getByRole("searchbox", { name: "搜索仓库" })).toBeVisible();
+  await expect(scopeRail.getByRole("button", { name: "仓库管理" })).toBeVisible();
+});
+
 test("renders mocked diagnostics in settings", async ({ page }) => {
   await launchApp(page, {
     settings,
@@ -78,7 +99,7 @@ test("suggests project mappings for unmapped repositories", async ({ page }) => 
 
   await expectWorkbench(page);
   await page.getByRole("button", { name: "打开设置" }).click();
-  await page.getByRole("button", { name: "项目映射" }).click();
+  await page.getByRole("button", { name: "项目映射", exact: true }).click();
 
   await expect(page.getByLabel("未映射仓库建议")).toBeVisible();
   await expect(page.getByText("Learning Platform Api")).toBeVisible();
@@ -152,8 +173,7 @@ test("generates and exports a daily report", async ({ page }) => {
   await expect(scope.getByText("Playwright Tester")).toBeVisible();
   await expect(scope.getByText("1 个仓库")).toBeVisible();
   await expect(scope.getByText("当前分支")).toBeVisible();
-  await expect(scope.getByText("未显示")).toBeVisible();
-  await expect(scope.getByText("已配置")).toBeVisible();
+  await expect(scope.locator(".generation-scope-item")).toHaveCount(4);
 
   await page.getByRole("button", { name: "生成日报" }).click();
 
@@ -162,7 +182,7 @@ test("generates and exports a daily report", async ({ page }) => {
   const qualityPanel = page.getByLabel("报告交付质量提示");
   await expect(qualityPanel).toBeVisible();
   await expect(page.getByText("2 条提交")).toBeVisible();
-  await expect(page.getByText("1 个项目")).toBeVisible();
+  await expect(qualityPanel.getByText("1 个项目", { exact: true })).toBeVisible();
   await expect(page.getByText("AI 待配置")).toBeVisible();
   await expect(qualityPanel.getByText("证据未显示")).toBeVisible();
   await expect(page.getByText("可导出")).toBeVisible();
@@ -195,6 +215,7 @@ test("opens the batch report output directory after generation", async ({ page }
   });
 
   await expectWorkbench(page);
+  await page.getByText("更多生成方式").click();
   await page.getByRole("button", { name: "批量", exact: true }).click();
 
   const dateInputs = page.locator('.range-dialog input[type="date"]');
@@ -270,14 +291,12 @@ test("keeps export setup visible when output is not configured", async ({ page }
   await page.getByRole("button", { name: "生成日报" }).click();
 
   await expect(page.getByText("补齐未配置导出时的操作入口")).toBeVisible();
-  const scope = page.getByLabel("当前生成范围");
-  await expect(scope.getByText("未开启")).toBeVisible();
   await expect(page.getByRole("button", { name: "设置导出" })).toBeVisible();
 
   await page.getByRole("button", { name: "设置导出" }).click();
 
   await expect(page.getByRole("dialog", { name: "设置" })).toBeVisible();
-  await expect(page.getByRole("status").getByText("请先开启输出到文件并选择输出目录")).toBeVisible();
+  await expect(page.getByText("请先开启输出到文件并选择输出目录").first()).toBeVisible();
   await expect(page.getByText("基础配置")).toBeVisible();
   await expect(page.getByText("输出到文件", { exact: true })).toBeVisible();
   await expect(page.getByText("高级提取设置")).toBeVisible();
@@ -289,7 +308,7 @@ test("keeps export setup visible when output is not configured", async ({ page }
   expect(saveCalls).toHaveLength(0);
 });
 
-test("renders generation scope with dark theme surfaces", async ({ page }) => {
+test("renders generation scope with dark theme surfaces", async ({ page }, testInfo) => {
   await launchApp(page, {
     settings: createSettings({ ...settings, themeMode: "dark", outputEnabled: false, outputDir: "" }),
     repoCache: createRepoCache(["C:/workspace"], repos),
@@ -306,17 +325,16 @@ test("renders generation scope with dark theme surfaces", async ({ page }) => {
 
   await expectWorkbench(page);
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  await expect(page.getByLabel("当前生成范围").getByText("未开启")).toBeVisible();
   await page.getByRole("button", { name: "生成日报" }).click();
   await expect(page.getByRole("button", { name: "设置导出" })).toBeVisible();
 
   const colors = await page.evaluate(() => {
     const strip = document.querySelector(".generation-scope-strip");
     const item = document.querySelector(".generation-scope-item");
-    const attention = document.querySelector(".generation-scope-item.attention");
     const setupButton = document.querySelector(".export-split.needs-setup .preview-save-button");
+    const canvas = document.querySelector(".report-canvas");
     return {
-      attentionBackground: attention ? getComputedStyle(attention).backgroundColor : "",
+      canvasBackground: canvas ? getComputedStyle(canvas).backgroundColor : "",
       itemBackground: item ? getComputedStyle(item).backgroundColor : "",
       setupButtonBackground: setupButton ? getComputedStyle(setupButton).backgroundColor : "",
       stripBackground: strip ? getComputedStyle(strip).backgroundColor : "",
@@ -325,8 +343,9 @@ test("renders generation scope with dark theme surfaces", async ({ page }) => {
 
   expect(cssRgbBrightness(colors.stripBackground)).toBeLessThan(80);
   expect(cssRgbBrightness(colors.itemBackground)).toBeLessThan(90);
-  expect(cssRgbBrightness(colors.attentionBackground)).toBeLessThan(110);
+  expect(cssRgbBrightness(colors.canvasBackground)).toBeLessThan(80);
   expect(cssRgbBrightness(colors.setupButtonBackground)).toBeLessThan(110);
+  await page.screenshot({ path: testInfo.outputPath("workbench-dark.png") });
 });
 
 test("guides users when workspace has no indexed repositories", async ({ page }) => {
@@ -519,7 +538,7 @@ test("generates and exports a weekly report", async ({ page }) => {
 
   await expect(page.getByText("接入 Playwright 汶览器级端到端护栏")).toBeVisible();
   await openAssistTab(page, /最近/);
-  await expect(page.getByText(/周报 · 2026-W27/)).toBeVisible();
+  await expect(page.getByRole("button", { name: /周报 · 2026-W27/ })).toBeVisible();
   await expect(page.getByText(/输出文件：.*weekly_report_2026-W27\.md/)).toBeVisible();
 
   await page.locator("button.preview-save-button").click();
