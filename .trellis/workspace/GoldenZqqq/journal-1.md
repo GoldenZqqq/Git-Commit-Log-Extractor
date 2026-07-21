@@ -386,3 +386,38 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 12: 修复 macOS universal 打包并发布 v0.6.1
+
+**Date**: 2026-07-21
+**Task**: 修复 macOS universal 打包并发布 v0.6.1
+**Branch**: `main`
+
+### Summary
+
+隔离 feature-gated workspace benchmark，修复默认 Tauri bundle 对开发 binary 的误收集；通过本地与 exact-SHA CI 全量门禁，发布 v0.6.1 并核验 Windows、Linux、macOS universal 安装包和 latest manifest。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `89af61a` | (see git log) |
+| `981c199` | (see git log) |
+| `7f2479f` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
