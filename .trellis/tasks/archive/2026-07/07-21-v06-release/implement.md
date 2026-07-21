@@ -18,7 +18,7 @@
 
 - [x] 验证 GitHub Release URL、`v0.6.0` tag、三个 Windows 资产和 latest manifest。
 - [x] 记录发布 SHA、tag、Release URL、资产 URL 和未完成的 macOS universal 资产风险。
-- [ ] 更新任务验收并归档，记录发布会话日志。
+- [x] 更新任务验收并归档，记录发布会话日志。
 
 ## Rollback Points
 
