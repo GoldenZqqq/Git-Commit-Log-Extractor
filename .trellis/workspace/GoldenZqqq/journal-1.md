@@ -493,3 +493,37 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 15: 优化工作台视觉与长任务通知
+
+**Date**: 2026-07-22
+**Task**: 优化工作台视觉与长任务通知
+**Branch**: `main`
+
+### Summary
+
+优化最近报告与工作台背景；修复多仓库扫描和提交提取时进度通知反复闪烁，并补充稳定通知回归测试与前端规范。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e84c357` | (see git log) |
+| `45d709d` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
