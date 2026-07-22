@@ -174,7 +174,7 @@ async function waitForWorkbench(baseUrl, sessionId, appLog) {
             skip.click();
             return { heading: "", clickedSkip: true };
           }
-          return { heading: document.querySelector("h2")?.textContent?.trim() || "", clickedSkip: false };
+          return { heading: document.querySelector("h1, h2")?.textContent?.trim() || "", clickedSkip: false };
         })();
       `);
       if (state?.clickedSkip) appLog.push("dismissed first-run onboarding");
