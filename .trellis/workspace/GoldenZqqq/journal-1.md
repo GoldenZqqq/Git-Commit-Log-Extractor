@@ -365,7 +365,10 @@
 
 ### Main Changes
 
-- Detailed change bullets were not supplied; see the summary above.
+- 修正日报、周报、月报和自定义 Tab 的垂直居中。
+- 将报告警告限制在报告视图，支持折叠详情、关闭和安全清理入口。
+- 基于 `WorkspaceHealthResult` 清理确定失效的根目录与仓库索引，并保留不可访问项。
+- 提取工作区扫描/清理 hook，补齐清理确认、失败回退和全部根目录失效测试。
 
 ### Git Commits
 
@@ -377,7 +380,10 @@
 
 ### Testing
 
-- Validation was not recorded for this session.
+- `npm run build` passed.
+- `npm run test:e2e` passed (85/85).
+- `cargo fmt -- --check`, `cargo check`, and `cargo test` passed (138/138).
+- `git diff --check` passed.
 
 ### Status
 
@@ -442,6 +448,39 @@
 | Hash | Message |
 |------|---------|
 | `ed2ecdd` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 14: 修复报告警告与失效路径清理
+
+**Date**: 2026-07-22
+**Task**: 修复报告警告与失效路径清理
+**Branch**: `main`
+
+### Summary
+
+完成报告 Tab 居中、报告警告折叠关闭、结构化健康检查清理失效根目录与仓库索引；全量 E2E 85/85，Rust 138/138，生产构建通过并已推送。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b598ca9` | (see git log) |
 
 ### Testing
 

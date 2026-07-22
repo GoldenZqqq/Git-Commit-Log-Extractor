@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 13
+- **Total Sessions**: 14
 - **Last Active**: 2026-07-22
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~456 | Active |
+| `journal-1.md` | ~489 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 14 | 2026-07-22 | 修复报告警告与失效路径清理 | `b598ca9` | `main` |
 | 13 | 2026-07-22 | 重构首页报告工作台 | `ed2ecdd` | `main` |
 | 12 | 2026-07-21 | 修复 macOS universal 打包并发布 v0.6.1 | `89af61a`, `981c199`, `7f2479f` | `main` |
 | 11 | 2026-07-21 | 发布 GitPulse v0.6.0 | `9cde36c`, `e951545`, `d5c4274` | `main` |
