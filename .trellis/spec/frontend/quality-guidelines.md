@@ -29,6 +29,27 @@ Frontend changes should preserve a reliable local desktop workflow: scan reposit
 - Commit evidence detail must preserve repository, branch, date, hash, and original message context.
 - Keep application, component, hook, and model files at or below the repository's 600-line limit. Use explicit props and focused domain modules instead of disabling checks or compressing unrelated logic.
 
+## Stable Long-Task Notification Contract
+
+Global notifications for `runTask` loading flows must remain mounted for the whole task. Progress events update the existing loading message in place; they must not allocate a new React key on every event or replay the entrance animation. The final success, warning, or error reuses that message identity and restores a bounded dismissal timer.
+
+- Loading messages use `duration: 0`; final non-loading messages use the normal timeout.
+- Reuse the current loading message ID for progress and final state changes. Ordinary notifications after the task receive a new ID.
+- Do not append every loading progress tick to support events; record the task start and final outcome instead.
+- A persistent loading toast must not intercept workbench pointer actions. Keep the toast body pointer-transparent and re-enable pointer events only for its close button.
+- Keep dialog-owned or banner-owned progress local to that surface. Do not mirror batch generation, updater download, or blank-day progress into repetitive global notifications.
+
+```tsx
+// Wrong: each repository event remounts the toast and replays its animation.
+setMessage({ id: Date.now(), message: progressText, tone: "loading" });
+
+// Correct: preserve the active loading identity, then update its content in place.
+const id = current?.tone === "loading" ? current.id : nextMessageId();
+setMessage({ id, message: progressText, tone: "loading", duration: 0 });
+```
+
+Regression tests must dispatch at least two scan/extract progress events, mark the initial `.app-message` DOM node, and assert that the marker survives both progress updates and the final state transition. A pending-scan test must also prove that tabs and other workbench controls remain clickable beneath the notification.
+
 ---
 
 ## Testing Requirements

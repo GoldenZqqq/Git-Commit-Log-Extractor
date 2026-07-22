@@ -95,6 +95,11 @@
 .app-message.loading {
   border-color: rgba(63, 140, 255, 0.28);
   color: var(--primary-dark);
+  pointer-events: none;
+}
+
+.app-message.loading button {
+  pointer-events: auto;
 }
 
 @keyframes app-message-in {

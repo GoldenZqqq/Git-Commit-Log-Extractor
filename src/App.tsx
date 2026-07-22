@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { AppMessageHost, type AppMessage, type AppMessageTone } from "./components/AppMessageHost";
@@ -77,6 +77,8 @@ function App() {
         : "就绪",
   );
   const [appMessage, setAppMessage] = useState<AppMessage | null>(null);
+  const appMessageRef = useRef<AppMessage | null>(null);
+  const appMessageSequenceRef = useRef(0);
   const { settings, setSettings, updateSetting, applyConfigProfileSettings } = useAppSettingsState({
     loadedSettings,
     onResizeHistory: reportHistoryStorage.resize,
@@ -113,16 +115,25 @@ function App() {
       ? Boolean(settings.aiModel.trim())
       : Boolean(settings.aiBaseUrl.trim() && settings.aiModel.trim() && settings.aiApiKey.trim());
   const { chooseOutputDir, addRootDirs, removeRootDir } = useWorkspaceDirectoryActions({ setSettings, updateSetting });
-  const dismissAppMessage = useCallback(() => setAppMessage(null), []);
+  const dismissAppMessage = useCallback(() => {
+    appMessageRef.current = null;
+    setAppMessage(null);
+  }, []);
 
   function showMessage(message: string, tone: AppMessageTone = inferMessageTone(message), duration?: number) {
-    supportEvents.record(message, tone);
-    setAppMessage({
-      id: Date.now(),
+    const current = appMessageRef.current;
+    const continuesLoadingMessage = current?.tone === "loading";
+    if (!(continuesLoadingMessage && tone === "loading")) {
+      supportEvents.record(message, tone);
+    }
+    const nextMessage: AppMessage = {
+      id: continuesLoadingMessage ? current.id : ++appMessageSequenceRef.current,
       message,
       tone,
-      duration: duration ?? (tone === "loading" ? 1800 : 2800),
-    });
+      duration: duration ?? (tone === "loading" ? 0 : 2800),
+    };
+    appMessageRef.current = nextMessage;
+    setAppMessage(nextMessage);
   }
   function setStatus(message: string, options: { notify?: boolean; tone?: AppMessageTone; duration?: number } = {}) {
     setStatusText(message);
@@ -226,7 +237,11 @@ function App() {
         return;
       }
       if (payload.done) return;
-      setStatus(`正在扫描仓库：已检查 ${payload.scannedDirs} 个目录，发现 ${payload.foundRepos} 个仓库`);
+      setStatus(`正在扫描仓库：已检查 ${payload.scannedDirs} 个目录，发现 ${payload.foundRepos} 个仓库`, {
+        tone: "loading",
+        notify: true,
+        duration: 0,
+      });
     })
       .then((cleanup) => {
         unlisten = cleanup;
@@ -241,7 +256,7 @@ function App() {
     listen<CommitExtractProgress>("commit-extract-progress", ({ payload }) => {
       setExtractProgress(payload);
       if (payload.done) return;
-      setStatus(formatExtractProgress(payload));
+      setStatus(formatExtractProgress(payload), { tone: "loading", notify: true, duration: 0 });
     })
       .then((cleanup) => {
         unlisten = cleanup;
@@ -324,7 +339,7 @@ function App() {
       setStatus(`请等待“${start.conflictLabel}”完成后再继续`, { tone: "warning", notify: true, duration: 3200 });
       return false;
     }
-    setStatus(label, { tone: "loading", notify: true, duration: 1600 });
+    setStatus(label, { tone: "loading", notify: true, duration: 0 });
     if (kind !== "interaction") setWarnings([]);
     let succeeded = false;
     try {
@@ -560,20 +575,14 @@ function App() {
 
 function shouldNotifyStatus(message: string) {
   const trimmed = message.trim();
-  if (!trimmed || trimmed === "就绪") return false;
-  if (
-    trimmed.startsWith("正在扫描仓库：")
-    || trimmed.startsWith("正在提取提交：")
-    || trimmed.startsWith("提取中：")
-  ) return false;
-  return true;
+  return Boolean(trimmed && trimmed !== "就绪");
 }
 
 function inferMessageTone(message: string): AppMessageTone {
   if (message.includes("失败") || message.includes("错误") || message.includes("无效") || message.includes("无法")) return "error";
   if (message.includes("请选择") || message.includes("请输入") || message.includes("请先") || message.includes("不能为空")) return "warning";
   if (message.includes("取消") || message.includes("未写入") || message.includes("未读取") || message.includes("待配置")) return "warning";
-  if (message.startsWith("正在") || message.startsWith("提取中：")) return "loading";
+  if (message.startsWith("正在") || message.startsWith("提取中")) return "loading";
   if (message.includes("已") || message.includes("完成") || message.includes("生成")) return "success";
   return "info";
 }

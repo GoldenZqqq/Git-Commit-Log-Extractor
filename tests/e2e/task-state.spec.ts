@@ -121,6 +121,78 @@ test("keeps scan progress and cancellation local to the repository panel", async
   await expect(page.getByRole("button", { name: "重新扫描仓库索引" })).toBeEnabled();
 });
 
+test("updates report extraction progress in one stable notification", async ({ page }) => {
+  await launchTaskStateApp(page, {
+    deferredCommands: ["extract_commits"],
+    extractResults: [{
+      repos,
+      summaryText: "# 新日报\n\n- 多仓库提取完成",
+      detailedText: "",
+      warnings: [],
+      commits: [createCommit("abc2202", "feat: 完成多仓库提取")],
+    }],
+  });
+
+  await page.getByRole("button", { name: "生成日报" }).click();
+  await expectCommandPending(page, "extract_commits");
+
+  const message = page.locator(".app-message");
+  await expect(message).toHaveClass(/loading/);
+  await markNotificationNode(message);
+
+  await emitTauriEvent(page, "commit-extract-progress", {
+    completedRepos: 1,
+    totalRepos: 3,
+    commitCount: 4,
+    done: false,
+  });
+  await expect(message).toContainText("1/3 仓库");
+  await expectStableNotificationNode(message);
+
+  await emitTauriEvent(page, "commit-extract-progress", {
+    completedRepos: 2,
+    totalRepos: 3,
+    commitCount: 9,
+    done: false,
+  });
+  await expect(message).toContainText("2/3 仓库");
+  await expectStableNotificationNode(message);
+
+  await releaseCommand(page, "extract_commits");
+  await expect(message).toHaveClass(/success/);
+  await expect(message).toContainText("日报已生成");
+  await expectStableNotificationNode(message);
+});
+
+test("updates repository scan progress in one stable notification", async ({ page }) => {
+  await launchTaskStateApp(page, { deferredCommands: ["scan_repos"] });
+
+  await page.getByRole("tab", { name: /范围/ }).click();
+  await page.getByRole("button", { name: "仓库管理" }).click();
+  await page.getByRole("button", { name: "重新扫描仓库索引" }).click();
+  await expectCommandPending(page, "scan_repos");
+
+  const message = page.locator(".app-message");
+  await expect(message).toHaveClass(/loading/);
+  await markNotificationNode(message);
+
+  await emitTauriEvent(page, "repo-scan-progress", {
+    rootDir: "C:/workspace",
+    currentPath: "C:/workspace/project-two",
+    scannedDirs: 12,
+    foundRepos: 2,
+    done: false,
+    cancelled: false,
+  });
+  await expect(message).toContainText("已检查 12 个目录，发现 2 个仓库");
+  await expectStableNotificationNode(message);
+
+  await releaseCommand(page, "scan_repos");
+  await expect(message).toHaveClass(/success/);
+  await expect(message).toContainText("已发现 1 个仓库");
+  await expectStableNotificationNode(message);
+});
+
 async function launchTaskStateApp(page: Page, overrides: Partial<Parameters<typeof launchApp>[1]>) {
   await launchApp(page, {
     settings,
@@ -141,6 +213,35 @@ async function expectCommandPending(page: Page, command: string) {
 
 async function releaseCommand(page: Page, command: string) {
   await page.evaluate((cmd) => window.__mockTauri.releaseCommand(cmd), command);
+}
+
+async function emitTauriEvent(page: Page, event: string, payload: unknown) {
+  await expect.poll(async () => page.evaluate((eventName) => (
+    window.__mockTauri.calls.some((call) => (
+      call.cmd === "plugin:event|listen" && call.args.event === eventName
+    ))
+  ), event)).toBe(true);
+  await page.evaluate(({ eventName, eventPayload }) => {
+    const call = window.__mockTauri.calls.find((entry) => (
+      entry.cmd === "plugin:event|listen" && entry.args.event === eventName
+    ));
+    if (!call) throw new Error(`未找到事件监听器：${eventName}`);
+    window.__TAURI_INTERNALS__.runCallback(call.args.handler, {
+      event: eventName,
+      id: 1,
+      payload: eventPayload,
+    });
+  }, { eventName: event, eventPayload: payload });
+}
+
+async function markNotificationNode(message: ReturnType<Page["locator"]>) {
+  await message.evaluate((element) => {
+    element.setAttribute("data-stable-notification", "true");
+  });
+}
+
+async function expectStableNotificationNode(message: ReturnType<Page["locator"]>) {
+  await expect(message).toHaveAttribute("data-stable-notification", "true");
 }
 
 async function commandCalls(page: Page, command: string) {
