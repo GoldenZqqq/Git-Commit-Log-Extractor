@@ -507,6 +507,68 @@ button.generation-scope-item:hover {
 
 .assist-panel {
   padding: 10px 12px 12px;
+  container-type: inline-size;
+}
+
+@container (max-width: 360px) {
+  .assist-panel .history-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "report actions"
+      "stats actions";
+    align-items: center;
+    gap: 5px 8px;
+    min-height: 76px;
+    padding: 8px;
+  }
+
+  .assist-panel .history-open-button {
+    grid-area: report;
+    align-self: stretch;
+    gap: 3px;
+  }
+
+  .assist-panel .history-kind {
+    white-space: nowrap;
+  }
+
+  .assist-panel .history-mainline strong {
+    display: block;
+    font-size: 12px;
+  }
+
+  .assist-panel .history-subline {
+    font-size: 9.5px;
+  }
+
+  .assist-panel .history-stats {
+    grid-area: stats;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .assist-panel .history-stats span {
+    min-width: 0;
+    overflow: hidden;
+    padding-inline: 6px;
+    text-overflow: ellipsis;
+  }
+
+  .assist-panel .history-actions {
+    grid-area: actions;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+
+  .assist-panel .history-actions button {
+    min-width: 54px;
+    min-height: 28px;
+    padding-inline: 7px;
+    font-size: 10.5px;
+  }
 }
 
 .assist-panel .repo-drawer {

@@ -717,6 +717,23 @@ test("filters report history by type date status and search", async ({ page }) =
 
   await expectWorkbench(page);
   await openAssistTab(page, /最近/);
+  const historyLayout = await page.locator(".assist-panel .history-row").first().evaluate((row) => {
+    const title = row.querySelector<HTMLElement>(".history-mainline strong")!;
+    const actions = row.querySelector<HTMLElement>(".history-actions")!;
+    const titleRect = title.getBoundingClientRect();
+    return {
+      titleWidth: titleRect.width,
+      titleHeight: titleRect.height,
+      overflow: row.scrollWidth - row.clientWidth,
+      actionDirection: getComputedStyle(actions).flexDirection,
+      bodyBackground: getComputedStyle(document.body).backgroundImage,
+    };
+  });
+  expect(historyLayout.titleWidth).toBeGreaterThan(90);
+  expect(historyLayout.titleHeight).toBeLessThan(20);
+  expect(historyLayout.overflow).toBeLessThanOrEqual(1);
+  expect(historyLayout.actionDirection).toBe("column");
+  expect(historyLayout.bodyBackground).toContain("linear-gradient");
   await page.getByLabel("筛选报告类型").selectOption("weekly");
   await expect(page.getByRole("button", { name: /周报 · 2026-W24/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /月报 · 2026-07/ })).toHaveCount(0);

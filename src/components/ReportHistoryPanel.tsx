@@ -242,7 +242,7 @@ function HistoryRow({
         onClick={() => onOpen(entry)}
         disabled={reportLocked}
         aria-pressed={active}
-        title="打开这份历史报告"
+        title={`${entry.title} · 点击打开`}
       >
         <span className="history-kind">{getHistoryKindLabel(entry.mode)}</span>
         <span className="history-mainline">

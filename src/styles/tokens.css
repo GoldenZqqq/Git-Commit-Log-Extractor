@@ -19,10 +19,10 @@
   --canvas: #ffffff;
   --canvas-line: #e0e4e9;
   --canvas-text: #252a32;
-  --body-bg: #f1f3f5;
-  --body-start: #f1f3f5;
-  --body-end: #f1f3f5;
-  --body-grid: transparent;
+  --body-bg: #eef7ff;
+  --body-start: #f7fbff;
+  --body-end: #eef7ff;
+  --body-grid: rgba(37, 99, 235, 0.055);
   --shadow-sm: 0 1px 2px rgba(20, 24, 31, 0.06);
   --shadow-md: 0 8px 24px rgba(20, 24, 31, 0.08);
   --radius-xs: 5px;
@@ -49,7 +49,12 @@ body {
   min-width: 320px;
   height: 100vh;
   overflow: hidden;
-  background: var(--body-bg);
+  background:
+    linear-gradient(90deg, var(--body-grid) 1px, transparent 1px),
+    linear-gradient(var(--body-grid) 1px, transparent 1px),
+    linear-gradient(180deg, var(--body-start), var(--body-end)),
+    var(--body-bg);
+  background-size: 34px 34px, 34px 34px, auto, auto;
 }
 
 * {
@@ -98,10 +103,10 @@ body {
   --canvas: #141619;
   --canvas-line: #30343b;
   --canvas-text: #e4e7eb;
-  --body-bg: #101215;
-  --body-start: #101215;
-  --body-end: #101215;
-  --body-grid: transparent;
+  --body-bg: #0e1624;
+  --body-start: #121d2e;
+  --body-end: #0e1624;
+  --body-grid: rgba(109, 168, 255, 0.075);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 18px 44px rgba(0, 0, 0, 0.32);
 }
