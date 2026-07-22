@@ -515,6 +515,68 @@ test("passes evidence link rules when generating daily reports", async ({ page }
   ]);
 });
 
+test("keeps workbench usable when week or month period input is incomplete", async ({ page }) => {
+  // Regression for issue #3: editing week/month mid-value must not throw in derived ranges (white screen).
+  await launchApp(page, {
+    settings,
+    repoCache: createRepoCache(["C:/workspace"], repos),
+    reportHistory: [
+      createHistoryEntry({
+        id: "history-partial-week",
+        mode: "weekly",
+        title: "周报 · 2026-W2",
+        periodLabel: "2026-W2",
+        range: { startDate: "2026-01-05", endDate: "2026-01-11" },
+        commitCount: 1,
+        reportText: "# 残缺周次历史\n\n- 残缺周次打开后不得白屏",
+      }),
+      createHistoryEntry({
+        id: "history-partial-month",
+        mode: "monthly",
+        title: "月报 · 2026-0",
+        periodLabel: "2026-0",
+        range: { startDate: "2026-01-01", endDate: "2026-01-31" },
+        commitCount: 1,
+        reportText: "# 残缺月份历史\n\n- 残缺月份打开后不得白屏",
+      }),
+    ],
+  });
+
+  await expectWorkbench(page);
+  await openAssistTab(page, /最近/);
+
+  await page.getByRole("button", { name: /周报 · 2026-W2/ }).click();
+  await expect(page.getByText("残缺周次打开后不得白屏")).toBeVisible();
+  await expect(page.getByLabel("选择周报周次")).toBeVisible();
+  await expect(page.getByRole("button", { name: "生成周报" })).toBeVisible();
+  await expect(page.locator("#root")).not.toBeEmpty();
+
+  // Native week control can emit empty while typing; state must keep a complete prior value.
+  await page.getByLabel("选择周报周次").evaluate((element) => {
+    const input = element as HTMLInputElement;
+    input.value = "";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await expect(page.getByText("残缺周次打开后不得白屏")).toBeVisible();
+  await expect(page.getByRole("button", { name: "生成周报" })).toBeVisible();
+
+  await openAssistTab(page, /最近/);
+  await page.getByRole("button", { name: /月报 · 2026-0/ }).click();
+  await expect(page.getByText("残缺月份打开后不得白屏")).toBeVisible();
+  await expect(page.getByLabel("选择月报月份")).toBeVisible();
+  await expect(page.getByRole("button", { name: "生成月报" })).toBeVisible();
+
+  await page.getByLabel("选择月报月份").evaluate((element) => {
+    const input = element as HTMLInputElement;
+    input.value = "2026-0";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await expect(page.getByText("残缺月份打开后不得白屏")).toBeVisible();
+  await expect(page.getByRole("button", { name: "生成月报" })).toBeVisible();
+});
+
 test("generates and exports a weekly report", async ({ page }) => {
   await launchApp(page, {
     settings,

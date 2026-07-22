@@ -1,4 +1,4 @@
-import { formatMonthLabel, type DateRange, type PreviewMode, type ReportExportFormat, type ReportHistoryProject } from "./model";
+import { formatMonthLabel, isValidMonthInput, type DateRange, type PreviewMode, type ReportExportFormat, type ReportHistoryProject } from "./model";
 
 export type HistoryEntryInput = {
   mode: PreviewMode;
@@ -34,7 +34,8 @@ export function activePreviewPeriodLabel(
   customRange: DateRange,
 ) {
   if (mode === "weekly") return weeklyWeek;
-  if (mode === "monthly") return formatMonthLabel(monthlyMonth);
+  // Incomplete month strings must not throw during polish/export label derivation.
+  if (mode === "monthly") return isValidMonthInput(monthlyMonth) ? formatMonthLabel(monthlyMonth) : monthlyMonth;
   if (mode === "custom") return `${customRange.startDate} ~ ${customRange.endDate}`;
   return dailyDate;
 }

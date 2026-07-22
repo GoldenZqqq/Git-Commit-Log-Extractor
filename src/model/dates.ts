@@ -27,6 +27,11 @@ export function getWeekRange(weekValue: string): DateRange {
   return { startDate: formatDateInput(start), endDate: formatDateInput(addDays(start, 6)) };
 }
 
+/** Safe range for render paths: never throws on partial/invalid week input. */
+export function getWeekRangeOrFallback(weekValue: string, fallback = getWeekLabel()): DateRange {
+  return isValidWeekInput(weekValue) ? getWeekRange(weekValue) : getWeekRange(fallback);
+}
+
 export function getPreviousMonthInput(date = new Date()) {
   return formatMonthInput(new Date(date.getFullYear(), date.getMonth() - 1, 1));
 }
@@ -38,6 +43,11 @@ export function getMonthRange(monthValue: string): DateRange {
   return { startDate: formatDateInput(start), endDate: formatDateInput(end) };
 }
 
+/** Safe range for render paths: never throws on partial/invalid month input. */
+export function getMonthRangeOrFallback(monthValue: string, fallback = getPreviousMonthInput()): DateRange {
+  return isValidMonthInput(monthValue) ? getMonthRange(monthValue) : getMonthRange(fallback);
+}
+
 export function formatMonthLabel(monthValue: string) {
   const parts = parseMonthInput(monthValue);
   return `${parts.year}-${String(parts.month).padStart(2, "0")}`;
@@ -46,6 +56,15 @@ export function formatMonthLabel(monthValue: string) {
 export function isValidMonthInput(monthValue: string) {
   try {
     parseMonthInput(monthValue);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function isValidWeekInput(weekValue: string) {
+  try {
+    parseWeekInput(weekValue);
     return true;
   } catch {
     return false;

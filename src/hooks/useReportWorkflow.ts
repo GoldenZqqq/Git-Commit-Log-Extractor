@@ -8,11 +8,15 @@ import {
   buildReportEnhanceOptions,
   formatMonthLabel,
   getMonthRange,
+  getMonthRangeOrFallback,
   getPreviousMonthInput,
   getSingleDayRange,
   getTodayRange,
   getWeekLabel,
   getWeekRange,
+  getWeekRangeOrFallback,
+  isValidMonthInput,
+  isValidWeekInput,
   isBlankDayHistoryEntry,
   type AppSettings,
   type CommitExtractProgress,
@@ -105,8 +109,9 @@ export function useReportWorkflow({
   const [blankDayDraftActive, setBlankDayDraftActive] = useState(false);
   const reportHistory = reportHistoryStorage.entries;
   const dailyRange = useMemo(() => getSingleDayRange(dailyDate), [dailyDate]);
-  const weeklyRange = useMemo(() => getWeekRange(weeklyWeek), [weeklyWeek]);
-  const monthlyRange = useMemo(() => getMonthRange(monthlyMonth), [monthlyMonth]);
+  // Derived ranges must not throw when the period control is mid-edit (partial week/month strings).
+  const weeklyRange = useMemo(() => getWeekRangeOrFallback(weeklyWeek), [weeklyWeek]);
+  const monthlyRange = useMemo(() => getMonthRangeOrFallback(monthlyMonth), [monthlyMonth]);
   const previewText = activePreview === "monthly" ? monthlyReport : activePreview === "weekly" ? weeklyReport : activePreview === "custom" ? customReport : summaryText;
   const currentReportRange = activePreviewRange(activePreview, dailyRange, weeklyRange, monthlyRange, customRange);
   const currentSupplementalDraftKey = buildSupplementalDraftKey(activePreview, currentReportRange);
@@ -114,8 +119,16 @@ export function useReportWorkflow({
 
   function changePreview(preview: PreviewMode) { setActivePreview(preview); setActiveHistoryId(""); }
   function changeDailyDate(date: string) { setDailyDate(date); setActiveHistoryId(""); setBlankDayDraftActive(false); }
-  function changeWeeklyWeek(week: string) { setWeeklyWeek(week); setActiveHistoryId(""); }
-  function changeMonthlyMonth(month: string) { setMonthlyMonth(month); setActiveHistoryId(""); }
+  function changeWeeklyWeek(week: string) {
+    if (!isValidWeekInput(week)) return;
+    setWeeklyWeek(week);
+    setActiveHistoryId("");
+  }
+  function changeMonthlyMonth(month: string) {
+    if (!isValidMonthInput(month)) return;
+    setMonthlyMonth(month);
+    setActiveHistoryId("");
+  }
   function changeSupplementalItems(value: string) { setSupplementalDrafts((current) => ({ ...current, [currentSupplementalDraftKey]: value })); }
 
   function supplementalItemsFor(mode: PreviewMode, range: DateRange, override?: string[]) {
@@ -157,13 +170,19 @@ export function useReportWorkflow({
   }
 
   async function generateWeeklyReport(weekValue = weeklyWeek, supplementalOverride?: string[]) {
-    const range = getWeekRange(weekValue); setExtractProgress(null);
+    setExtractProgress(null);
     await runTask({ kind: "generate", label: "正在生成周报", task: async () => {
+      const range = getWeekRange(weekValue);
       const supplementalItems = supplementalItemsFor("weekly", range, supplementalOverride);
       const result = await invoke<PeriodReportResult>("generate_period_report", { options: buildPeriodReportOptions(settings, projectNames, "weekly", range, weekValue, false, "", repos, supplementalItems) });
       setWeeklyWeek(result.periodLabel); setWeeklyReport(result.reportText); setWarnings(result.warnings); setLastOutputFile(result.outputFile); setCommitCount(result.commitCount); setProjectCount(result.projectCount); setBlankDayDraftActive(false); setActivePreview("weekly");
       rememberHistory(buildHistoryEntry({ mode: "weekly", range, periodLabel: result.periodLabel, reportText: result.reportText, commitCount: result.commitCount, projectCount: result.projectCount, aiEnhanced: false, outputFile: result.outputFile, supplementalItems, projects: result.projects })); setStatus(result.outputFile ? `${result.periodLabel} 周报已生成` : `${result.periodLabel} 周报已生成，未写入文件`);
-    }, validate: () => { validatePeriodReportSettings(settings, range); supplementalItemsFor("weekly", range, supplementalOverride); }});
+    }, validate: () => {
+      if (!isValidWeekInput(weekValue)) throw new Error("请选择有效的报告周");
+      const range = getWeekRange(weekValue);
+      validatePeriodReportSettings(settings, range);
+      supplementalItemsFor("weekly", range, supplementalOverride);
+    }});
   }
 
   async function generateMonthlyReport(monthValue = monthlyMonth, supplementalOverride?: string[]) {
@@ -173,7 +192,12 @@ export function useReportWorkflow({
       const result = await invoke<PeriodReportResult>("generate_period_report", { options: buildPeriodReportOptions(settings, projectNames, "monthly", range, label, false, "", repos, supplementalItems) });
       setMonthlyMonth(result.periodLabel); setMonthlyReport(result.reportText); setMonthlyLabel(result.periodLabel); setWarnings(result.warnings); setLastOutputFile(result.outputFile); setCommitCount(result.commitCount); setProjectCount(result.projectCount); setBlankDayDraftActive(false); setActivePreview("monthly");
       rememberHistory(buildHistoryEntry({ mode: "monthly", range, periodLabel: result.periodLabel, reportText: result.reportText, commitCount: result.commitCount, projectCount: result.projectCount, aiEnhanced: false, outputFile: result.outputFile, supplementalItems, projects: result.projects })); setStatus(result.outputFile ? `${result.periodLabel} 月报已生成` : `${result.periodLabel} 月报已生成，未写入文件`);
-    }, validate: () => { const range = getMonthRange(monthValue); validatePeriodReportSettings(settings, range); supplementalItemsFor("monthly", range, supplementalOverride); }});
+    }, validate: () => {
+      if (!isValidMonthInput(monthValue)) throw new Error("请选择有效的报告月份");
+      const range = getMonthRange(monthValue);
+      validatePeriodReportSettings(settings, range);
+      supplementalItemsFor("monthly", range, supplementalOverride);
+    }});
   }
 
   function setActivePreviewText(mode: PreviewMode, text: string) {
@@ -212,7 +236,13 @@ export function useReportWorkflow({
   async function saveReport(format: ReportExportFormat = "markdown") {
     if (!previewText) return;
     if (!settings.outputEnabled || !settings.outputDir.trim()) { onOpenSettings(); setStatus(settings.outputEnabled ? "请选择输出目录后再导出报告" : "请先开启输出到文件并选择输出目录", { tone: "warning", notify: true, duration: 4200 }); return; }
-    const range = activePreview === "custom" ? customRange : dailyRange; const baseName = activePreview === "monthly" ? `monthly_report_${monthlyLabel || formatMonthLabel(monthlyMonth)}` : activePreview === "weekly" ? `weekly_report_${weeklyWeek}` : `git_commits_${range.startDate}_to_${range.endDate}`;
+    const range = activePreview === "custom" ? customRange : dailyRange;
+    const monthBase = monthlyLabel || (isValidMonthInput(monthlyMonth) ? formatMonthLabel(monthlyMonth) : monthlyMonth);
+    const baseName = activePreview === "monthly"
+      ? `monthly_report_${monthBase}`
+      : activePreview === "weekly"
+        ? `weekly_report_${weeklyWeek}`
+        : `git_commits_${range.startDate}_to_${range.endDate}`;
     await runTask({ kind: "export", label: "正在导出报告", task: async () => { const outputFile = await invoke<string>("save_report_file", { outputDir: settings.outputDir, baseName, format, content: previewText }); setLastOutputFile(outputFile); updateActiveHistory({ outputFile }); setStatus(`报告已导出为 ${formatReportExportLabel(format)}`); }, validate: () => validateOutputSettings(settings) });
   }
 

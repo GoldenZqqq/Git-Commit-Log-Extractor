@@ -50,7 +50,10 @@ export function ReportPeriodControl({
           value={dailyDate}
           disabled={periodLocked}
           aria-label="选择日报日期"
-          onChange={(event) => event.target.value && onDailyDateChange(event.target.value)}
+          onChange={(event) => {
+            const next = event.target.value;
+            if (next) onDailyDateChange(next);
+          }}
         />
       )}
       {activePreview === "weekly" && (
@@ -59,7 +62,11 @@ export function ReportPeriodControl({
           value={weeklyWeek}
           disabled={periodLocked}
           aria-label="选择周报周次"
-          onChange={(event) => event.target.value && onWeeklyWeekChange(event.target.value)}
+          onChange={(event) => {
+            // Native week inputs can emit empty/partial values while typing; keep prior complete value.
+            const next = event.target.value;
+            if (next) onWeeklyWeekChange(next);
+          }}
         />
       )}
       {activePreview === "monthly" && (
@@ -68,7 +75,11 @@ export function ReportPeriodControl({
           value={monthlyMonth}
           disabled={periodLocked}
           aria-label="选择月报月份"
-          onChange={(event) => event.target.value && onMonthlyMonthChange(event.target.value)}
+          onChange={(event) => {
+            // Native month inputs can emit empty/partial values while typing; keep prior complete value.
+            const next = event.target.value;
+            if (next) onMonthlyMonthChange(next);
+          }}
         />
       )}
       {activePreview === "custom" && (
