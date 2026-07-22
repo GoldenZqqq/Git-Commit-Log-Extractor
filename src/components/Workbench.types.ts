@@ -82,4 +82,7 @@ export type WorkbenchProps = {
   onOpenBlankDayFill: () => void;
   onGenerateDailyFromCalendar: (date: string) => void;
   onOpenBlankDayFillFromCalendar: (date: string) => void;
+  onInspectWorkspaceCleanup: () => void;
+  onDismissWarnings: () => void;
+  workspaceCleanupBlocked: boolean;
 };

@@ -58,6 +58,7 @@ type MockScenario = {
   scanRepos?: RepoInfo[];
   scanWarnings?: string[];
   workspaceHealthResult?: Record<string, unknown>;
+  workspaceHealthError?: string;
   extractResults?: Array<{
     repos?: RepoInfo[];
     summaryText: string;
@@ -227,6 +228,7 @@ export async function launchApp(page: Page, scenario: MockScenario) {
     scanRepos: scenario.scanRepos ?? scenario.repoCache?.repos ?? [],
     scanWarnings: scenario.scanWarnings ?? [],
     workspaceHealthResult: scenario.workspaceHealthResult ?? { roots: [], repos: [] },
+    workspaceHealthError: scenario.workspaceHealthError,
     extractResults: scenario.extractResults ?? [],
     periodResults: scenario.periodResults ?? {},
     diagnosticsResult: scenario.diagnosticsResult ?? {
@@ -506,6 +508,7 @@ export async function launchApp(page: Page, scenario: MockScenario) {
                 warnings: state.scanWarnings ?? [],
               };
             case "inspect_workspace_health":
+              if (state.workspaceHealthError) throw new Error(state.workspaceHealthError);
               return state.workspaceHealthResult;
             case "load_report_history": {
               if (state.reportHistoryLoadError) throw new Error(state.reportHistoryLoadError);

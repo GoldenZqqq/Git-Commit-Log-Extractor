@@ -7,3 +7,4 @@ export * from "./model/report-options";
 export * from "./model/support-bundle";
 export * from "./model/repository";
 export * from "./model/settings";
+export * from "./model/workspace-cleanup";

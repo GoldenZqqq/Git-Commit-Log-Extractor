@@ -9,6 +9,7 @@ import { RepoMappingDialog } from "./components/RepoMappingDialog";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { Workbench } from "./components/Workbench";
+import { WorkspaceCleanupDialog } from "./components/WorkspaceCleanupDialog";
 import { useAppRuntime } from "./hooks/useAppRuntime";
 import { useAppSettingsState } from "./hooks/useAppSettingsState";
 import { useReportHistoryStorage } from "./hooks/useReportHistoryStorage";
@@ -16,6 +17,7 @@ import { useReportWorkflow } from "./hooks/useReportWorkflow";
 import { useSupportEvents } from "./hooks/useSupportEvents";
 import { useWorkspaceHealth } from "./hooks/useWorkspaceHealth";
 import { useWorkspaceDirectoryActions } from "./hooks/useWorkspaceDirectoryActions";
+import { useWorkspaceScanning } from "./hooks/useWorkspaceScanning";
 import {
   taskIsActive,
   type AppTaskKind,
@@ -26,14 +28,12 @@ import {
   type GitIdentity,
   type RepoInfo,
   type RepoScanProgress,
-  type RepoScanResult,
   type MappingScope,
   clearRepoIndexCache,
   loadRepoIndexCache,
   loadSettingsState,
   parseProjectNames,
   persistRepoIndexCache,
-  saveRepoIndexCache,
   upsertRepoMapping,
   validateRequiredSettings,
   validateWorkspaceSettings,
@@ -48,6 +48,7 @@ import "./styles/onboarding.css";
 import "./styles/theme.css";
 import "./styles/workbench.css";
 import "./styles/workbench-responsive.css";
+import "./styles/workbench-feedback.css";
 type RunTaskInput = {
   kind: AppTaskKind;
   label: string;
@@ -185,6 +186,20 @@ function App() {
     handleBlankDayGenerated,
     handleBlankDayApply,
   } = reportWorkflow;
+  const workspaceScanning = useWorkspaceScanning({
+    settings,
+    repos,
+    isRepoScanning,
+    workspaceHealth,
+    runTask,
+    validateSettings: validateWorkspaceSettings,
+    setSettings,
+    setRepos,
+    setRepoScannedAt,
+    setScanProgress,
+    setWarnings,
+    setStatus,
+  });
 
   useEffect(() => {
     if (!startupUpdateNotice) return;
@@ -275,44 +290,8 @@ function App() {
       setStatus("工作目录已更新，请点击重新扫描仓库索引");
       return;
     }
-    scanWorkspace();
+    workspaceScanning.scanWorkspace();
   }, [settings.rootDirs, settings.onboardingDone]);
-
-  async function scanWorkspace() {
-    await runTask({
-      kind: "scan",
-      label: "正在扫描仓库",
-      task: async () => {
-        setScanProgress({
-          rootDir: "",
-          currentPath: "",
-          scannedDirs: 0,
-          foundRepos: 0,
-          done: false,
-          cancelled: false,
-        });
-        const result = await invoke<RepoScanResult>("scan_repos", { rootDirs: settings.rootDirs });
-        updateRepoIndex(result.repos);
-        setWarnings(result.warnings);
-        setScanProgress((current) => ({
-          rootDir: current?.rootDir ?? "",
-          currentPath: current?.currentPath ?? "",
-          scannedDirs: current?.scannedDirs ?? 0,
-          foundRepos: result.repos.length,
-          done: true,
-          cancelled: false,
-        }));
-        setStatus(
-          result.warnings.length > 0
-            ? `已发现 ${result.repos.length} 个仓库，部分路径已跳过`
-            : `已发现 ${result.repos.length} 个仓库`,
-          result.warnings.length > 0 ? { tone: "warning", notify: true, duration: 4200 } : undefined,
-        );
-        workspaceHealth.refreshIfLoaded(result.repos);
-      },
-      validate: () => validateWorkspaceSettings(settings),
-    });
-  }
 
   async function cancelRepoScan() {
     setStatus("正在取消仓库扫描");
@@ -329,31 +308,34 @@ function App() {
     task,
     validate = () => validateRequiredSettings(settings),
     allowDuringPolishReview = false,
-  }: RunTaskInput) {
+  }: RunTaskInput): Promise<boolean> {
     if (polishReview && !allowDuringPolishReview && (kind === "generate" || kind === "polish" || kind === "export")) {
       setStatus("请先接受或放弃当前 AI 润色结果", { tone: "warning", notify: true });
-      return;
+      return false;
     }
     try {
       validate();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error), { tone: "error", notify: true, duration: 4200 });
-      return;
+      return false;
     }
     const start = tryStartTask(kind, label);
     if (!start.started) {
       setStatus(`请等待“${start.conflictLabel}”完成后再继续`, { tone: "warning", notify: true, duration: 3200 });
-      return;
+      return false;
     }
     setStatus(label, { tone: "loading", notify: true, duration: 1600 });
     if (kind !== "interaction") setWarnings([]);
+    let succeeded = false;
     try {
       await task();
+      succeeded = true;
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error), { tone: "error", notify: true, duration: 4200 });
     } finally {
       finishTask(kind);
     }
+    return succeeded;
   }
 
   function toggleRepo(repoPath: string, enabled: boolean) {
@@ -380,12 +362,6 @@ function App() {
     });
     workspaceHealth.setReposDisabled(changedPaths, !enabled);
     setStatus(`已${enabled ? "启用" : "禁用"}当前结果中的 ${changedPaths.length} 个仓库`, { tone: "success", notify: true });
-  }
-
-  function updateRepoIndex(nextRepos: RepoInfo[]) {
-    setRepos(nextRepos);
-    const cache = saveRepoIndexCache(settings.rootDirs, nextRepos);
-    setRepoScannedAt(cache.scannedAt);
   }
 
   function removeRepoFromIndex(repoPath: string) {
@@ -508,7 +484,7 @@ function App() {
         onToggleRepo={toggleRepo}
         onSetReposEnabled={setReposEnabled}
         onEditRepo={setEditingRepo}
-        onRefreshRepos={scanWorkspace}
+        onRefreshRepos={() => void workspaceScanning.scanWorkspace()}
         onCancelRepoScan={cancelRepoScan}
         onRefreshWorkspaceHealth={() => void workspaceHealth.refresh()}
         onRemoveRepoFromIndex={removeRepoFromIndex}
@@ -519,6 +495,9 @@ function App() {
         onOpenBlankDayFill={() => setBlankDayOpen(true)}
         onGenerateDailyFromCalendar={handleGenerateDailyFromCalendar}
         onOpenBlankDayFillFromCalendar={handleOpenBlankDayFillFromCalendar}
+        onInspectWorkspaceCleanup={workspaceScanning.inspectCleanup}
+        onDismissWarnings={() => setWarnings([])}
+        workspaceCleanupBlocked={isRepoScanning || workspaceScanning.cleanupBusy}
       />
       <SettingsDialog
         open={settingsOpen}
@@ -568,6 +547,12 @@ function App() {
         projectNamesText={settings.projectNamesText}
         onClose={() => setEditingRepo(null)}
         onConfirm={saveRepoMapping}
+      />
+      <WorkspaceCleanupDialog
+        candidate={workspaceScanning.cleanupCandidate}
+        busy={workspaceScanning.cleanupBusy}
+        onCancel={workspaceScanning.dismissCleanup}
+        onConfirm={() => void workspaceScanning.confirmCleanup()}
       />
     </main>
   );

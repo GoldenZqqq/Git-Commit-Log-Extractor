@@ -172,18 +172,23 @@ export function Workbench(props: WorkbenchProps) {
           onRemoveRepo={props.onRemoveRepoFromIndex}
         />
       )}
-      <WorkbenchEventLog
-        warnings={props.warnings}
-        lastOutputFile={props.lastOutputFile}
-        emptyReportAdvice={emptyReportAdvice}
-        showEmptyReportAdvice={showEmptyReportAdvice}
-        scanBlocked={scanBlocked}
-        onDismissAdvice={() => setEmptyAdviceDismissedKey(emptyAdviceKey)}
-        onOpenSettings={props.onOpenSettings}
-        onRefreshRepos={props.onRefreshRepos}
-        canFillBlankDay={props.activePreview === "summary" && props.aiConfigured}
-        onOpenBlankDayFill={props.onOpenBlankDayFill}
-      />
+      {workbenchView === "report" && (
+        <WorkbenchEventLog
+          warnings={props.warnings}
+          lastOutputFile={props.lastOutputFile}
+          emptyReportAdvice={emptyReportAdvice}
+          showEmptyReportAdvice={showEmptyReportAdvice}
+          scanBlocked={scanBlocked}
+          cleanupBlocked={props.workspaceCleanupBlocked}
+          onDismissAdvice={() => setEmptyAdviceDismissedKey(emptyAdviceKey)}
+          onOpenSettings={props.onOpenSettings}
+          onRefreshRepos={props.onRefreshRepos}
+          onInspectCleanup={props.onInspectWorkspaceCleanup}
+          onDismissWarnings={props.onDismissWarnings}
+          canFillBlankDay={props.activePreview === "summary" && props.aiConfigured}
+          onOpenBlankDayFill={props.onOpenBlankDayFill}
+        />
+      )}
     </section>
   );
 }

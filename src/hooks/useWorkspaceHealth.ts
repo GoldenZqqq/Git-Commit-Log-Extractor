@@ -27,8 +27,8 @@ function useWorkspaceHealthRequest(params: Params) {
     setError("");
     setLoading(false);
   }, [rootKey]);
-  const refresh = useCallback(async (reposOverride?: RepoInfo[], supersede = false) => {
-    if (activeRequestRef.current !== null && !supersede) return;
+  const refresh = useCallback(async (reposOverride?: RepoInfo[], supersede = false): Promise<WorkspaceHealthResult | null> => {
+    if (activeRequestRef.current !== null && !supersede) return null;
     const requestVersion = ++requestVersionRef.current;
     activeRequestRef.current = requestVersion;
     setLoading(true);
@@ -46,10 +46,12 @@ function useWorkspaceHealthRequest(params: Params) {
         resultRef.current = nextResult;
         setResult(nextResult);
       }
+      return nextResult;
     } catch (requestError) {
       if (requestVersion === requestVersionRef.current) {
         setError(requestError instanceof Error ? requestError.message : String(requestError));
       }
+      return null;
     } finally {
       if (activeRequestRef.current === requestVersion) activeRequestRef.current = null;
       if (requestVersion === requestVersionRef.current) setLoading(false);
@@ -87,6 +89,14 @@ export function useWorkspaceHealth(params: Params) {
       return next;
     });
   }, [request.resultRef, request.setResult]);
+  const removeRepos = useCallback((paths: string[]) => {
+    const pathSet = new Set(paths);
+    request.setResult((current) => {
+      const next = current ? { ...current, repos: current.repos.filter((repo) => !pathSet.has(repo.path)) } : current;
+      request.resultRef.current = next;
+      return next;
+    });
+  }, [request.resultRef, request.setResult]);
 
   const refresh = useCallback((reposOverride?: RepoInfo[]) => request.refresh(reposOverride), [request.refresh]);
   const refreshIfLoaded = useCallback((reposOverride: RepoInfo[]) => {
@@ -104,5 +114,6 @@ export function useWorkspaceHealth(params: Params) {
     setRepoDisabled,
     setReposDisabled,
     removeRepo,
+    removeRepos,
   };
 }

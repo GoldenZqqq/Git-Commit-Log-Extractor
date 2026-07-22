@@ -107,6 +107,16 @@ The report workbench is organized as a progressive flow: choose report type and 
 
 The right rail stays visible as “本次范围” so users can verify what will be included without opening a management surface. Management operations are intentionally secondary because they change the workspace rather than the current report intent.
 
+## Warning Ownership and Workspace Cleanup Contract
+
+- Scan and report warnings are owned by the report view's event log. Insights and workspace-health views must not reserve footer space for report warnings.
+- The event log renders a one-line summary first. Raw scan details stay behind an explicit disclosure; high-priority AI failure text may remain inline so a failed polish never becomes invisible.
+- “Check and clean” derives candidates only from the structured `WorkspaceHealthResult`. Removeable roots are `missing`/`not_directory`; removable repository indexes are `missing`/`not_git`. Keep `inaccessible`, `branch_unknown`, and `branch_changed` for user review.
+- Cleanup changes GitPulse settings, repository index cache, and disabled-repository references only. The confirmation dialog must say that no disk files or directories are deleted.
+- A failed health check or a candidate set with no safe entries keeps the original warning and reports a retry or mount/permission action; it must not open a destructive confirmation dialog.
+
+The contract is covered by `tests/e2e/workbench-cleanup.spec.ts`, including cancellation, failure, no-safe-entry, view ownership, and post-cleanup rescan assertions.
+
 ## Experimental Provider Disclosure
 
 - Mark an experimental provider in the protocol option itself so users see the status before selecting it.

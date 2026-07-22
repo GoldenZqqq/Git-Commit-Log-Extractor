@@ -130,6 +130,21 @@
     padding: 24px 18px;
   }
 
+  .warning-event-summary {
+    align-items: flex-start;
+  }
+
+  .warning-event-actions {
+    width: 100%;
+    margin-left: 22px;
+  }
+
+  .warning-event-details ul {
+    right: auto;
+    left: 0;
+    width: min(520px, calc(100vw - 48px));
+  }
+
   .report-generate-primary,
   .generation-more {
     grid-column: 1;

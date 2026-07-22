@@ -18,6 +18,7 @@ Hooks are used sparingly. Most app state lives in `App.tsx`; custom hooks are re
 - Keep report generation/polish/export/history transitions together in `useReportWorkflow`; keep localStorage and secure-store synchronization together in `useAppSettingsState`.
 - Initialize source state before constructing hooks that depend on it. For example, load settings and create report-history storage before passing either into the settings synchronization hook; do not close over a later `const` during hook initialization.
 - Hook actions should receive a typed status/task callback from the root so task activity and support events remain single-source-of-truth.
+- Workspace scan and cleanup orchestration belongs in one focused hook (`useWorkspaceScanning`) so scan progress, cache writes, structured health inspection, and cleanup-after-rescan share the same root-directory snapshot. Keep disk operations behind Tauri commands and expose typed intent callbacks to components.
 
 ## Overlay Focus Contract
 

@@ -387,6 +387,7 @@ test("keeps valid repositories and shows skipped path warnings after scanning", 
   await page.getByLabel("仓库索引为空").getByRole("button", { name: "重新扫描" }).click();
 
   await expect(page.locator(".run-status")).toContainText("已发现 1 个仓库，部分路径已跳过");
+  await page.locator(".warning-event-details summary").click();
   await expect(page.getByText(scanWarning)).toBeVisible();
   await expect(page.getByText("gitpulse", { exact: true })).toBeVisible();
 });

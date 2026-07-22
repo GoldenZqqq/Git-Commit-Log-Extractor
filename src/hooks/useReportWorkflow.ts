@@ -64,7 +64,7 @@ type Params = {
   repos: RepoInfo[];
   projectNames: Record<string, string>;
   reportHistoryStorage: HistoryStorage;
-  runTask: (input: RunTaskInput) => Promise<void>;
+  runTask: (input: RunTaskInput) => Promise<unknown>;
   setStatus: (message: string, options?: StatusOptions) => void;
   setWarnings: Dispatch<SetStateAction<string[]>>;
   setExtractProgress: Dispatch<SetStateAction<CommitExtractProgress | null>>;
