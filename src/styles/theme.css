@@ -236,6 +236,10 @@
   color: #9fb4d0;
 }
 
+:root[data-theme="dark"] .repo-empty-checks {
+  background: rgba(12, 20, 34, 0.55);
+}
+
 :root[data-theme="dark"] .repo-empty-actions button {
   border-color: rgba(109, 168, 255, 0.28);
   color: #cfe3ff;

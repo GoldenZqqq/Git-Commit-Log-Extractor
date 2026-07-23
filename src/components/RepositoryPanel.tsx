@@ -52,31 +52,33 @@ export function RepositoryPanel(props: Props) {
   const counts = countRepositoryEntries(entries);
   const visibleEntries = filterRepositoryEntries(entries, query, status);
   const paths = visibleEntries.map((entry) => entry.repo.path);
+  const isIndexEmpty = entries.length === 0;
   return (
-    <section className="repo-drawer" aria-label="仓库索引">
-      <div className="repo-panel-head">
-        {entries.length > 0 && <RepositorySearch query={query} onQueryChange={setQuery} />}
-        {entries.length > 0 && (
+    <section className={`repo-drawer${isIndexEmpty ? " is-empty" : ""}`} aria-label="仓库索引">
+      {!isIndexEmpty && (
+        <div className="repo-panel-head">
+          <RepositorySearch query={query} onQueryChange={setQuery} />
           <div className="repo-management-row">
             <button className="repo-management-toggle" type="button" aria-expanded={managementOpen} onClick={() => setManagementOpen((current) => !current)}>
               <SlidersHorizontal size={14} />仓库管理
             </button>
             <span aria-live="polite">已选 {counts.enabled} / {counts.total}</span>
           </div>
-        )}
-        <RepoScanStatus scanning={props.isScanning} progress={props.scanProgress} />
-        {entries.length > 0 && managementOpen && (
-          <RepositoryControls
-            status={status}
-            counts={counts}
-            visibleEntries={visibleEntries}
-            onStatusChange={setStatus}
-            onSetReposEnabled={(enabled) => props.onSetReposEnabled(paths, enabled)}
-          />
-        )}
-        {entries.length > 0 && managementOpen && <RepositoryMaintenance {...props} />}
-        {entries.length > 0 && counts.enabled === 0 && <AllDisabledNotice onShowDisabled={() => { setManagementOpen(true); setStatus("disabled"); }} />}
-      </div>
+          <RepoScanStatus scanning={props.isScanning} progress={props.scanProgress} />
+          {managementOpen && (
+            <RepositoryControls
+              status={status}
+              counts={counts}
+              visibleEntries={visibleEntries}
+              onStatusChange={setStatus}
+              onSetReposEnabled={(enabled) => props.onSetReposEnabled(paths, enabled)}
+            />
+          )}
+          {managementOpen && <RepositoryMaintenance {...props} />}
+          {counts.enabled === 0 && <AllDisabledNotice onShowDisabled={() => { setManagementOpen(true); setStatus("disabled"); }} />}
+        </div>
+      )}
+      {isIndexEmpty && <RepoScanStatus scanning={props.isScanning} progress={props.scanProgress} />}
       <RepositoryList {...props} entries={visibleEntries} query={query} status={status} onQueryChange={setQuery} onStatusChange={setStatus} />
     </section>
   );
