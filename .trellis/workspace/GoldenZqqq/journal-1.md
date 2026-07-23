@@ -527,3 +527,36 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 16: 完成官网 3D 品牌首屏
+
+**Date**: 2026-07-23
+**Task**: 完成官网 3D 品牌首屏
+**Branch**: `main`
+
+### Summary
+
+使用 Blender 与 Three.js 构建 Pulse Core 首屏场景，补齐交互、响应式降级、性能生命周期和 WebGL E2E 验证。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b8fba13` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
