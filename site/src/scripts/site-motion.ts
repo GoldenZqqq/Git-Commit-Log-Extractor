@@ -47,24 +47,6 @@ function setupHero() {
     stagger: 0.08,
     delay: 0.35,
   });
-  gsap.from("[data-hero-readout] span", {
-    scaleX: 0,
-    duration: 0.8,
-    stagger: 0.12,
-    delay: 0.45,
-    transformOrigin: "left center",
-  });
-  gsap.to("[data-hero-video]", {
-    scale: 1.16,
-    yPercent: 8,
-    ease: "none",
-    scrollTrigger: {
-      trigger: "[data-hero]",
-      start: "top top",
-      end: "bottom top",
-      scrub: 1,
-    },
-  });
   gsap.to("[data-hero-meter]", {
     scaleX: 1,
     ease: "none",

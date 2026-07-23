@@ -12,6 +12,8 @@ const assets = [
   ["public/favicon.png", "favicon.png"],
   ["docs/gitpulse-demo.gif", "gitpulse-demo.gif"],
   ["docs/gitpulse-demo.mp4", "gitpulse-demo.mp4"],
+  ["site/assets-src/3d/gitpulse-pulse-core.glb", "gitpulse-pulse-core.glb"],
+  ["site/assets-src/3d/gitpulse-pulse-core.webp", "gitpulse-pulse-core.webp"],
 ];
 
 mkdirSync(assetsDir, { recursive: true });

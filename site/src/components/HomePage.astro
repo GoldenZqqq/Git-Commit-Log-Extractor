@@ -133,20 +133,16 @@ const commitLabels = ["feat", "fix", "refactor", "test", "docs", "build", "chore
 
     <main>
       <section class="hero" aria-labelledby="hero-title" data-hero>
-        <video
-          class="hero-video"
-          autoplay
-          muted
-          loop
-          playsinline
-          preload="metadata"
-          poster={asset("assets/gitpulse-demo.gif")}
-          aria-label={content.demoAriaLabel}
-          data-hero-video
+        <div
+          class="hero-scene"
+          data-hero-scene
+          data-model-url={asset("assets/gitpulse-pulse-core.glb")}
+          data-scene-state="loading"
+          aria-hidden="true"
         >
-          <source src={asset("assets/gitpulse-demo.mp4")} type="video/mp4" />
-        </video>
-        <div class="hero-texture" aria-hidden="true"></div>
+          <img class="hero-poster" src={asset("assets/gitpulse-pulse-core.webp")} alt="" width="960" height="960" />
+          <canvas class="hero-canvas" data-hero-canvas></canvas>
+        </div>
         <div class="hero-scrim" aria-hidden="true"></div>
         <div class="hero-content" data-hero-copy>
           <p class="eyebrow">{content.hero.eyebrow}</p>
@@ -164,11 +160,6 @@ const commitLabels = ["feat", "fix", "refactor", "test", "docs", "build", "chore
               </div>
             ))}
           </dl>
-        </div>
-        <div class="hero-readout" aria-hidden="true" data-hero-readout>
-          <span></span>
-          <span></span>
-          <span></span>
         </div>
         <div class="hero-meter" aria-hidden="true"><span data-hero-meter></span></div>
       </section>
@@ -230,7 +221,7 @@ const commitLabels = ["feat", "fix", "refactor", "test", "docs", "build", "chore
             <h2 id="demo-title">{content.demo.title}</h2>
           </div>
           <div class="demo-frame" data-demo-frame>
-            <video controls playsinline preload="metadata" poster={asset("assets/gitpulse-demo.gif")}>
+            <video controls playsinline preload="none" poster={asset("assets/gitpulse-demo.gif")}>
               <source src={asset("assets/gitpulse-demo.mp4")} type="video/mp4" />
             </video>
           </div>
@@ -346,6 +337,7 @@ const commitLabels = ["feat", "fix", "refactor", "test", "docs", "build", "chore
     </script>
     <script>
       import "../scripts/site-motion";
+      void import("../scripts/hero-scene");
     </script>
   </body>
 </html>

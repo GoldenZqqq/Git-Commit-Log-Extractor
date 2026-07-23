@@ -90,3 +90,23 @@ On Windows, Tauri uses WebView2 (Chromium). Native form controls (`<input type="
 - At or below 720px, stack report controls and allow action groups/popovers to wrap within `calc(100vw - local padding)`. Do not use horizontal scrolling to reveal generation, settings, copy, or export actions.
 - Shared dialogs use `max-height: calc(100dvh - local padding)` and `overflow-y: auto`; grid/flex child dialogs also set `min-height: 0`, because overflow does not reliably defeat automatic min-content sizing. Narrow/small-height variants keep the header and close control sticky or outside the scrolling content.
 - Responsive Playwright coverage must include `320×900`, `640×450` (200% equivalent CSS viewport), and `1280×480`, checking document/card `scrollWidth`, key bounding boxes, dialog bounds, and screenshot artifacts.
+
+## Website WebGL Hero Quality Contract
+
+Use this contract when the Astro website adds or changes a full-bleed WebGL/Three.js Hero.
+
+- Keep a server-rendered poster, heading, copy, and CTA visible before JavaScript. Load the WebGL runtime through a dynamic import and reveal the Canvas only after the first successful frame.
+- Treat reduced motion, save-data, unavailable WebGL, model-load failure, and object-contract failure as explicit poster fallbacks. A failed scene must never hide or delay the Hero content.
+- Cap device pixel ratio, pause rendering outside the viewport or in a hidden tab, and dispose geometry, materials, observers, listeners, and the renderer on `pagehide`.
+- Run GPU-backed Playwright projects with `fullyParallel: false` and `workers: 1` on Windows CI/local verification. Concurrent Chromium WebGL screenshots can contend for GPU resources and create false timeouts.
+- Verify the Canvas from a screenshot with image entropy and RGB deviation assertions; DOM visibility alone can pass for a blank WebGL surface. Keep desktop pointer/raycast checks desktop-only, while mobile still covers nonblank rendering, overflow, content visibility, reduced-motion, and load-failure fallbacks.
+
+```ts
+// Correct: deterministic GPU verification with a real pixel assertion.
+const screenshot = await canvas.screenshot({ animations: "disabled" });
+const stats = await sharp(screenshot).stats();
+expect(stats.entropy).toBeGreaterThan(0.35);
+expect(Math.max(...stats.channels.slice(0, 3).map((channel) => channel.stdev))).toBeGreaterThan(8);
+```
+
+Required assertion points: the scene reaches `ready`, the Canvas is nonblank, the document has no horizontal overflow, title/CTA and the next-section edge remain visible, reduced motion stays on the poster path, and a blocked GLB request preserves the poster and content.

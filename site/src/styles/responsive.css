@@ -122,14 +122,19 @@
     padding: 110px 18px 42px;
   }
 
-  .hero-video {
-    opacity: 0.5;
+  .hero-content {
+    width: min(100%, 560px);
+  }
+
+  .hero-poster,
+  .hero-canvas {
+    object-position: 78% 18%;
   }
 
   .hero-scrim {
     background:
-      linear-gradient(0deg, rgba(8, 12, 9, 0.82), rgba(8, 12, 9, 0.62)),
-      linear-gradient(90deg, rgba(8, 12, 9, 0.88), rgba(8, 12, 9, 0.48));
+      linear-gradient(0deg, rgba(8, 12, 9, 0.96), rgba(8, 12, 9, 0.7) 54%, rgba(8, 12, 9, 0.38)),
+      linear-gradient(90deg, rgba(8, 12, 9, 0.94), rgba(8, 12, 9, 0.38));
   }
 
   .hero-copy {

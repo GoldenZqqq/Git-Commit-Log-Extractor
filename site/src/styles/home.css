@@ -28,8 +28,7 @@
   isolation: isolate;
 }
 
-.hero-video,
-.hero-texture,
+.hero-scene,
 .hero-scrim {
   position: absolute;
   inset: 0;
@@ -37,33 +36,72 @@
   height: 100%;
 }
 
-.hero-video {
-  object-fit: cover;
-  opacity: 0.7;
-  transform: scale(1.04);
+.hero-scene {
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: auto;
 }
 
-.hero-texture {
-  z-index: 1;
-  background:
-    linear-gradient(rgba(244, 240, 231, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(244, 240, 231, 0.06) 1px, transparent 1px);
-  background-size: 74px 74px;
-  mix-blend-mode: screen;
-  opacity: 0.32;
+.hero-poster,
+.hero-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: right center;
+  transition: opacity 420ms ease;
+}
+
+.hero-poster {
+  opacity: 0.76;
+}
+
+.hero-canvas {
+  opacity: 0;
+  cursor: grab;
+  touch-action: pan-y;
+}
+
+.hero-canvas:active {
+  cursor: grabbing;
+}
+
+.hero-canvas.is-node-hovered {
+  cursor: pointer;
+}
+
+.hero-scene[data-scene-state="ready"] .hero-poster {
+  opacity: 0;
+}
+
+.hero-scene[data-scene-state="ready"] .hero-canvas {
+  opacity: 1;
+}
+
+.hero-scene[data-scene-state="fallback"] .hero-canvas {
+  display: none;
 }
 
 .hero-scrim {
   z-index: 1;
+  pointer-events: none;
   background:
-    linear-gradient(90deg, rgba(8, 12, 9, 0.94), rgba(8, 12, 9, 0.72) 52%, rgba(8, 12, 9, 0.24)),
-    linear-gradient(0deg, rgba(8, 12, 9, 0.72), transparent 52%);
+    linear-gradient(90deg, rgba(8, 12, 9, 0.95), rgba(8, 12, 9, 0.78) 38%, rgba(8, 12, 9, 0.28) 72%, rgba(8, 12, 9, 0.08)),
+    linear-gradient(0deg, rgba(8, 12, 9, 0.82), transparent 58%);
 }
 
 .hero-content {
   position: relative;
   z-index: 3;
-  width: min(900px, 100%);
+  width: min(760px, 58vw);
+}
+
+.hero h1 {
+  max-width: 780px;
+  font-size: clamp(64px, 8vw, 96px);
+  line-height: 0.92;
+  text-wrap: balance;
 }
 
 .hero .eyebrow {

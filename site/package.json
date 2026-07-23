@@ -9,13 +9,18 @@
   "scripts": {
     "dev": "node ./scripts/sync-assets.mjs && astro dev --host 127.0.0.1",
     "build": "node ./scripts/sync-assets.mjs && astro build",
-    "preview": "astro preview --host 127.0.0.1"
+    "preview": "astro preview --host 127.0.0.1",
+    "test:e2e:hero": "playwright test --config playwright.config.ts"
   },
   "devDependencies": {
-    "astro": "^6.4.8"
+    "@playwright/test": "^1.61.1",
+    "@types/three": "^0.185.1",
+    "astro": "^6.4.8",
+    "sharp": "^0.35.3"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.7.3",
-    "gsap": "^3.15.0"
+    "gsap": "^3.15.0",
+    "three": "^0.185.1"
   }
 }
