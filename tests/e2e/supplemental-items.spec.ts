@@ -64,7 +64,14 @@ test("adds non-Git supplemental facts to every report mode and history", async (
     extractCalls[0].args.options.supplementalItems,
   );
 
-  await page.getByLabel("选择日报日期").fill("2026-07-01");
+  // Changing daily period switches the supplemental draft key (shadcn period calendar).
+  const beforeDate = await page.getByLabel("选择日报日期").getAttribute("data-period-value");
+  await page.getByLabel("选择日报日期").click();
+  await expect(page.getByText("选择报告日")).toBeVisible();
+  const prevMonth = page.locator(".gp-period-calendar button").filter({ has: page.locator("svg") }).first();
+  await prevMonth.click();
+  await page.locator(".gp-period-calendar button").filter({ hasText: /^15$/ }).first().click();
+  await expect(page.getByLabel("选择日报日期")).not.toHaveAttribute("data-period-value", beforeDate || "");
   await expect(page.getByLabel("补充事项（非 Git）")).toHaveValue("");
   await page.getByRole("tab", { name: /最近/ }).click();
   await page.getByRole("button", { name: /日报 · / }).click();

@@ -25,6 +25,7 @@ import {
   validateExtractSettings,
 } from "../model";
 import { useModalDialog } from "../hooks/useOverlayFocus";
+import { DatePickerField } from "./date-picker";
 import { Field } from "./Primitives";
 
 type Props = {
@@ -258,11 +259,11 @@ export function BlankDayFillDialog({
           <>
             <div className="range-fields">
               <Field label="目标日">
-                <input
+                <DatePickerField
                   data-dialog-initial-focus
-                  type="date"
+                  ariaLabel="目标日"
                   value={targetDate}
-                  onChange={(event) => setTargetDate(event.target.value)}
+                  onChange={setTargetDate}
                 />
               </Field>
               <Field label="生成条数">
@@ -281,17 +282,17 @@ export function BlankDayFillDialog({
 
             <div className="range-fields">
               <Field label="素材开始">
-                <input
-                  type="date"
+                <DatePickerField
+                  ariaLabel="素材开始"
                   value={sourceRange.startDate}
-                  onChange={(event) => setSourceRange((current) => ({ ...current, startDate: event.target.value }))}
+                  onChange={(startDate) => setSourceRange((current) => ({ ...current, startDate }))}
                 />
               </Field>
               <Field label="素材结束">
-                <input
-                  type="date"
+                <DatePickerField
+                  ariaLabel="素材结束"
                   value={sourceRange.endDate}
-                  onChange={(event) => setSourceRange((current) => ({ ...current, endDate: event.target.value }))}
+                  onChange={(endDate) => setSourceRange((current) => ({ ...current, endDate }))}
                 />
               </Field>
             </div>

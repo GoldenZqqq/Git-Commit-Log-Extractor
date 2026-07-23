@@ -1,0 +1,761 @@
+/* Shared date / month pickers + workbench period picker */
+
+.date-picker-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 37px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 0 10px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 720;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.date-picker-field.is-sm {
+  min-height: 30px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.date-picker-field:hover:not(:disabled) {
+  border-color: rgba(63, 140, 255, 0.34);
+  background: #ffffff;
+}
+
+.date-picker-field:focus-visible {
+  border-color: var(--primary);
+  background: #ffffff;
+  outline: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    0 0 0 3px rgba(63, 140, 255, 0.13);
+}
+
+.date-picker-field:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
+}
+
+.date-picker-field.is-empty .date-picker-field-value {
+  color: var(--muted);
+  font-weight: 620;
+}
+
+.date-picker-field-icon {
+  flex-shrink: 0;
+  color: var(--primary);
+  opacity: 0.82;
+}
+
+.date-picker-field-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.date-picker-field-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  line-height: 1.15;
+}
+
+.date-picker-field-meta {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 640;
+}
+
+.date-picker-field-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.date-picker-field-clear:hover {
+  color: var(--ink);
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.history-filter-bar .date-picker-field {
+  width: auto;
+  min-width: 132px;
+}
+
+:root[data-theme="dark"] .date-picker-field {
+  border-color: rgba(109, 168, 255, 0.22);
+  color: #e5f0ff;
+  background: linear-gradient(180deg, rgba(15, 26, 43, 0.96), rgba(10, 18, 31, 0.9));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+:root[data-theme="dark"] .date-picker-field:hover:not(:disabled) {
+  border-color: rgba(109, 168, 255, 0.36);
+  background: rgba(12, 22, 36, 0.96);
+}
+
+:root[data-theme="dark"] .date-picker-field:focus-visible {
+  border-color: var(--primary);
+  background: rgba(12, 22, 36, 0.96);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 3px rgba(109, 168, 255, 0.16);
+}
+
+:root[data-theme="dark"] .date-picker-field-icon {
+  color: #9ec5ff;
+}
+
+:root[data-theme="dark"] .date-picker-field.is-empty .date-picker-field-value,
+:root[data-theme="dark"] .date-picker-field-meta,
+:root[data-theme="dark"] .date-picker-field-clear {
+  color: #9fb4d0;
+}
+
+/* Workbench period picker — dense desktop calendar, no default rdp chrome */
+
+.period-picker-popover {
+  width: min(292px, calc(100vw - 24px));
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow:
+    0 18px 48px rgba(15, 23, 42, 0.18),
+    0 2px 8px rgba(15, 23, 42, 0.08);
+}
+
+.period-picker-header {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.95), rgba(255, 255, 255, 0.4));
+}
+
+.period-picker-header strong {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 780;
+  letter-spacing: 0.01em;
+}
+
+.period-picker-header span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 560;
+  line-height: 1.35;
+}
+
+.period-picker-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--line);
+  background: var(--paper-soft);
+}
+
+.period-picker-footer-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.period-picker-chip,
+.period-picker-ghost {
+  min-height: 28px;
+  border-radius: 7px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 720;
+  cursor: pointer;
+  transition: border-color 0.14s ease, background 0.14s ease, color 0.14s ease;
+}
+
+.period-picker-chip {
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  color: var(--primary);
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.period-picker-chip:hover {
+  border-color: rgba(37, 99, 235, 0.36);
+  background: rgba(37, 99, 235, 0.14);
+}
+
+.period-picker-ghost {
+  border: 1px solid transparent;
+  color: var(--muted);
+  background: transparent;
+}
+
+.period-picker-ghost:hover {
+  color: var(--ink);
+  background: rgba(15, 23, 42, 0.05);
+}
+
+/* Trigger button inside legacy period chrome */
+.report-period-control .period-picker-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 168px;
+  min-height: 30px;
+  max-width: 240px;
+  border: 1px solid rgba(63, 140, 255, 0.18);
+  border-radius: var(--radius-md);
+  padding: 3px 9px;
+  color: var(--ink);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 249, 255, 0.94));
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 760;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  cursor: pointer;
+  transition: border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+}
+
+.report-period-control .period-picker-trigger:hover:not(:disabled) {
+  border-color: rgba(63, 140, 255, 0.34);
+  background: #ffffff;
+}
+
+.report-period-control .period-picker-trigger:focus-visible {
+  border-color: var(--primary);
+  outline: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    0 0 0 3px rgba(63, 140, 255, 0.13);
+}
+
+.report-period-control .period-picker-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
+}
+
+.period-picker-trigger-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  text-align: left;
+  line-height: 1.15;
+}
+
+.period-picker-trigger-copy strong {
+  overflow: hidden;
+  max-width: 180px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 780;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.period-picker-trigger-copy span {
+  overflow: hidden;
+  max-width: 180px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 680;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.period-picker-trigger-chevron {
+  flex-shrink: 0;
+  color: var(--muted);
+  opacity: 0.75;
+}
+
+/* Calendar grid */
+.gp-period-calendar {
+  --gp-day-size: 34px;
+  padding: 10px 12px 8px;
+  user-select: none;
+}
+
+.gp-period-calendar .rdp-root,
+.gp-period-calendar.rdp-root {
+  margin: 0;
+  width: 100%;
+}
+
+.gp-period-calendar .rdp-months {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gp-period-calendar .rdp-month {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gp-period-calendar .rdp-month_caption {
+  display: flex;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 36px;
+}
+
+.gp-period-calendar .rdp-caption_label {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 780;
+  letter-spacing: 0.01em;
+}
+
+.gp-period-calendar .rdp-nav {
+  position: absolute;
+  inset: 0 0 auto;
+  display: flex;
+  height: 32px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px;
+}
+
+.gp-period-calendar .rdp-button_previous,
+.gp-period-calendar .rdp-button_next {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink-soft);
+  background: var(--paper);
+  cursor: pointer;
+  transition: border-color 0.14s ease, background 0.14s ease, color 0.14s ease;
+}
+
+.gp-period-calendar .rdp-button_previous:hover,
+.gp-period-calendar .rdp-button_next:hover {
+  border-color: rgba(37, 99, 235, 0.35);
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.gp-period-calendar .rdp-button_previous:focus-visible,
+.gp-period-calendar .rdp-button_next:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
+}
+
+.gp-period-calendar .rdp-month_grid {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.gp-period-calendar .rdp-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  margin-bottom: 4px;
+}
+
+.gp-period-calendar .rdp-weekday {
+  height: 24px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 24px;
+  text-align: center;
+}
+
+.gp-period-calendar .rdp-weeks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gp-period-calendar .rdp-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.gp-period-calendar .rdp-day {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 0;
+  text-align: center;
+}
+
+.gp-period-calendar .rdp-day_button {
+  display: inline-flex;
+  width: var(--gp-day-size);
+  max-width: 100%;
+  height: var(--gp-day-size);
+  max-height: 100%;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: var(--ink);
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 650;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.gp-period-calendar .rdp-day_button:hover {
+  border-color: rgba(37, 99, 235, 0.18);
+  color: var(--primary-dark);
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.gp-period-calendar .rdp-day_button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+}
+
+/* Today: quiet ring, not a heavy fill */
+.gp-period-calendar .rdp-today:not(.rdp-selected) .rdp-day_button {
+  border-color: rgba(37, 99, 235, 0.35);
+  color: var(--primary);
+  font-weight: 780;
+  background: rgba(37, 99, 235, 0.06);
+}
+
+/* Selected day */
+.gp-period-calendar .rdp-selected .rdp-day_button,
+.gp-period-calendar .rdp-selected.rdp-today .rdp-day_button {
+  border-color: transparent;
+  color: #ffffff;
+  font-weight: 780;
+  background: linear-gradient(180deg, #3b82f6, #2563eb);
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.28);
+}
+
+.gp-period-calendar .rdp-selected .rdp-day_button:hover {
+  color: #ffffff;
+  background: linear-gradient(180deg, #4b8ff7, #1d4ed8);
+}
+
+/* Outside month */
+.gp-period-calendar .rdp-outside .rdp-day_button {
+  color: color-mix(in srgb, var(--muted) 72%, transparent);
+  font-weight: 560;
+}
+
+.gp-period-calendar .rdp-outside.rdp-selected .rdp-day_button {
+  color: #ffffff;
+  opacity: 0.9;
+}
+
+/* Week highlight strip for weekly mode */
+.gp-period-calendar .rdp-day.gp-week-day:not(.rdp-selected) .rdp-day_button {
+  border-radius: 0;
+  background: rgba(37, 99, 235, 0.1);
+}
+
+.gp-period-calendar .rdp-day.gp-week-day.gp-week-start:not(.rdp-selected) .rdp-day_button {
+  border-radius: 9px 0 0 9px;
+}
+
+.gp-period-calendar .rdp-day.gp-week-day.gp-week-end:not(.rdp-selected) .rdp-day_button {
+  border-radius: 0 9px 9px 0;
+}
+
+/* Month grid picker (year + 12 months, not day cells) */
+.gp-month-grid {
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px 8px;
+}
+
+.gp-month-grid-nav {
+  display: grid;
+  grid-template-columns: 28px 1fr 28px;
+  align-items: center;
+  gap: 8px;
+}
+
+.gp-month-nav-button {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink-soft);
+  background: var(--paper);
+  cursor: pointer;
+  transition: border-color 0.14s ease, background 0.14s ease, color 0.14s ease;
+}
+
+.gp-month-nav-button:hover {
+  border-color: rgba(37, 99, 235, 0.35);
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.gp-month-nav-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
+}
+
+.gp-month-grid-year {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 780;
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+
+.gp-month-grid-cells {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.gp-month-cell {
+  min-height: 40px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--ink);
+  background: rgba(15, 23, 42, 0.03);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.gp-month-cell:hover {
+  border-color: rgba(37, 99, 235, 0.2);
+  color: var(--primary-dark);
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.gp-month-cell:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
+}
+
+.gp-month-cell.is-current:not(.is-selected) {
+  border-color: rgba(37, 99, 235, 0.35);
+  color: var(--primary);
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.gp-month-cell.is-selected {
+  border-color: transparent;
+  color: #ffffff;
+  background: linear-gradient(180deg, #3b82f6, #2563eb);
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.28);
+}
+
+.gp-month-cell.is-selected:hover {
+  color: #ffffff;
+  background: linear-gradient(180deg, #4b8ff7, #1d4ed8);
+}
+
+.gp-period-calendar .rdp-disabled .rdp-day_button {
+  color: color-mix(in srgb, var(--muted) 50%, transparent);
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.gp-period-calendar .rdp-hidden {
+  visibility: hidden;
+}
+
+/* Dark theme */
+:root[data-theme="dark"] .period-picker-popover {
+  border-color: rgba(109, 168, 255, 0.2);
+  background: #0f1a2b;
+  color: #e5f0ff;
+  box-shadow:
+    0 22px 54px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(109, 168, 255, 0.08);
+}
+
+:root[data-theme="dark"] .period-picker-header {
+  border-bottom-color: rgba(109, 168, 255, 0.14);
+  background: linear-gradient(180deg, rgba(20, 31, 48, 0.96), rgba(15, 26, 43, 0.7));
+}
+
+:root[data-theme="dark"] .period-picker-header strong {
+  color: #e5f0ff;
+}
+
+:root[data-theme="dark"] .period-picker-header span {
+  color: #9fb4d0;
+}
+
+:root[data-theme="dark"] .period-picker-footer {
+  border-top-color: rgba(109, 168, 255, 0.14);
+  background: rgba(12, 20, 34, 0.92);
+}
+
+:root[data-theme="dark"] .period-picker-chip {
+  border-color: rgba(109, 168, 255, 0.28);
+  color: #9ec5ff;
+  background: rgba(109, 168, 255, 0.12);
+}
+
+:root[data-theme="dark"] .period-picker-chip:hover {
+  border-color: rgba(109, 168, 255, 0.42);
+  background: rgba(109, 168, 255, 0.18);
+}
+
+:root[data-theme="dark"] .period-picker-ghost {
+  color: #9fb4d0;
+}
+
+:root[data-theme="dark"] .period-picker-ghost:hover {
+  color: #e5f0ff;
+  background: rgba(109, 168, 255, 0.1);
+}
+
+:root[data-theme="dark"] .report-period-control .period-picker-trigger {
+  border-color: rgba(109, 168, 255, 0.22);
+  color: #e5f0ff;
+  background: linear-gradient(180deg, rgba(15, 26, 43, 0.96), rgba(10, 18, 31, 0.9));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+:root[data-theme="dark"] .report-period-control .period-picker-trigger:hover:not(:disabled) {
+  border-color: rgba(109, 168, 255, 0.36);
+  background: rgba(12, 22, 36, 0.96);
+}
+
+:root[data-theme="dark"] .period-picker-trigger-copy strong {
+  color: #e5f0ff;
+}
+
+:root[data-theme="dark"] .period-picker-trigger-copy span,
+:root[data-theme="dark"] .period-picker-trigger-chevron {
+  color: #9fb4d0;
+}
+
+:root[data-theme="dark"] .gp-period-calendar .rdp-caption_label {
+  color: #e5f0ff;
+}
+
+:root[data-theme="dark"] .gp-period-calendar .rdp-weekday {
+  color: #9fb4d0;
+}
+
+:root[data-theme="dark"] .gp-period-calendar .rdp-button_previous,
+:root[data-theme="dark"] .gp-period-calendar .rdp-button_next {
+  border-color: rgba(109, 168, 255, 0.22);
+  color: #c7dcff;
+  background: rgba(15, 26, 43, 0.95);
+}
+
+:root[data-theme="dark"] .gp-period-calendar .rdp-button_previous:hover,
+:root[data-theme="dark"] .gp-period-calendar .rdp-button_next:hover {
+  border-color: rgba(109, 168, 255, 0.4);
+  color: #9ec5ff;
+  background: rgba(109, 168, 255, 0.12);
+}
+
+:root[data-theme="dark"] .gp-period-calendar .rdp-day_button {
+  color: #e5f0ff;
+}
+
+:root[data-theme="dark"] .gp-period-calendar .rdp-day_button:hover {
+  border-color: rgba(109, 168, 255, 0.22);
+  color: #cfe1ff;
+  background: rgba(109, 168, 255, 0.12);
+}
+
+:root[data-theme="dark"] .gp-period-calendar .rdp-today:not(.rdp-selected) .rdp-day_button {
+  border-color: rgba(109, 168, 255, 0.45);
+  color: #9ec5ff;
+  background: rgba(109, 168, 255, 0.12);
+}
+
+:root[data-theme="dark"] .gp-period-calendar .rdp-selected .rdp-day_button,
+:root[data-theme="dark"] .gp-period-calendar .rdp-selected.rdp-today .rdp-day_button {
+  color: #0b1220;
+  background: linear-gradient(180deg, #7db4ff, #6da8ff);
+  box-shadow: 0 4px 12px rgba(109, 168, 255, 0.28);
+}
+
+:root[data-theme="dark"] .gp-period-calendar .rdp-outside .rdp-day_button {
+  color: rgba(159, 180, 208, 0.45);
+}
+
+:root[data-theme="dark"] .gp-period-calendar .rdp-day.gp-week-day:not(.rdp-selected) .rdp-day_button {
+  background: rgba(109, 168, 255, 0.12);
+}
+
+:root[data-theme="dark"] .gp-month-nav-button {
+  border-color: rgba(109, 168, 255, 0.22);
+  color: #c7dcff;
+  background: rgba(15, 26, 43, 0.95);
+}
+
+:root[data-theme="dark"] .gp-month-nav-button:hover {
+  border-color: rgba(109, 168, 255, 0.4);
+  color: #9ec5ff;
+  background: rgba(109, 168, 255, 0.12);
+}
+
+:root[data-theme="dark"] .gp-month-grid-year {
+  color: #e5f0ff;
+}
+
+:root[data-theme="dark"] .gp-month-cell {
+  color: #e5f0ff;
+  background: rgba(109, 168, 255, 0.06);
+}
+
+:root[data-theme="dark"] .gp-month-cell:hover {
+  border-color: rgba(109, 168, 255, 0.22);
+  color: #cfe1ff;
+  background: rgba(109, 168, 255, 0.12);
+}
+
+:root[data-theme="dark"] .gp-month-cell.is-current:not(.is-selected) {
+  border-color: rgba(109, 168, 255, 0.45);
+  color: #9ec5ff;
+  background: rgba(109, 168, 255, 0.12);
+}
+
+:root[data-theme="dark"] .gp-month-cell.is-selected {
+  color: #0b1220;
+  background: linear-gradient(180deg, #7db4ff, #6da8ff);
+  box-shadow: 0 4px 12px rgba(109, 168, 255, 0.28);
+}

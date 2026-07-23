@@ -9,6 +9,11 @@ export function getSingleDayRange(date: string): DateRange {
   return { startDate: date, endDate: date };
 }
 
+/** Safe range for render paths: never throws on partial/invalid day input. */
+export function getSingleDayRangeOrFallback(date: string, fallback = getToday()): DateRange {
+  return isValidDateInput(date) ? getSingleDayRange(date) : getSingleDayRange(fallback);
+}
+
 export function getCurrentWeekRange(): DateRange {
   return getWeekRange(getWeekLabel(new Date()));
 }
@@ -69,6 +74,64 @@ export function isValidWeekInput(weekValue: string) {
   } catch {
     return false;
   }
+}
+
+/** Full yyyy-mm-dd only; empty/partial strings are invalid for generation. */
+export function isValidDateInput(dateValue: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) return false;
+  const year = Number(dateValue.slice(0, 4));
+  const month = Number(dateValue.slice(5, 7));
+  const day = Number(dateValue.slice(8, 10));
+  if (month < 1 || month > 12 || day < 1 || day > 31) return false;
+  const parsed = new Date(year, month - 1, day);
+  return (
+    parsed.getFullYear() === year
+    && parsed.getMonth() === month - 1
+    && parsed.getDate() === day
+  );
+}
+
+export function resolveDateInput(dateValue: string, fallback = getToday()) {
+  return isValidDateInput(dateValue) ? dateValue : fallback;
+}
+
+export function resolveWeekInput(weekValue: string, fallback = getWeekLabel()) {
+  return isValidWeekInput(weekValue) ? weekValue : fallback;
+}
+
+export function resolveMonthInput(monthValue: string, fallback = getPreviousMonthInput()) {
+  return isValidMonthInput(monthValue) ? monthValue : fallback;
+}
+
+export function parseDateInputValue(dateValue: string) {
+  const resolved = resolveDateInput(dateValue);
+  const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(resolved);
+  if (!parts) return new Date();
+  return new Date(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3]));
+}
+
+export function parseMonthInputValue(monthValue: string) {
+  const { year, month } = parseMonthInput(resolveMonthInput(monthValue));
+  return new Date(year, month - 1, 1);
+}
+
+export function formatDateFromDate(date: Date) {
+  return formatDateInput(date);
+}
+
+export function formatMonthFromDate(date: Date) {
+  return formatMonthInput(date);
+}
+
+export function formatWeekDisplayLabel(weekValue: string) {
+  const resolved = resolveWeekInput(weekValue);
+  const { year, week } = parseWeekInput(resolved);
+  return `${year} 年第 ${week} 周`;
+}
+
+export function formatMonthDisplayLabel(monthValue: string) {
+  const { year, month } = parseMonthInput(resolveMonthInput(monthValue));
+  return `${year} 年 ${month} 月`;
 }
 
 export function getToday() {

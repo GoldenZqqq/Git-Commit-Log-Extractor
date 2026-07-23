@@ -2,6 +2,7 @@ import { CalendarDays, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getMonthRange, isValidMonthInput } from "../model";
 import { useModalDialog } from "../hooks/useOverlayFocus";
+import { MonthPickerField } from "./date-picker";
 import { Field } from "./Primitives";
 
 type Props = {
@@ -48,11 +49,12 @@ export function MonthReportDialog({ open, initialMonth, isBusy, onClose, onConfi
 
         <div className="range-fields month-fields">
           <Field label="月份">
-            <input
+            <MonthPickerField
               data-dialog-initial-focus
-              type="month"
+              ariaLabel="月份"
               value={month}
-              onChange={(event) => setMonth(event.target.value)}
+              onChange={setMonth}
+              showRangeHint
             />
           </Field>
           <Field label="覆盖日期">

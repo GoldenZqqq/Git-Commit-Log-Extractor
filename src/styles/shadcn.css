@@ -1,0 +1,58 @@
+/*
+ * shadcn/ui pilot styles for the workbench period picker.
+ * Intentionally omit Tailwind preflight so existing desktop CSS stays intact.
+ */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+@source "../components/ui/**/*.{ts,tsx}";
+@source "../components/date-picker/**/*.{ts,tsx}";
+@source "../components/ReportPeriodPicker.tsx";
+@source "../components/WorkbenchControls.tsx";
+@source "../lib/**/*.{ts,tsx}";
+
+@theme {
+  --color-background: var(--paper);
+  --color-foreground: var(--ink);
+  --color-card: var(--paper);
+  --color-card-foreground: var(--ink);
+  --color-popover: var(--paper);
+  --color-popover-foreground: var(--ink);
+  --color-primary: var(--primary);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: var(--mist);
+  --color-secondary-foreground: var(--ink);
+  --color-muted: var(--paper-soft);
+  --color-muted-foreground: var(--muted);
+  --color-accent: var(--primary-soft);
+  --color-accent-foreground: var(--ink);
+  --color-destructive: var(--danger);
+  --color-border: var(--line);
+  --color-input: var(--line);
+  --color-ring: var(--primary);
+  --radius-sm: var(--radius-xs);
+  --radius-md: var(--radius-sm);
+  --radius-lg: var(--radius-md);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-mono);
+}
+
+:root[data-theme="dark"] {
+  --color-background: var(--paper);
+  --color-foreground: var(--ink);
+  --color-card: var(--paper);
+  --color-card-foreground: var(--ink);
+  --color-popover: #0f1a2b;
+  --color-popover-foreground: #e5f0ff;
+  --color-primary: var(--primary);
+  --color-primary-foreground: #0b1220;
+  --color-secondary: rgba(20, 31, 48, 0.9);
+  --color-secondary-foreground: #e5f0ff;
+  --color-muted: rgba(20, 31, 48, 0.86);
+  --color-muted-foreground: #9fb4d0;
+  --color-accent: rgba(109, 168, 255, 0.16);
+  --color-accent-foreground: #e5f0ff;
+  --color-border: var(--line);
+  --color-input: var(--line);
+  --color-ring: #6da8ff;
+}

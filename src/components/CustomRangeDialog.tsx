@@ -2,6 +2,7 @@ import { CalendarDays, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { DateRange } from "../model";
 import { useModalDialog } from "../hooks/useOverlayFocus";
+import { DatePickerField } from "./date-picker";
 import { Field } from "./Primitives";
 
 type Props = {
@@ -47,18 +48,18 @@ export function CustomRangeDialog({ open, initialRange, generationBlocked, onClo
 
         <div className="range-fields">
           <Field label="开始日期">
-            <input
+            <DatePickerField
               data-dialog-initial-focus
-              type="date"
+              ariaLabel="开始日期"
               value={range.startDate}
-              onChange={(event) => setRange((current) => ({ ...current, startDate: event.target.value }))}
+              onChange={(startDate) => setRange((current) => ({ ...current, startDate }))}
             />
           </Field>
           <Field label="结束日期">
-            <input
-              type="date"
+            <DatePickerField
+              ariaLabel="结束日期"
               value={range.endDate}
-              onChange={(event) => setRange((current) => ({ ...current, endDate: event.target.value }))}
+              onChange={(endDate) => setRange((current) => ({ ...current, endDate }))}
             />
           </Field>
         </div>

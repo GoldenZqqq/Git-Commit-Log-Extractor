@@ -39,6 +39,8 @@ import {
   validateWorkspaceSettings,
 } from "./model";
 import "./styles/tokens.css";
+import "./styles/shadcn.css";
+import "./styles/period-picker.css";
 import "./styles/layout.css";
 import "./styles/components.css";
 import "./styles/preview.css";

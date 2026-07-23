@@ -218,9 +218,11 @@ test("opens the batch report output directory after generation", async ({ page }
   await page.getByText("更多生成方式").click();
   await page.getByRole("button", { name: "批量", exact: true }).click();
 
-  const dateInputs = page.locator('.range-dialog input[type="date"]');
-  await dateInputs.nth(0).fill("2026-07-01");
-  await dateInputs.nth(1).fill("2026-07-05");
+  await page.getByLabel("开始日期").click();
+  await expect(page.getByText("点选日期，可用月份箭头快速跳转")).toBeVisible();
+  await page.getByRole("button", { name: "今天", exact: true }).click();
+  await page.getByLabel("结束日期").click();
+  await page.getByRole("button", { name: "今天", exact: true }).click();
   await page.getByLabel("拆分粒度").selectOption("custom");
   const startBatchButton = page.getByRole("button", { name: "开始生成" });
   const allGroups = page.getByRole("radio", { name: "全部汇总" });
@@ -515,8 +517,8 @@ test("passes evidence link rules when generating daily reports", async ({ page }
   ]);
 });
 
-test("keeps workbench usable when week or month period input is incomplete", async ({ page }) => {
-  // Regression for issue #3: editing week/month mid-value must not throw in derived ranges (white screen).
+test("keeps workbench usable when week or month period history is incomplete", async ({ page }) => {
+  // Regression for issue #3: incomplete history labels must not white-screen with shadcn period picker.
   await launchApp(page, {
     settings,
     repoCache: createRepoCache(["C:/workspace"], repos),
@@ -551,15 +553,11 @@ test("keeps workbench usable when week or month period input is incomplete", asy
   await expect(page.getByRole("button", { name: "生成周报" })).toBeVisible();
   await expect(page.locator("#root")).not.toBeEmpty();
 
-  // Native week control can emit empty while typing; state must keep a complete prior value.
-  await page.getByLabel("选择周报周次").evaluate((element) => {
-    const input = element as HTMLInputElement;
-    input.value = "";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    input.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  await page.getByLabel("选择周报周次").click();
+  await expect(page.getByText("选择报告周")).toBeVisible();
+  await page.getByRole("button", { name: "本周", exact: true }).click();
+  await expect(page.getByLabel("选择周报周次")).toHaveAttribute("data-period-value", /20\d{2}-W\d{2}/);
   await expect(page.getByText("残缺周次打开后不得白屏")).toBeVisible();
-  await expect(page.getByRole("button", { name: "生成周报" })).toBeVisible();
 
   await openAssistTab(page, /最近/);
   await page.getByRole("button", { name: /月报 · 2026-0/ }).click();
@@ -567,14 +565,37 @@ test("keeps workbench usable when week or month period input is incomplete", asy
   await expect(page.getByLabel("选择月报月份")).toBeVisible();
   await expect(page.getByRole("button", { name: "生成月报" })).toBeVisible();
 
-  await page.getByLabel("选择月报月份").evaluate((element) => {
-    const input = element as HTMLInputElement;
-    input.value = "2026-0";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    input.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  await page.getByLabel("选择月报月份").click();
+  await expect(page.getByText("选择报告月")).toBeVisible();
+  await page.getByRole("button", { name: "本月", exact: true }).click();
+  await expect(page.getByLabel("选择月报月份")).toHaveAttribute("data-period-value", /20\d{2}-\d{2}/);
   await expect(page.getByText("残缺月份打开后不得白屏")).toBeVisible();
-  await expect(page.getByRole("button", { name: "生成月报" })).toBeVisible();
+});
+
+test("picks week and month from period calendar popover", async ({ page }) => {
+  await launchApp(page, {
+    settings,
+    repoCache: createRepoCache(["C:/workspace"], repos),
+  });
+
+  await expectWorkbench(page);
+  await page.getByRole("button", { name: "周报" }).click();
+  await page.getByLabel("选择周报周次").click();
+  await expect(page.getByText("选择报告周")).toBeVisible();
+  await page.getByRole("button", { name: "本周", exact: true }).click();
+  await expect(page.getByLabel("选择周报周次")).toHaveAttribute("data-period-value", /20\d{2}-W\d{2}/);
+
+  await page.getByRole("button", { name: "月报" }).click();
+  await page.getByLabel("选择月报月份").click();
+  await expect(page.getByText("选择报告月")).toBeVisible();
+  await page.getByRole("button", { name: "本月", exact: true }).click();
+  await expect(page.getByLabel("选择月报月份")).toHaveAttribute("data-period-value", /20\d{2}-\d{2}/);
+
+  await page.getByRole("button", { name: "日报" }).click();
+  await page.getByLabel("选择日报日期").click();
+  await expect(page.getByText("选择报告日")).toBeVisible();
+  await page.getByRole("button", { name: "今天", exact: true }).click();
+  await expect(page.getByLabel("选择日报日期")).toHaveAttribute("data-period-value", /20\d{2}-\d{2}-\d{2}/);
 });
 
 test("generates and exports a weekly report", async ({ page }) => {
@@ -807,7 +828,10 @@ test("filters report history by type date status and search", async ({ page }) =
   await expect(page.getByRole("button", { name: /周报 · 2026-W24/ })).toHaveCount(0);
 
   await page.getByRole("button", { name: "重置" }).click();
-  await page.getByLabel("筛选历史日期").fill("2026-06-12");
+  await page.getByLabel("筛选历史日期").click();
+  // History fixture weekly covers 2026-06-08..14; go to June and pick the 12th.
+  await page.locator(".gp-period-calendar .rdp-button_previous").click();
+  await page.locator(".gp-period-calendar .rdp-day_button").filter({ hasText: /^12$/ }).first().click();
   await expect(page.getByRole("button", { name: /周报 · 2026-W24/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /月报 · 2026-07/ })).toHaveCount(0);
 

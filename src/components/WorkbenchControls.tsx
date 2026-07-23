@@ -1,5 +1,5 @@
-import { CalendarDays } from "lucide-react";
 import type { DateRange, PreviewMode } from "../model";
+import { ReportPeriodPicker } from "./ReportPeriodPicker";
 
 type ReportPeriodProps = {
   activePreview: PreviewMode;
@@ -16,87 +16,9 @@ type ReportPeriodProps = {
   onOpenCustomRange: () => void;
 };
 
-export function ReportPeriodControl({
-  activePreview,
-  dailyDate,
-  weeklyWeek,
-  weeklyRange,
-  monthlyMonth,
-  monthlyRange,
-  customRange,
-  periodLocked,
-  onDailyDateChange,
-  onWeeklyWeekChange,
-  onMonthlyMonthChange,
-  onOpenCustomRange,
-}: ReportPeriodProps) {
-  const rangeLabel = activePreview === "weekly"
-    ? `${weeklyRange.startDate} ~ ${weeklyRange.endDate}`
-    : activePreview === "monthly"
-      ? `${monthlyRange.startDate} ~ ${monthlyRange.endDate}`
-      : activePreview === "custom"
-        ? `${customRange.startDate} ~ ${customRange.endDate}`
-        : dailyDate;
-
-  return (
-    <div className="report-period-control" aria-label="报告周期选择">
-      <span className="period-label">
-        <CalendarDays size={14} />
-        周期
-      </span>
-      {activePreview === "summary" && (
-        <input
-          type="date"
-          value={dailyDate}
-          disabled={periodLocked}
-          aria-label="选择日报日期"
-          onChange={(event) => {
-            const next = event.target.value;
-            if (next) onDailyDateChange(next);
-          }}
-        />
-      )}
-      {activePreview === "weekly" && (
-        <input
-          type="week"
-          value={weeklyWeek}
-          disabled={periodLocked}
-          aria-label="选择周报周次"
-          onChange={(event) => {
-            // Native week inputs can emit empty/partial values while typing; keep prior complete value.
-            const next = event.target.value;
-            if (next) onWeeklyWeekChange(next);
-          }}
-        />
-      )}
-      {activePreview === "monthly" && (
-        <input
-          type="month"
-          value={monthlyMonth}
-          disabled={periodLocked}
-          aria-label="选择月报月份"
-          onChange={(event) => {
-            // Native month inputs can emit empty/partial values while typing; keep prior complete value.
-            const next = event.target.value;
-            if (next) onMonthlyMonthChange(next);
-          }}
-        />
-      )}
-      {activePreview === "custom" && (
-        <button
-          className="period-range-button"
-          type="button"
-          disabled={periodLocked}
-          onClick={onOpenCustomRange}
-        >
-          {rangeLabel}
-        </button>
-      )}
-      {activePreview !== "summary" && activePreview !== "custom" && (
-        <span className="period-range-label">{rangeLabel}</span>
-      )}
-    </div>
-  );
+/** Workbench period control — shadcn pilot (Popover + Calendar). */
+export function ReportPeriodControl(props: ReportPeriodProps) {
+  return <ReportPeriodPicker {...props} />;
 }
 
 type GenerationScopeProps = {

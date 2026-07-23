@@ -18,6 +18,7 @@ import {
   parseProjectNames,
 } from "../model";
 import { useModalDialog } from "../hooks/useOverlayFocus";
+import { DatePickerField } from "./date-picker";
 import { Field } from "./Primitives";
 
 type Props = {
@@ -230,18 +231,18 @@ export function BatchDialog({ open: isOpen, settings, indexedRepos, onNotify, on
           <>
             <div className="range-fields">
               <Field label="开始日期">
-                <input
+                <DatePickerField
                   data-dialog-initial-focus
-                  type="date"
+                  ariaLabel="开始日期"
                   value={rangeStart}
-                  onChange={(e) => setRangeStart(e.target.value)}
+                  onChange={setRangeStart}
                 />
               </Field>
               <Field label="结束日期">
-                <input
-                  type="date"
+                <DatePickerField
+                  ariaLabel="结束日期"
                   value={rangeEnd}
-                  onChange={(e) => setRangeEnd(e.target.value)}
+                  onChange={setRangeEnd}
                 />
               </Field>
             </div>

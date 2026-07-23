@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import type { PreviewMode, ReportHistoryEntry } from "../model";
+import { DatePickerField } from "./date-picker";
 import { PanelTitle } from "./PanelTitle";
 import { getHistoryKindLabel } from "./WorkbenchControls";
 
@@ -156,11 +157,13 @@ function HistoryFilterBar({
         <option value="monthly">月报</option>
         <option value="custom">自定义</option>
       </select>
-      <input
-        type="date"
+      <DatePickerField
+        size="sm"
+        allowClear
+        ariaLabel="筛选历史日期"
+        placeholder="全部日期"
         value={filters.dateFilter}
-        aria-label="筛选历史日期"
-        onChange={(event) => onDateFilterChange(event.target.value)}
+        onChange={onDateFilterChange}
       />
       <select
         value={filters.aiFilter}

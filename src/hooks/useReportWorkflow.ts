@@ -11,10 +11,12 @@ import {
   getMonthRangeOrFallback,
   getPreviousMonthInput,
   getSingleDayRange,
+  getSingleDayRangeOrFallback,
   getTodayRange,
   getWeekLabel,
   getWeekRange,
   getWeekRangeOrFallback,
+  isValidDateInput,
   isValidMonthInput,
   isValidWeekInput,
   isBlankDayHistoryEntry,
@@ -108,8 +110,8 @@ export function useReportWorkflow({
   const [projectCount, setProjectCount] = useState(0);
   const [blankDayDraftActive, setBlankDayDraftActive] = useState(false);
   const reportHistory = reportHistoryStorage.entries;
-  const dailyRange = useMemo(() => getSingleDayRange(dailyDate), [dailyDate]);
-  // Derived ranges must not throw when the period control is mid-edit (partial week/month strings).
+  // Derived ranges never throw on incomplete history labels; picker only commits complete values.
+  const dailyRange = useMemo(() => getSingleDayRangeOrFallback(dailyDate), [dailyDate]);
   const weeklyRange = useMemo(() => getWeekRangeOrFallback(weeklyWeek), [weeklyWeek]);
   const monthlyRange = useMemo(() => getMonthRangeOrFallback(monthlyMonth), [monthlyMonth]);
   const previewText = activePreview === "monthly" ? monthlyReport : activePreview === "weekly" ? weeklyReport : activePreview === "custom" ? customReport : summaryText;
@@ -118,7 +120,12 @@ export function useReportWorkflow({
   const supplementalItemsText = supplementalDrafts[currentSupplementalDraftKey] ?? "";
 
   function changePreview(preview: PreviewMode) { setActivePreview(preview); setActiveHistoryId(""); }
-  function changeDailyDate(date: string) { setDailyDate(date); setActiveHistoryId(""); setBlankDayDraftActive(false); }
+  function changeDailyDate(date: string) {
+    if (!isValidDateInput(date)) return;
+    setDailyDate(date);
+    setActiveHistoryId("");
+    setBlankDayDraftActive(false);
+  }
   function changeWeeklyWeek(week: string) {
     if (!isValidWeekInput(week)) return;
     setWeeklyWeek(week);
