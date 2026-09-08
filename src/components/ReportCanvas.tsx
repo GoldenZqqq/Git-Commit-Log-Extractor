@@ -170,7 +170,7 @@ export function ReportCanvas({ workbench: props }: Props) {
             <GenerationScopeStrip activePreview={props.activePreview} rangeLabel={activeRangeLabel} author={props.author} enabledRepoCount={enabledRepoCount} totalRepoCount={props.repos.length} extractAllBranches={props.extractAllBranches} redactionEnabled={props.redactionEnabled} onOpenSettings={props.onOpenSettings} />
             <SupplementalItemsEditor value={props.supplementalItemsText} disabled={isGenerating || isPolishing || reviewPending} onChange={props.onSupplementalItemsChange} />
           </div>
-          <div className={`preview-shell ${hasReport || props.polishReview ? "has-report" : "is-empty"}`}>
+          <div className={`preview-shell ${!isGenerating && (hasReport || props.polishReview) ? "has-report" : "is-empty"}`}>
             {!isGenerating && (hasReport || props.polishReview) && <div className="result-toolbar" aria-label="报告结果操作">
               <div className="result-summary"><strong>{reportKindLabel}{props.polishReview ? "审核中" : "已生成"}</strong><span>{props.commitCount} 个提交 · {props.projectCount} 个项目</span></div>
               <div className="canvas-actions-group">

@@ -28,6 +28,54 @@ const settings = createSettings({
   aiApiKey: "sk-test",
 });
 
+const loadingViewports = [
+  { width: 1180, height: 900 },
+  { width: 1280, height: 480 },
+  { width: 640, height: 450 },
+  { width: 320, height: 900 },
+];
+
+for (const themeMode of ["light", "dark"]) {
+  for (const viewport of loadingViewports) {
+    test(`centers first and repeated report loading in ${themeMode} at ${viewport.width}x${viewport.height}`, async ({ page }, testInfo) => {
+      await page.setViewportSize(viewport);
+      const result = { repos, summaryText: baseReport, commits: [createCommit("abc2203", "feat: loading layout")] };
+      await launchApp(page, {
+        settings: { ...settings, themeMode },
+        repoCache: createRepoCache(settings.rootDirs, repos),
+        deferredCommands: ["extract_commits"],
+        extractResults: [result, result],
+      });
+      await expectWorkbench(page);
+
+      for (const attempt of [1, 2]) {
+        await page.getByRole("button", { name: "生成日报" }).click();
+        await expect.poll(() => commandCalls(page, "extract_commits")).toBe(attempt);
+        await emitTauriEvent(page, "commit-extract-progress", {
+          completedRepos: 8, totalRepos: 25, commitCount: 3, done: false,
+        });
+        await expect(page.locator(".preview-loading")).toContainText("提取中 · 8/25 仓库 · 3 提交");
+        await expect(page.locator(".result-toolbar")).toHaveCount(0);
+        await expectLoadingCentered(page);
+        await page.screenshot({ path: testInfo.outputPath(`loading-${attempt}.png`), fullPage: true });
+
+        if (attempt === 2 && viewport.width > 1040) {
+          await page.getByRole("button", { name: "全屏查看预览" }).click();
+          await expectLoadingCentered(page);
+          await page.screenshot({ path: testInfo.outputPath("loading-fullscreen.png"), fullPage: true });
+          await page.keyboard.press("Escape");
+          await expectLoadingCentered(page);
+        }
+
+        await releaseCommand(page, "extract_commits");
+        await expect(page.locator(".preview-loading")).toHaveCount(0);
+        await expect(page.locator(".result-toolbar")).toBeVisible();
+        await expect(page.locator(".markdown-preview")).toContainText("保留当前报告上下文");
+      }
+    });
+  }
+}
+
 test("blocks the preview only while generating a report", async ({ page }) => {
   await launchTaskStateApp(page, {
     deferredCommands: ["extract_commits"],
@@ -209,6 +257,25 @@ async function launchTaskStateApp(page: Page, overrides: Partial<Parameters<type
 
 async function expectCommandPending(page: Page, command: string) {
   await expect.poll(async () => commandCalls(page, command)).toBe(1);
+}
+
+async function expectLoadingCentered(page: Page) {
+  const centerTolerance = 2;
+  const metrics = await page.locator(".preview-loading").evaluate((element) => {
+    const loading = element.getBoundingClientRect();
+    const shell = element.parentElement!.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    return {
+      horizontalDelta: Math.abs(loading.x + loading.width / 2 - shell.x - shell.width / 2),
+      verticalDelta: Math.abs(loading.y + loading.height / 2 - shell.y - shell.height / 2),
+      alignItems: style.alignItems,
+      justifyContent: style.justifyContent,
+    };
+  });
+  expect(metrics.horizontalDelta).toBeLessThan(centerTolerance);
+  expect(metrics.verticalDelta).toBeLessThan(centerTolerance);
+  expect(metrics.alignItems).toBe("center");
+  expect(metrics.justifyContent).toBe("center");
 }
 
 async function releaseCommand(page: Page, command: string) {
