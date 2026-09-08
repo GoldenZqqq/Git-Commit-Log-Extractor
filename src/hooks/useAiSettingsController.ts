@@ -93,6 +93,13 @@ export function useAiSettingsController({ open, settings, updateSetting }: Param
     updateSetting(key, value);
   }
 
+  function applyOrcaRouterPreset() {
+    resetAiModelFetch();
+    updateSetting("aiProvider", "openai-compatible");
+    updateSetting("aiBaseUrl", "https://api.orcarouter.ai/v1");
+    updateSetting("aiModel", "orcarouter/auto");
+  }
+
   function updateAiModel(model: string) {
     updateSetting("aiModel", model);
   }
@@ -301,6 +308,7 @@ export function useAiSettingsController({ open, settings, updateSetting }: Param
     modelOptionsRef,
     updateAiProvider,
     updateAiConnectionSetting,
+    applyOrcaRouterPreset,
     updateAiModel,
     selectAiModel,
     resetSystemPrompt,

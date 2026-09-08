@@ -114,6 +114,7 @@ npm run tauri build      # 产物位于 src-tauri/target/release/bundle/
 
 - **协议**：`OpenAI Compatible` 或 `Anthropic Native`
 - **Base URL**：例如 `https://api.openai.com/v1` 或 `https://api.anthropic.com/v1`
+- **可选预设**：协议选择 `OpenAI Compatible` 后可一键填入 OrcaRouter（Base URL `https://api.orcarouter.ai/v1`、模型 `orcarouter/auto`），再粘贴自己的 OrcaRouter API Key 即可
 - **API Key**：输入一次后自动保存到系统凭据库；也可填写 `OPENAI_API_KEY` / `env:OPENAI_API_KEY` 这类环境变量引用
 - **模型**：可手动填写，或点「获取模型」从服务返回列表中选择
 

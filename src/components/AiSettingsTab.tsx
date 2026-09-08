@@ -45,6 +45,7 @@ export function AiSettingsTab({ settings, updateSetting, controller }: Props) {
     modelOptionsRef,
     updateAiProvider,
     updateAiConnectionSetting,
+    applyOrcaRouterPreset,
     updateAiModel,
     selectAiModel,
     resetSystemPrompt,
@@ -146,6 +147,27 @@ export function AiSettingsTab({ settings, updateSetting, controller }: Props) {
         <span className="experimental-badge">实验</span>
         Codex OAuth 可能随协议变化失效，建议优先使用 OpenAI Compatible 或 Anthropic Native。
       </p>
+      {settings.aiProvider === "openai-compatible" && (
+        <div className="provider-preset">
+          <div className="provider-preset-head">
+            <span className="provider-preset-title"><Bot size={15} /> OrcaRouter（OpenAI 兼容可选服务商）</span>
+            <button type="button" className="provider-preset-apply" onClick={applyOrcaRouterPreset}>
+              填入 OrcaRouter 预设
+            </button>
+          </div>
+          <p>
+            一键填入官方 Base URL 与示例模型，保留你当前填写的 API Key；注册后到后台生成 OrcaRouter Key 并粘贴到上方即可。
+          </p>
+          <div className="provider-preset-links">
+            <a className="provider-preset-link" href="https://www.orcarouter.ai/ref/ref_42af1ff924f526df920d" target="_blank" rel="noreferrer">
+              <ExternalLink size={13} /> 注册 / 获取 API Key
+            </a>
+            <a className="provider-preset-link" href="https://www.orcarouter.ai/zh-CN/built-with" target="_blank" rel="noreferrer">
+              <ExternalLink size={13} /> 查看开源支持计划
+            </a>
+          </div>
+        </div>
+      )}
       {settings.aiProvider === "codex-oauth" ? (
         <>
           <CodexOAuthExperimentalNotice onSwitchProvider={updateAiProvider} />

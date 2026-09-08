@@ -529,6 +529,30 @@
   background: rgba(101, 65, 16, 0.22);
 }
 
+:root[data-theme="dark"] .provider-preset {
+  border-color: rgba(109, 168, 255, 0.24);
+  background: rgba(63, 140, 255, 0.1);
+}
+
+:root[data-theme="dark"] .provider-preset-title {
+  color: #d9eaff;
+}
+
+:root[data-theme="dark"] .provider-preset p {
+  color: #9fb4d0;
+}
+
+:root[data-theme="dark"] .provider-preset-apply {
+  border-color: rgba(109, 168, 255, 0.28);
+  color: var(--primary-dark);
+  background: rgba(63, 140, 255, 0.18);
+}
+
+:root[data-theme="dark"] .provider-preset-apply:hover:not(:disabled) {
+  border-color: rgba(109, 168, 255, 0.42);
+  background: rgba(63, 140, 255, 0.28);
+}
+
 :root[data-theme="dark"] .experimental-badge {
   color: #f4c978;
   background: rgba(245, 200, 106, 0.16);
