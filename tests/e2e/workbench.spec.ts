@@ -829,8 +829,8 @@ test("filters report history by type date status and search", async ({ page }) =
 
   await page.getByRole("button", { name: "重置" }).click();
   await page.getByLabel("筛选历史日期").click();
-  // History fixture weekly covers 2026-06-08..14; go to June and pick the 12th.
-  await page.locator(".gp-period-calendar .rdp-button_previous").click();
+  // History fixture weekly covers 2026-06-08..14; navigate to June regardless of today's month.
+  await navigateCalendarToMonth(page, "2026年6月");
   await page.locator(".gp-period-calendar .rdp-day_button").filter({ hasText: /^12$/ }).first().click();
   await expect(page.getByRole("button", { name: /周报 · 2026-W24/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /月报 · 2026-07/ })).toHaveCount(0);
@@ -857,6 +857,15 @@ function createCommit(hash: string, message: string, author = "Playwright Tester
 
 async function openAssistTab(page: Parameters<typeof expectWorkbench>[0], name: RegExp) {
   await page.getByRole("tab", { name }).click();
+}
+
+async function navigateCalendarToMonth(page: Parameters<typeof expectWorkbench>[0], monthLabel: string) {
+  const caption = page.locator(".gp-period-calendar .rdp-caption_label");
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    if ((await caption.innerText()).includes(monthLabel)) return;
+    await page.locator(".gp-period-calendar .rdp-button_previous").click();
+  }
+  throw new Error(`未能在日期选择器中定位 ${monthLabel}`);
 }
 
 function cssRgbBrightness(value: string) {
